@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Use service role to bypass RLS for initial setup
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(request: Request) {
   try {
+    // Create admin client INSIDE the handler to ensure env vars are available
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Missing env vars:", { 
+        hasUrl: !!supabaseUrl, 
+        hasKey: !!serviceRoleKey 
+      });
+      return NextResponse.json(
+        { error: "Server configuration error" }, 
+        { status: 500 }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
     const { user_id, email, full_name, org_name } = await request.json();
 
     if (!user_id || !email || !full_name) {
@@ -33,8 +49,11 @@ export async function POST(request: Request) {
       .single();
 
     if (orgError) {
-      console.error("Org creation error:", orgError);
-      return NextResponse.json({ error: "Failed to create organization" }, { status: 500 });
+      console.error("Org creation error:", JSON.stringify(orgError));
+      return NextResponse.json(
+        { error: "Failed to create organization", detail: orgError.message }, 
+        { status: 500 }
+      );
     }
 
     // Create user record linked to org
@@ -50,15 +69,21 @@ export async function POST(request: Request) {
       });
 
     if (userError) {
-      console.error("User creation error:", userError);
+      console.error("User creation error:", JSON.stringify(userError));
       // Rollback org
       await supabaseAdmin.from("organizations").delete().eq("id", org.id);
-      return NextResponse.json({ error: "Failed to create user profile" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to create user profile", detail: userError.message }, 
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ org_id: org.id, success: true });
-  } catch (err) {
-    console.error("Setup error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (err: any) {
+    console.error("Setup error:", err?.message || err);
+    return NextResponse.json(
+      { error: "Internal server error", detail: err?.message }, 
+      { status: 500 }
+    );
   }
 }

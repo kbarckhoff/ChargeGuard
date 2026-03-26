@@ -57,7 +57,7 @@ export default function SignupPage() {
 
     if (!res.ok) {
       const body = await res.json();
-      setError(body.error || "Failed to set up organization");
+      setError(`${body.error}${body.detail ? ': ' + body.detail : ''}`);
       setLoading(false);
       return;
     }

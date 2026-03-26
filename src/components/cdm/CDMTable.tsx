@@ -6,6 +6,7 @@ import { importChargeItems } from "@/app/actions";
 import { CDMColorDot, CDM_COLORS, Badge, EmptyState } from "@/components/ui/shared";
 import { Search, Upload, Download, X, Check, CheckCircle2, FileSpreadsheet, ChevronLeft, Loader2 } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { CDM_TARGET_COLUMNS } from "@/types";
 
 export function CDMTable({
@@ -207,34 +208,71 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
+  const processData = (h: string[], data: Record<string, string>[]) => {
+    setHeaders(h);
+    setAllRows(data);
+    setRows(data.slice(0, 5));
+
+    // Auto-map
+    const autoMap: Record<string, string> = {};
+    CDM_TARGET_COLUMNS.forEach((tc) => {
+      const match = h.find((hh) => {
+        const hl = hh.toLowerCase().trim();
+        const tl = tc.label.toLowerCase();
+        const tk = tc.key.toLowerCase().replace(/_/g, " ");
+        return hl === tl || hl === tk || hl.includes(tk) || tl.includes(hl);
+      });
+      if (match) autoMap[tc.key] = match;
+    });
+    setMappings(autoMap);
+    setStep(2);
+  };
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const h = results.meta.fields || [];
-        setHeaders(h);
-        setAllRows(results.data as Record<string, string>[]);
-        setRows((results.data as Record<string, string>[]).slice(0, 5));
+    const ext = file.name.split(".").pop()?.toLowerCase();
 
-        // Auto-map
-        const autoMap: Record<string, string> = {};
-        CDM_TARGET_COLUMNS.forEach((tc) => {
-          const match = h.find((hh) => {
-            const hl = hh.toLowerCase().trim();
-            const tl = tc.label.toLowerCase();
-            const tk = tc.key.toLowerCase().replace(/_/g, " ");
-            return hl === tl || hl === tk || hl.includes(tk) || tl.includes(hl);
+    if (ext === "csv") {
+      // Parse CSV with PapaParse
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const h = results.meta.fields || [];
+          processData(h, results.data as Record<string, string>[]);
+        },
+      });
+    } else if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
+      // Parse Excel with SheetJS
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = evt.target?.result;
+          const workbook = XLSX.read(data, { type: "array" });
+          // Use the first sheet
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          // Convert to array of objects
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
+            raw: false,
+            defval: "",
           });
-          if (match) autoMap[tc.key] = match;
-        });
-        setMappings(autoMap);
-        setStep(2);
-      },
-    });
+          if (jsonData.length === 0) {
+            alert("No data found in the spreadsheet.");
+            return;
+          }
+          const h = Object.keys(jsonData[0]);
+          processData(h, jsonData);
+        } catch (err: any) {
+          alert("Failed to parse Excel file: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert("Unsupported file type. Please upload a .csv, .xlsx, or .xls file.");
+    }
   };
 
   const requiredMet = CDM_TARGET_COLUMNS.filter((c) => c.required).every((c) => mappings[c.key]);
@@ -272,8 +310,8 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
                 <Upload size={28} className="text-[#5a5a55]" />
               </div>
               <p className="text-[#3d3d3a] font-medium mb-1">Upload your hospital&apos;s CDM export</p>
-              <p className="text-sm text-[#9a9a95] mb-4">Supports .csv files</p>
-              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+              <p className="text-sm text-[#9a9a95] mb-4">Supports .xlsx, .xls, and .csv files</p>
+              <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.xlsm" className="hidden" onChange={handleFile} />
               <button onClick={() => fileRef.current?.click()}
                 className="px-5 py-2.5 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a]">
                 Choose File
