@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { importChargeItems } from "@/app/actions";
 import { CDMColorDot, CDM_COLORS, Badge, EmptyState } from "@/components/ui/shared";
 import { Search, Upload, Download, X, Check, CheckCircle2, FileSpreadsheet, ChevronLeft, Loader2 } from "lucide-react";
 import Papa from "papaparse";
@@ -195,7 +194,7 @@ export function CDMTable({
   );
 }
 
-// ─── CSV Import Modal ────────────────────────────────────────
+// ─── CDM Import Modal ────────────────────────────────────────
 
 function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => void }) {
   const [step, setStep] = useState(1);
@@ -203,17 +202,30 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [allRows, setAllRows] = useState<Record<string, string>[]>([]);
   const [mappings, setMappings] = useState<Record<string, string>>({});
-  const [importing, startImport] = useTransition();
-  const [result, setResult] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ inserted: number; errors?: string[] } | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [savedConfigs, setSavedConfigs] = useState<{ id: string; name: string; column_mappings: Record<string, string> }[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Load saved mappings on mount
+  useEffect(() => {
+    setLoadingConfigs(true);
+    fetch("/api/import-configs")
+      .then((r) => r.json())
+      .then((data) => setSavedConfigs(data.configs || []))
+      .catch(() => {})
+      .finally(() => setLoadingConfigs(false));
+  }, []);
 
   const processData = (h: string[], data: Record<string, string>[]) => {
     setHeaders(h);
     setAllRows(data);
     setRows(data.slice(0, 5));
 
-    // Auto-map
+    // Auto-map by fuzzy matching
     const autoMap: Record<string, string> = {};
     CDM_TARGET_COLUMNS.forEach((tc) => {
       const match = h.find((hh) => {
@@ -228,6 +240,17 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
     setStep(2);
   };
 
+  const applySavedMapping = (config: { column_mappings: Record<string, string> }) => {
+    // Apply saved mapping — only set if the source column exists in current headers
+    const applied: Record<string, string> = {};
+    Object.entries(config.column_mappings).forEach(([targetCol, sourceCol]) => {
+      if (sourceCol && headers.includes(sourceCol)) {
+        applied[targetCol] = sourceCol;
+      }
+    });
+    setMappings(applied);
+  };
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -235,7 +258,6 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "csv") {
-      // Parse CSV with PapaParse
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -245,16 +267,13 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
         },
       });
     } else if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
-      // Parse Excel with SheetJS
       const reader = new FileReader();
       reader.onload = (evt) => {
         try {
           const data = evt.target?.result;
           const workbook = XLSX.read(data, { type: "array" });
-          // Use the first sheet
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          // Convert to array of objects
           const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
             raw: false,
             defval: "",
@@ -277,17 +296,35 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
 
   const requiredMet = CDM_TARGET_COLUMNS.filter((c) => c.required).every((c) => mappings[c.key]);
 
-  const handleImport = () => {
-    startImport(async () => {
-      try {
-        const count = await importChargeItems(auditId, allRows, mappings);
-        setResult(count);
-        setStep(4);
-        router.refresh();
-      } catch (err: any) {
-        alert("Import failed: " + err.message);
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          auditId,
+          items: allRows,
+          columnMappings: mappings,
+          saveMappingAs: saveName || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Import failed: ${data.error}${data.detail ? " — " + data.detail : ""}`);
+        setImporting(false);
+        return;
       }
-    });
+
+      setResult({ inserted: data.inserted, errors: data.errors });
+      setStep(4);
+      router.refresh();
+    } catch (err: any) {
+      alert("Import failed: " + err.message);
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -297,7 +334,7 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
           <div>
             <h2 className="text-lg font-semibold text-[#1a1a18]">Import Charge Master</h2>
             <p className="text-sm text-[#7a7a75]">
-              {step === 1 ? "Upload CSV" : step === 2 ? "Map columns" : step === 3 ? "Review & confirm" : "Import complete"}
+              {step === 1 ? "Upload file" : step === 2 ? "Map columns" : step === 3 ? "Review & confirm" : "Import complete"}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg"><X size={18} /></button>
@@ -320,10 +357,32 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
           )}
 
           {step === 2 && (
-            <div className="space-y-2">
-              <p className="text-sm text-[#7a7a75] mb-3">
-                {headers.length} columns detected • {allRows.length.toLocaleString()} rows
-              </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#7a7a75]">
+                  {headers.length} columns detected • {allRows.length.toLocaleString()} rows
+                </p>
+                {/* Saved Mappings Dropdown */}
+                {savedConfigs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#9a9a95]">Load saved:</span>
+                    <select
+                      onChange={(e) => {
+                        const config = savedConfigs.find((c) => c.id === e.target.value);
+                        if (config) applySavedMapping(config);
+                      }}
+                      className="text-sm border border-[#e5e5e0] rounded-lg px-2 py-1 bg-white focus:outline-none"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select mapping…</option>
+                      {savedConfigs.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
               {CDM_TARGET_COLUMNS.map((tc) => (
                 <div key={tc.key} className="flex items-center gap-3 py-2 px-3 rounded-lg border border-[#e5e5e0] bg-[#fafaf8]">
                   <div className="w-44 flex items-center gap-2">
@@ -361,6 +420,19 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
                   {allRows.length.toLocaleString()} rows
                 </p>
               </div>
+
+              {/* Save Mapping Option */}
+              <div className="flex items-center gap-3 p-3 border border-[#e5e5e0] rounded-xl bg-[#fafaf8]">
+                <span className="text-sm text-[#5a5a55] whitespace-nowrap">Save this mapping as:</span>
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="e.g. Hoag CDM Format"
+                  className="flex-1 text-sm border border-[#e5e5e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+                />
+              </div>
+
               <div className="overflow-x-auto border border-[#e5e5e0] rounded-xl">
                 <table className="w-full text-sm">
                   <thead>
@@ -390,7 +462,12 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
                 <Check size={28} className="text-emerald-600" />
               </div>
               <p className="text-lg font-semibold text-[#1a1a18] mb-1">Import Complete</p>
-              <p className="text-sm text-[#7a7a75]">{result?.toLocaleString()} charge items imported successfully.</p>
+              <p className="text-sm text-[#7a7a75]">{result?.inserted.toLocaleString()} charge items imported successfully.</p>
+              {result?.errors && result.errors.length > 0 && (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 max-w-md">
+                  {result.errors.length} batch(es) had errors — {result.inserted.toLocaleString()} of {allRows.length.toLocaleString()} rows imported.
+                </div>
+              )}
             </div>
           )}
         </div>
