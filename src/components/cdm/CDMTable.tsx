@@ -295,35 +295,59 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
   };
 
   const requiredMet = CDM_TARGET_COLUMNS.filter((c) => c.required).every((c) => mappings[c.key]);
+  const [importProgress, setImportProgress] = useState("");
 
   const handleImport = async () => {
     setImporting(true);
+    setImportProgress("Starting import…");
     try {
-      const res = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          auditId,
-          items: allRows,
-          columnMappings: mappings,
-          saveMappingAs: saveName || undefined,
-        }),
-      });
+      const CHUNK_SIZE = 5000; // Stay well under Vercel's 4.5MB body limit
+      let totalInserted = 0;
+      const allErrors: string[] = [];
+      const totalChunks = Math.ceil(allRows.length / CHUNK_SIZE);
 
-      const data = await res.json();
-      if (!res.ok) {
-        alert(`Import failed: ${data.error}${data.detail ? " — " + data.detail : ""}`);
-        setImporting(false);
-        return;
+      for (let i = 0; i < allRows.length; i += CHUNK_SIZE) {
+        const chunk = allRows.slice(i, i + CHUNK_SIZE);
+        const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
+        setImportProgress(`Uploading batch ${chunkNum} of ${totalChunks} (${Math.min(i + CHUNK_SIZE, allRows.length).toLocaleString()} / ${allRows.length.toLocaleString()} rows)…`);
+
+        const res = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            auditId,
+            items: chunk,
+            columnMappings: mappings,
+            // Only save mapping on the first chunk
+            saveMappingAs: i === 0 ? (saveName || undefined) : undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          let errMsg = "Unknown error";
+          try {
+            const data = await res.json();
+            errMsg = `${data.error}${data.detail ? " — " + data.detail : ""}`;
+          } catch {
+            errMsg = `HTTP ${res.status}: ${res.statusText}`;
+          }
+          allErrors.push(`Batch ${chunkNum}: ${errMsg}`);
+          continue; // Continue with remaining batches
+        }
+
+        const data = await res.json();
+        totalInserted += data.inserted || 0;
+        if (data.errors) allErrors.push(...data.errors);
       }
 
-      setResult({ inserted: data.inserted, errors: data.errors });
+      setResult({ inserted: totalInserted, errors: allErrors.length > 0 ? allErrors : undefined });
       setStep(4);
       router.refresh();
     } catch (err: any) {
       alert("Import failed: " + err.message);
     } finally {
       setImporting(false);
+      setImportProgress("");
     }
   };
 
@@ -495,8 +519,17 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
                 {step === 3 && (
                   <button onClick={handleImport} disabled={importing}
                     className="px-5 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
-                    {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                    Import {allRows.length.toLocaleString()} Items
+                    {importing ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span className="max-w-[200px] truncate">{importProgress || "Importing…"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} />
+                        Import {allRows.length.toLocaleString()} Items
+                      </>
+                    )}
                   </button>
                 )}
               </>
