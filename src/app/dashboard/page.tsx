@@ -3,6 +3,7 @@ import { Layers, AlertTriangle, FileText, CheckCircle2, Plus } from "lucide-reac
 import { KPICard, Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState } from "@/components/ui/shared";
 import Link from "next/link";
 import { NewAuditDialog } from "@/components/audit/NewAuditDialog";
+import { ScanButton } from "@/components/audit/ScanButton";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -115,16 +116,19 @@ export default async function DashboardPage() {
         ) : (
           /* ─── Dashboard with data ─── */
           <div className="max-w-7xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-[#1a1a18]">
-                {currentAudit.hospital_name} — {currentAudit.name}
-              </h2>
-              <p className="text-sm text-[#7a7a75] mt-0.5">
-                Comprehensive Charge Master Review • Started{" "}
-                {currentAudit.start_date
-                  ? new Date(currentAudit.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "Not set"}
-              </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-[#1a1a18]">
+                  {currentAudit.hospital_name} — {currentAudit.name}
+                </h2>
+                <p className="text-sm text-[#7a7a75] mt-0.5">
+                  Comprehensive Charge Master Review • Started{" "}
+                  {currentAudit.start_date
+                    ? new Date(currentAudit.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    : "Not set"}
+                </p>
+              </div>
+              <ScanButton auditId={currentAudit.id} />
             </div>
 
             {/* KPIs */}
