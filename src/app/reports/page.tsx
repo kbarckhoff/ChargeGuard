@@ -1,86 +1,104 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge, EmptyState } from "@/components/ui/shared";
-import { PieChart, FileText, Download, Plus } from "lucide-react";
+import { createClient as createAdminClientLib } from "@supabase/supabase-js";
+import { Badge, EmptyState, SEVERITY_CONFIG } from "@/components/ui/shared";
+import { PieChart, AlertTriangle } from "lucide-react";
+import { ExportForm } from "@/components/reports/ExportForm";
 
 export default async function ReportsPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: audits } = await supabase.from("audits").select("id").order("created_at", { ascending: false }).limit(1);
-  const auditId = audits?.[0]?.id;
+  const supabaseAdmin = createAdminClientLib(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
-  const { data: reports } = auditId
-    ? await supabase.from("reports").select("*").eq("audit_id", auditId).order("created_at", { ascending: false })
-    : { data: [] };
+  const { data: userData } = await supabaseAdmin
+    .from("users")
+    .select("org_id")
+    .eq("id", user!.id)
+    .single();
+
+  const { data: audits } = await supabaseAdmin
+    .from("audits")
+    .select("id, hospital_name, name")
+    .eq("org_id", userData!.org_id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const audit = audits?.[0];
+
+  if (!audit) {
+    return (
+      <>
+        <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
+          <h1 className="text-base font-semibold text-[#1a1a18]">Reports</h1>
+        </header>
+        <div className="flex-1 overflow-y-auto p-6">
+          <EmptyState icon={PieChart} title="No audit yet" description="Create an audit and run a scan to generate reports." />
+        </div>
+      </>
+    );
+  }
+
+  // Get finding stats for the summary
+  const { data: findings } = await supabaseAdmin
+    .from("findings")
+    .select("severity, status, category, financial_impact")
+    .eq("audit_id", audit.id);
+
+  const total = findings?.length || 0;
+  const open = findings?.filter((f) => f.status === "open").length || 0;
+  const accepted = findings?.filter((f) => f.status === "accepted").length || 0;
+  const resolved = findings?.filter((f) => f.status === "resolved").length || 0;
+  const rejected = findings?.filter((f) => f.status === "rejected").length || 0;
+  const totalImpact = findings?.reduce((s, f) => s + (f.financial_impact || 0), 0) || 0;
+  const categories = [...new Set(findings?.map((f) => f.category).filter(Boolean) || [])].sort();
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#1a1a18]">Reports — Phase VII</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a]">
-          <Plus size={15} /> New Report
-        </button>
+      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
+        <h1 className="text-base font-semibold text-[#1a1a18]">Reports</h1>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* Report Builder */}
-          <div className="bg-white rounded-xl border border-[#e5e5e0] p-6">
-            <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Report Builder</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="text-xs font-medium text-[#7a7a75] block mb-1">Format</label>
-                <select className="w-full text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
-                  <option>PDF</option><option>Excel</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#7a7a75] block mb-1">View</label>
-                <select className="w-full text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
-                  <option>Summary</option><option>Detail</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-[#7a7a75] block mb-1">Sort By</label>
-                <select className="w-full text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
-                  <option>HCPCS/CPT Code</option><option>Procedure Code</option><option>Gross Revenue</option><option>Description</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              {["Phase I Findings", "Compliance Issues", "Pricing Below Benchmark", "Missing Charges", "Modifier Errors", "Claim Corrections", "Department Actions", "All Findings"].map((f, i) => (
-                <label key={i} className="flex items-center gap-2 text-sm text-[#5a5a55] cursor-pointer">
-                  <input type="checkbox" defaultChecked={i < 3} className="rounded border-[#d5d5d0]" /> {f}
-                </label>
-              ))}
-            </div>
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a]">
-              <Download size={15} /> Generate Report
-            </button>
-          </div>
-
-          {/* Generated Reports */}
+        <div className="max-w-3xl mx-auto space-y-6">
+          {/* Summary */}
           <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-            <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Generated Reports</h3>
-            {(!reports || reports.length === 0) ? (
-              <p className="text-sm text-[#9a9a95] py-8 text-center">No reports generated yet. Use the builder above to create your first report.</p>
-            ) : (
-              <div className="space-y-2">
-                {reports.map((r: any) => (
-                  <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#e5e5e0] hover:bg-[#fafaf8]">
-                    <div className="w-9 h-9 rounded-lg bg-[#f5f5f0] flex items-center justify-center">
-                      <FileText size={16} className="text-[#5a5a55]" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-[#3d3d3a]">{r.title}</div>
-                      <div className="text-xs text-[#9a9a95]">
-                        {new Date(r.created_at).toLocaleDateString()} • {r.report_format.toUpperCase()} • {r.report_view}
-                      </div>
-                    </div>
-                    <button className="p-2 hover:bg-[#f0f0ec] rounded-lg"><Download size={15} className="text-[#7a7a75]" /></button>
-                  </div>
-                ))}
+            <h3 className="text-sm font-semibold text-[#3d3d3a] mb-1">{audit.hospital_name}</h3>
+            <p className="text-sm text-[#7a7a75] mb-4">{audit.name}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="p-3 bg-[#f5f5f0] rounded-xl text-center">
+                <div className="text-lg font-semibold text-[#1a1a18]">{total}</div>
+                <div className="text-xs text-[#7a7a75]">Total</div>
+              </div>
+              <div className="p-3 bg-amber-50 rounded-xl text-center">
+                <div className="text-lg font-semibold text-amber-700">{open}</div>
+                <div className="text-xs text-amber-600">Open</div>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-xl text-center">
+                <div className="text-lg font-semibold text-emerald-700">{accepted}</div>
+                <div className="text-xs text-emerald-600">Accepted</div>
+              </div>
+              <div className="p-3 bg-red-50 rounded-xl text-center">
+                <div className="text-lg font-semibold text-red-700">{rejected}</div>
+                <div className="text-xs text-red-600">Rejected</div>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-xl text-center">
+                <div className="text-lg font-semibold text-purple-700">{resolved}</div>
+                <div className="text-xs text-purple-600">Resolved</div>
+              </div>
+            </div>
+            {totalImpact > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                <span className="text-sm text-amber-800">Total Estimated Financial Impact</span>
+                <span className="text-lg font-semibold text-amber-900">${(totalImpact / 1000).toFixed(1)}K</span>
               </div>
             )}
           </div>
+
+          {/* Export Form */}
+          <ExportForm auditId={audit.id} categories={categories} totalFindings={total} />
         </div>
       </div>
     </>

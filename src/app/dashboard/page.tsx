@@ -1,224 +1,210 @@
 import { createClient } from "@/lib/supabase/server";
-import { Layers, AlertTriangle, FileText, CheckCircle2, Plus } from "lucide-react";
+import { createClient as createAdminClientLib } from "@supabase/supabase-js";
+import { Layers, AlertTriangle, CheckCircle2, Zap, FileSpreadsheet, Upload } from "lucide-react";
 import { KPICard, Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState } from "@/components/ui/shared";
 import Link from "next/link";
-import { NewAuditDialog } from "@/components/audit/NewAuditDialog";
 import { ScanButton } from "@/components/audit/ScanButton";
+import { CreateAuditForm } from "@/components/audit/CreateAuditForm";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Get user's profile
-  const { data: profile } = await supabase
+  const supabaseAdmin = createAdminClientLib(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  // Get user profile
+  const { data: profile } = await supabaseAdmin
     .from("users")
     .select("*, organizations(*)")
     .eq("id", user!.id)
     .single();
 
-  // Get audits
-  const { data: audits } = await supabase
+  // Get most recent audit
+  const { data: audits } = await supabaseAdmin
     .from("audits")
     .select("*")
-    .order("created_at", { ascending: false });
+    .eq("org_id", profile?.org_id)
+    .order("created_at", { ascending: false })
+    .limit(1);
 
-  const currentAudit = audits?.[0];
+  const audit = audits?.[0];
 
-  // If audit exists, get stats
+  // Get stats if audit exists
   let stats = null;
-  let phases = null;
-  let recentFindings = null;
+  if (audit) {
+    const [findingsRes, chargeCount] = await Promise.all([
+      supabaseAdmin.from("findings").select("severity, status, financial_impact").eq("audit_id", audit.id),
+      supabaseAdmin.from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", audit.id),
+    ]);
 
-  if (currentAudit) {
-    // Get phases
-    const { data: phaseData } = await supabase
-      .from("audit_phases")
-      .select("*")
-      .eq("audit_id", currentAudit.id)
-      .order("phase_number");
-    phases = phaseData;
-
-    // Get task counts per phase
-    const { data: tasks } = await supabase
-      .from("audit_tasks")
-      .select("phase_id, status")
-      .eq("audit_id", currentAudit.id);
-
-    // Get findings
-    const { data: findings } = await supabase
-      .from("findings")
-      .select("*")
-      .eq("audit_id", currentAudit.id)
-      .order("created_at", { ascending: false })
-      .limit(6);
-    recentFindings = findings;
-
-    // Get claims
-    const { data: claims } = await supabase
-      .from("claim_reviews")
-      .select("id, is_reviewed")
-      .eq("audit_id", currentAudit.id);
-
-    const allFindings = (await supabase.from("findings").select("severity, status, financial_impact").eq("audit_id", currentAudit.id)).data || [];
-
+    const findings = findingsRes.data || [];
     stats = {
-      totalChargeItems: currentAudit.total_charge_items || 0,
-      totalFindings: allFindings.length,
-      openFindings: allFindings.filter((f: any) => f.status === "open").length,
-      totalImpact: allFindings.reduce((s: number, f: any) => s + (f.financial_impact || 0), 0),
-      totalTasks: tasks?.length || 0,
-      completedTasks: tasks?.filter((t: any) => t.status === "completed").length || 0,
-      totalClaims: claims?.length || 0,
-      reviewedClaims: claims?.filter((c: any) => c.is_reviewed).length || 0,
+      chargeItems: chargeCount.count || 0,
+      totalFindings: findings.length,
+      openFindings: findings.filter((f) => f.status === "open").length,
+      acceptedFindings: findings.filter((f) => f.status === "accepted").length,
+      resolvedFindings: findings.filter((f) => f.status === "resolved").length,
+      rejectedFindings: findings.filter((f) => f.status === "rejected").length,
+      totalImpact: findings.reduce((s, f) => s + (f.financial_impact || 0), 0),
       severityCounts: {
-        critical: allFindings.filter((f: any) => f.severity === "critical").length,
-        high: allFindings.filter((f: any) => f.severity === "high").length,
-        medium: allFindings.filter((f: any) => f.severity === "medium").length,
-        low: allFindings.filter((f: any) => f.severity === "low").length,
-        info: allFindings.filter((f: any) => f.severity === "info").length,
+        critical: findings.filter((f) => f.severity === "critical").length,
+        high: findings.filter((f) => f.severity === "high").length,
+        medium: findings.filter((f) => f.severity === "medium").length,
+        low: findings.filter((f) => f.severity === "low").length,
       },
-      tasksByPhase: (phases || []).map((p: any) => {
-        const phaseTasks = tasks?.filter((t: any) => t.phase_id === p.id) || [];
-        return {
-          phaseId: p.id,
-          phaseNumber: p.phase_number,
-          total: phaseTasks.length,
-          completed: phaseTasks.filter((t: any) => t.status === "completed").length,
-        };
-      }),
     };
   }
 
   return (
     <>
-      {/* Header */}
       <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center justify-between flex-shrink-0">
         <h1 className="text-base font-semibold text-[#1a1a18]">Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <NewAuditDialog />
-          <div className="w-8 h-8 rounded-full bg-[#1a1a18] flex items-center justify-center text-white text-xs font-medium">
-            {profile?.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "U"}
-          </div>
+        <div className="w-8 h-8 rounded-full bg-[#1a1a18] flex items-center justify-center text-white text-xs font-medium">
+          {profile?.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "U"}
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
-        {!currentAudit ? (
-          /* ─── Empty State ─── */
-          <div className="max-w-7xl mx-auto">
+        {!audit ? (
+          <div className="max-w-xl mx-auto">
             <EmptyState
               icon={Layers}
               title="Welcome to ChargeGuard"
-              description="Create your first CDM audit to get started. The system will automatically set up all 7 phases with 62 pre-configured tasks from the PARA audit process."
-              action={<NewAuditDialog />}
+              description="Create your first audit engagement to get started. Upload a hospital's charge master and the scanner will identify coding errors, compliance issues, and revenue opportunities."
+              action={<CreateAuditForm />}
             />
           </div>
         ) : (
-          /* ─── Dashboard with data ─── */
           <div className="max-w-7xl mx-auto space-y-6">
+            {/* Header */}
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-[#1a1a18]">
-                  {currentAudit.hospital_name} — {currentAudit.name}
-                </h2>
-                <p className="text-sm text-[#7a7a75] mt-0.5">
-                  Comprehensive Charge Master Review • Started{" "}
-                  {currentAudit.start_date
-                    ? new Date(currentAudit.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                    : "Not set"}
-                </p>
+                <h2 className="text-xl font-semibold text-[#1a1a18]">{audit.hospital_name}</h2>
+                <p className="text-sm text-[#7a7a75] mt-0.5">{audit.name}</p>
               </div>
-              <ScanButton auditId={currentAudit.id} />
+              <ScanButton auditId={audit.id} />
             </div>
+
+            {/* Workflow Steps */}
+            {stats && stats.chargeItems === 0 && (
+              <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <Upload size={20} className="text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Next step: Upload the charge master</p>
+                    <p className="text-sm text-blue-700 mt-0.5">
+                      Go to{" "}
+                      <Link href="/charge-master" className="underline font-medium">Charge Master</Link>
+                      {" "}and import the hospital&apos;s CDM file (Excel or CSV).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {stats && stats.chargeItems > 0 && stats.totalFindings === 0 && (
+              <div className="p-5 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <Zap size={20} className="text-amber-600" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">Next step: Run the CDM scan</p>
+                    <p className="text-sm text-amber-700 mt-0.5">
+                      {stats.chargeItems.toLocaleString()} charge items loaded. Click <strong>Run CDM Scan</strong> above to check them against 14 audit rules.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPICard
-                icon={Layers}
-                label="Charge Items"
-                value={stats!.totalChargeItems.toLocaleString()}
-                subtext={stats!.totalChargeItems === 0 ? "Import CDM to begin" : "Loaded from CDM export"}
-              />
-              <KPICard
-                icon={AlertTriangle}
-                label="Open Findings"
-                value={stats!.openFindings.toString()}
-                subtext={stats!.totalImpact > 0 ? `$${(stats!.totalImpact / 1000).toFixed(1)}K estimated impact` : "No findings yet"}
-              />
-              <KPICard
-                icon={FileText}
-                label="Claims Reviewed"
-                value={`${stats!.reviewedClaims} / ${currentAudit.total_claims_target}`}
-                subtext={`${stats!.totalClaims} claims entered`}
-              />
-              <KPICard
-                icon={CheckCircle2}
-                label="Tasks Completed"
-                value={`${stats!.completedTasks} / ${stats!.totalTasks}`}
-                subtext="Across all 7 phases"
-              />
-            </div>
-
-            {/* Phase Progress */}
-            <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-              <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Audit Phase Progress</h3>
-              <div className="grid grid-cols-7 gap-2">
-                {(phases || []).map((phase: any) => {
-                  const phaseStats = stats!.tasksByPhase.find((t: any) => t.phaseId === phase.id);
-                  const pct = phaseStats && phaseStats.total > 0
-                    ? Math.round((phaseStats.completed / phaseStats.total) * 100)
-                    : 0;
-                  return (
-                    <Link
-                      key={phase.id}
-                      href={`/audits/${currentAudit.id}?phase=${phase.phase_number}`}
-                      className="flex flex-col items-center p-3 rounded-xl hover:bg-[#f5f5f0] transition-colors text-center"
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm mb-1.5 ${
-                          pct === 100
-                            ? "bg-emerald-100 text-emerald-700"
-                            : pct > 0
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-[#f0f0ec] text-[#7a7a75]"
-                        }`}
-                      >
-                        {phase.phase_number}
-                      </div>
-                      <span className="text-[11px] font-medium text-[#3d3d3a] leading-tight">
-                        {phase.name.length > 12 ? phase.name.slice(0, 12) + "…" : phase.name}
-                      </span>
-                      <span className="text-[10px] text-[#9a9a95] mt-0.5">{pct}%</span>
-                    </Link>
-                  );
-                })}
+            {stats && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <KPICard
+                  icon={FileSpreadsheet}
+                  label="Charge Items"
+                  value={stats.chargeItems.toLocaleString()}
+                />
+                <KPICard
+                  icon={AlertTriangle}
+                  label="Open Issues"
+                  value={stats.openFindings.toString()}
+                  subtext={stats.totalImpact > 0 ? `$${(stats.totalImpact / 1000).toFixed(1)}K est. impact` : undefined}
+                />
+                <KPICard
+                  icon={CheckCircle2}
+                  label="Accepted"
+                  value={stats.acceptedFindings.toString()}
+                  subtext={`${stats.resolvedFindings} resolved`}
+                />
+                <KPICard
+                  icon={Zap}
+                  label="Total Findings"
+                  value={stats.totalFindings.toString()}
+                  subtext={`${stats.rejectedFindings} rejected`}
+                />
               </div>
-            </div>
+            )}
 
-            {/* Recent Findings */}
-            {recentFindings && recentFindings.length > 0 && (
-              <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-[#3d3d3a]">Recent Findings</h3>
-                  <Link href={`/audits/${currentAudit.id}`} className="text-xs text-[#7a7a75] hover:text-[#3d3d3a]">
-                    View all →
-                  </Link>
+            {/* Severity Breakdown */}
+            {stats && stats.totalFindings > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
+                  <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Issues by Severity</h3>
+                  <div className="space-y-3">
+                    {Object.entries(SEVERITY_CONFIG).filter(([k]) => k !== "info").map(([key, cfg]) => {
+                      const count = stats!.severityCounts[key as keyof typeof stats.severityCounts] || 0;
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
+                          <span className="text-sm text-[#5a5a55] w-16">{cfg.label}</span>
+                          <div className="flex-1"><ProgressBar value={count} max={Math.max(stats!.totalFindings, 1)} color={cfg.color} height={6} /></div>
+                          <span className="text-sm font-semibold text-[#1a1a18] w-10 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {recentFindings.map((f: any) => (
-                    <div key={f.id} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-[#fafaf8] transition-colors">
-                      <SeverityDot severity={f.severity} />
-                      <span className="text-sm text-[#3d3d3a] flex-1 truncate">{f.title}</span>
-                      <Badge variant={f.severity === "critical" ? "danger" : f.severity === "high" ? "warning" : "default"}>
-                        {f.severity}
-                      </Badge>
-                      {f.financial_impact && (
-                        <span className="text-xs text-[#9a9a95]">
-                          ${(f.financial_impact / 1000).toFixed(1)}K
+
+                <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
+                  <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Review Progress</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-[#7a7a75]">Reviewed</span>
+                        <span className="text-sm font-medium text-[#1a1a18]">
+                          {stats.acceptedFindings + stats.rejectedFindings + stats.resolvedFindings} / {stats.totalFindings}
                         </span>
-                      )}
+                      </div>
+                      <ProgressBar
+                        value={stats.acceptedFindings + stats.rejectedFindings + stats.resolvedFindings}
+                        max={Math.max(stats.totalFindings, 1)}
+                        color="#1a1a18"
+                        height={8}
+                        showLabel
+                      />
                     </div>
-                  ))}
+                    <div className="grid grid-cols-3 gap-3 pt-2">
+                      <div className="text-center p-3 bg-emerald-50 rounded-xl">
+                        <div className="text-lg font-semibold text-emerald-700">{stats.acceptedFindings}</div>
+                        <div className="text-xs text-emerald-600">Accepted</div>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 rounded-xl">
+                        <div className="text-lg font-semibold text-red-700">{stats.rejectedFindings}</div>
+                        <div className="text-xs text-red-600">Rejected</div>
+                      </div>
+                      <div className="text-center p-3 bg-purple-50 rounded-xl">
+                        <div className="text-lg font-semibold text-purple-700">{stats.resolvedFindings}</div>
+                        <div className="text-xs text-purple-600">Resolved</div>
+                      </div>
+                    </div>
+                  </div>
+                  <Link href="/findings" className="block mt-4 text-center text-sm text-[#1a1a18] font-medium hover:underline">
+                    Review all findings →
+                  </Link>
                 </div>
               </div>
             )}
