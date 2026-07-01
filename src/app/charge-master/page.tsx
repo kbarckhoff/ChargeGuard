@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { CDMTable } from "@/components/cdm/CDMTable";
+import { RUImport } from "@/components/cdm/RUImport";
+import { FormularyImport } from "@/components/cdm/FormularyImport";
 import { EmptyState } from "@/components/ui/shared";
 import { FileSpreadsheet } from "lucide-react";
 
@@ -64,8 +66,12 @@ export default async function ChargeMasterPage({
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
+      <header className="min-h-14 border-b border-[#e5e5e0] bg-white px-6 py-2 flex items-center justify-between flex-shrink-0 gap-4">
         <h1 className="text-base font-semibold text-[#1a1a18]">Charge Master</h1>
+        <div className="flex items-start gap-3">
+          <RUImport auditId={auditId} />
+          <FormularyImport auditId={auditId} />
+        </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto">

@@ -1,0 +1,367 @@
+{
+ "procToDevice": [
+  {
+   "cpt": "63650",
+   "family": "Neurostimulator",
+   "ccodes": [
+    "C1778"
+   ],
+   "logic": "single",
+   "desc": "Perc implant neurostimulator electrode array",
+   "risk": "CRITICAL"
+  },
+  {
+   "cpt": "64561",
+   "family": "Neurostimulator",
+   "ccodes": [
+    "C1778",
+    "C1897"
+   ],
+   "logic": "AND",
+   "desc": "Perc implant sacral nerve neurostimulator electrode",
+   "risk": "CRITICAL"
+  },
+  {
+   "cpt": "64590",
+   "family": "Neurostimulator",
+   "ccodes": [
+    "C1767",
+    "C1820"
+   ],
+   "logic": "OR",
+   "desc": "Ins/repl peripheral neurostimulator pulse generator",
+   "risk": "CRITICAL"
+  },
+  {
+   "cpt": "33208",
+   "family": "Cardiac Device",
+   "ccodes": [
+    "C1785",
+    "C1898"
+   ],
+   "logic": "AND",
+   "desc": "Insertion permanent pacemaker w/transvenous electrodes",
+   "risk": "Document for future"
+  },
+  {
+   "cpt": "33249",
+   "family": "Cardiac Device",
+   "ccodes": [
+    "C1721",
+    "C1891"
+   ],
+   "logic": "AND",
+   "desc": "Insertion/replacement ICD system",
+   "risk": "Document for future"
+  },
+  {
+   "cpt": "33270",
+   "family": "Cardiac Device",
+   "ccodes": [
+    "C1721",
+    "C1895"
+   ],
+   "logic": "AND",
+   "desc": "Ins/repl S-ICD system (subcutaneous)",
+   "risk": "Document for future"
+  },
+  {
+   "cpt": "37224",
+   "family": "Vascular",
+   "ccodes": [
+    "C1725",
+    "C1874"
+   ],
+   "logic": "AND",
+   "desc": "Revascularization femoral/popliteal w/angioplasty",
+   "risk": "Document for future"
+  },
+  {
+   "cpt": "37226",
+   "family": "Vascular",
+   "ccodes": [
+    "C1874"
+   ],
+   "logic": "single",
+   "desc": "Revascularization femoral/popliteal w/stent",
+   "risk": "Document for future"
+  },
+  {
+   "cpt": "27130",
+   "family": "Joint Replacement",
+   "ccodes": [
+    "C1776"
+   ],
+   "logic": "single",
+   "desc": "Total hip arthroplasty",
+   "risk": "HIGH"
+  },
+  {
+   "cpt": "27447",
+   "family": "Joint Replacement",
+   "ccodes": [
+    "C1776"
+   ],
+   "logic": "single",
+   "desc": "Total knee arthroplasty",
+   "risk": "HIGH"
+  }
+ ],
+ "deviceCategories": [
+  {
+   "category": "Neurostimulator",
+   "keywords": [
+    "EVOKE",
+    "AXONICS",
+    "STIMULATOR",
+    "SACRAL",
+    "LEAD EVOKE"
+   ],
+   "ccodes": [
+    "C1778",
+    "C1767",
+    "C1820",
+    "C1897"
+   ],
+   "cptFamily": [
+    "63650",
+    "64561",
+    "64590"
+   ]
+  },
+  {
+   "category": "Spinal Interbody Cage",
+   "keywords": [
+    "CAGE",
+    "INTERBODY",
+    "SPACER",
+    "CERVICAL SPACER"
+   ],
+   "ccodes": [],
+   "cptFamily": [
+    "22551",
+    "22554",
+    "22558",
+    "22633"
+   ]
+  },
+  {
+   "category": "Spinal Hardware (Screw/Rod)",
+   "keywords": [
+    "SCREW",
+    "ROD",
+    "FIXATION",
+    "MIDLINE",
+    "SET SCREW"
+   ],
+   "ccodes": [],
+   "cptFamily": [
+    "22612",
+    "22630",
+    "22633",
+    "22634"
+   ]
+  },
+  {
+   "category": "Spinal Implant (Level-coded)",
+   "keywords": [
+    "LEVEL 1",
+    "LEVEL 2",
+    "LEVEL 21 IMPLANT"
+   ],
+   "ccodes": [],
+   "cptFamily": [
+    "22551",
+    "22558",
+    "22612",
+    "22633"
+   ]
+  },
+  {
+   "category": "Joint Replacement",
+   "keywords": [
+    "FEMORAL",
+    "TIBIAL",
+    "TRIATHLON",
+    "ARTHROPLASTY"
+   ],
+   "ccodes": [
+    "C1776"
+   ],
+   "cptFamily": [
+    "27130",
+    "27132",
+    "27447",
+    "27448"
+   ]
+  },
+  {
+   "category": "General Surgical Implant",
+   "keywords": [
+    "SEROSAFUSE",
+    "CARTRIDGE",
+    "MESH"
+   ],
+   "ccodes": [],
+   "cptFamily": []
+  },
+  {
+   "category": "Vascular Device",
+   "keywords": [
+    "VASCULAR",
+    "STENT",
+    "CATHETER"
+   ],
+   "ccodes": [
+    "C1725",
+    "C1874"
+   ],
+   "cptFamily": [
+    "37224",
+    "37226",
+    "37228"
+   ]
+  },
+  {
+   "category": "Other / Unclassified",
+   "keywords": [],
+   "ccodes": [],
+   "cptFamily": []
+  }
+ ],
+ "vaccines": [
+  {
+   "hcpcs": "90656",
+   "vtype": "Influenza",
+   "gcode": "G0008",
+   "requiresG": true,
+   "gap": 12.439999999999998,
+   "note": "Add G0008 to CDM; confirm 90471 lines paired with flu vaccine"
+  },
+  {
+   "hcpcs": "90686",
+   "vtype": "Influenza",
+   "gcode": "G0008",
+   "requiresG": true,
+   "gap": 12.439999999999998,
+   "note": "Add G0008 to CDM"
+  },
+  {
+   "hcpcs": "90732",
+   "vtype": "Pneumococcal",
+   "gcode": "G0009",
+   "requiresG": true,
+   "gap": 12.439999999999998,
+   "note": "Map HCPCS 90732 to charge 11562; add G0009"
+  },
+  {
+   "hcpcs": "90670",
+   "vtype": "Pneumococcal",
+   "gcode": "G0009",
+   "requiresG": true,
+   "gap": 12.439999999999998,
+   "note": "Confirm Prevnar 13 vs Pneumovax 23 \u2014 map correct HCPCS"
+  },
+  {
+   "hcpcs": "91322",
+   "vtype": "COVID-19",
+   "gcode": "G0010",
+   "requiresG": true,
+   "gap": 35.33,
+   "note": "Add G0010 to CDM; pair with 91322 on charge build"
+  },
+  {
+   "hcpcs": "90480",
+   "vtype": "COVID-19",
+   "gcode": "G0010",
+   "requiresG": true,
+   "gap": 35.33,
+   "note": "90480 is a vaccine code not an admin code \u2014 recode to G0010"
+  },
+  {
+   "hcpcs": "90707",
+   "vtype": "MMR",
+   "gcode": "90471",
+   "requiresG": false,
+   "gap": 0.0,
+   "note": "90471 IS correct \u2014 but price=$0 in CDM (also in FLAG - Zero Price)"
+  },
+  {
+   "hcpcs": "90715",
+   "vtype": "Tdap",
+   "gcode": "90471",
+   "requiresG": false,
+   "gap": 0.0,
+   "note": "90471 correct for Tdap"
+  },
+  {
+   "hcpcs": "90714",
+   "vtype": "Td",
+   "gcode": "90471",
+   "requiresG": false,
+   "gap": 0.0,
+   "note": "90471 correct for Td"
+  },
+  {
+   "hcpcs": "90675",
+   "vtype": "Rabies",
+   "gcode": "90471",
+   "requiresG": false,
+   "gap": 0.0,
+   "note": "90471 correct for rabies"
+  },
+  {
+   "hcpcs": "90750",
+   "vtype": "Zoster",
+   "gcode": "90471",
+   "requiresG": false,
+   "gap": 0.0,
+   "note": "90471 correct for Shingrix; confirm CDM has both vaccine and admin lines"
+  }
+ ],
+ "newCodes": [
+  {
+   "code": "76014",
+   "effective": "01/01/2026",
+   "desc": "Initial clinical assessment of implants prior to MRI, 15 min",
+   "family": "MRI Safety",
+   "priority": "HIGH"
+  },
+  {
+   "code": "76015",
+   "effective": "01/01/2026",
+   "desc": "Each additional 30-min evaluation after initial assessment (add-on)",
+   "family": "MRI Safety",
+   "priority": "HIGH"
+  },
+  {
+   "code": "76016",
+   "effective": "01/01/2026",
+   "desc": "Formal MRI safety determination by physician/QHP",
+   "family": "MRI Safety",
+   "priority": "HIGH"
+  },
+  {
+   "code": "76017",
+   "effective": "01/01/2026",
+   "desc": "Customization of medical physics for specialized device safety",
+   "family": "MRI Safety",
+   "priority": "MEDIUM"
+  },
+  {
+   "code": "76018",
+   "effective": "01/01/2026",
+   "desc": "Direct preparation of implant electronics (e.g., pacemaker to MRI Mode)",
+   "family": "MRI Safety",
+   "priority": "HIGH"
+  },
+  {
+   "code": "76019",
+   "effective": "01/01/2026",
+   "desc": "Specialized positioning/immobilization/shielding during active scan",
+   "family": "MRI Safety",
+   "priority": "MEDIUM"
+  }
+ ],
+ "source": "CMS_Device_Procedure_Crosswalk_Reference.xlsx (living reference; update each January)"
+}

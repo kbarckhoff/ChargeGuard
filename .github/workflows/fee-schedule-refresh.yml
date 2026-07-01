@@ -1,0 +1,43 @@
+name: CMS Fee Schedule Refresh
+
+# Checks CMS for new quarterly fee-schedule releases and stages them for review.
+# Quarterly files land around the 1st of Jan/Apr/Jul/Oct but are sometimes revised
+# mid-month, so we check on the 5th and 20th of those months.
+on:
+  schedule:
+    - cron: "0 13 5 1,4,7,10 *"
+    - cron: "0 13 20 1,4,7,10 *"
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Check CMS for new fee-schedule versions
+        run: node scripts/fee-schedules/refresh.mjs | tee refresh-report.txt
+      - name: Upload staged data + report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fee-schedule-refresh
+          path: |
+            refresh-report.txt
+            data/cms-sources/staging/**
+            data/cms-sources/manifest.json
+      - name: Open an issue if new versions were found
+        if: ${{ contains( hashFiles('data/cms-sources/staging/**'), '' ) }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.existsSync('refresh-report.txt') ? fs.readFileSync('refresh-report.txt','utf8') : '';
+            if (!/NEW VERSION/.test(report)) { core.info('No new versions.'); return; }
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `CMS fee schedule update available (${new Date().toISOString().slice(0,10)})`,
+              body: "A new CMS fee-schedule version was detected.\n\n```\n" + report + "\n```\n\nReview the staged data (Actions artifact), then run `promote.mjs` + `build-reference.mjs` locally.",
+            });

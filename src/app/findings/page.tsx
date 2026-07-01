@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
-import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState } from "@/components/ui/shared";
+import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { AlertTriangle, Zap } from "lucide-react";
 
@@ -77,28 +77,45 @@ export default async function FindingsPage({
   const { data: findings, count } = await query.range(from, to);
   const totalPages = Math.ceil((count || 0) / pageSize);
 
-  // Get severity counts for summary
-  const { data: allFindings } = await supabaseAdmin
-    .from("findings")
-    .select("severity, status, financial_impact, category")
-    .eq("audit_id", auditId);
+  // Get severity counts for summary — page through ALL findings (Supabase caps
+  // each response at 1000 rows, which otherwise undercounts stats and drops
+  // categories from the filter dropdown).
+  const allFindings: { severity: string; status: string; financial_impact: number | null; category: string | null; title: string | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabaseAdmin
+      .from("findings")
+      .select("severity, status, financial_impact, category, title")
+      .eq("audit_id", auditId)
+      .range(offset, offset + 999);
+    if (error || !data || data.length === 0) break;
+    allFindings.push(...data);
+    if (data.length < 1000) break;
+  }
+
+  // Summary cards reflect the active category/search filter (but not the severity
+  // filter, so the severity breakdown stays meaningful). The category dropdown
+  // still lists every category (built from the full set below).
+  const scope = allFindings.filter((f) =>
+    (!sp.category || sp.category === "all" || f.category === sp.category) &&
+    (!sp.search || (f.title || "").toLowerCase().includes(sp.search.toLowerCase()))
+  );
 
   const severityCounts = {
-    critical: allFindings?.filter((f) => f.severity === "critical").length || 0,
-    high: allFindings?.filter((f) => f.severity === "high").length || 0,
-    medium: allFindings?.filter((f) => f.severity === "medium").length || 0,
-    low: allFindings?.filter((f) => f.severity === "low").length || 0,
-    info: allFindings?.filter((f) => f.severity === "info").length || 0,
+    critical: scope.filter((f) => f.severity === "critical").length,
+    high: scope.filter((f) => f.severity === "high").length,
+    medium: scope.filter((f) => f.severity === "medium").length,
+    low: scope.filter((f) => f.severity === "low").length,
+    info: scope.filter((f) => f.severity === "info").length,
   };
 
   const statusCounts = {
-    open: allFindings?.filter((f) => f.status === "open").length || 0,
-    accepted: allFindings?.filter((f) => f.status === "accepted").length || 0,
-    rejected: allFindings?.filter((f) => f.status === "rejected").length || 0,
-    resolved: allFindings?.filter((f) => f.status === "resolved").length || 0,
+    open: scope.filter((f) => f.status === "open").length,
+    accepted: scope.filter((f) => f.status === "accepted").length,
+    rejected: scope.filter((f) => f.status === "rejected").length,
+    resolved: scope.filter((f) => f.status === "resolved").length,
   };
 
-  const totalImpact = allFindings?.reduce((s, f) => s + (f.financial_impact || 0), 0) || 0;
+  const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
 
   // Get unique categories
   const categories = [...new Set(allFindings?.map((f) => f.category).filter(Boolean) || [])].sort();
@@ -131,7 +148,7 @@ export default async function FindingsPage({
             <div className="bg-white rounded-xl border border-[#e5e5e0] p-4">
               <div className="text-xs text-[#7a7a75] mb-1">Est. Impact</div>
               <div className="text-xl font-semibold text-[#1a1a18]">
-                ${totalImpact > 0 ? (totalImpact / 1000).toFixed(1) + "K" : "0"}
+                {formatImpact(totalImpact)}
               </div>
             </div>
           </div>

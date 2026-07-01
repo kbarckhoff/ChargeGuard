@@ -1,0 +1,559 @@
+{
+ "shoppableServices": [
+  {
+   "n": 1,
+   "desc": "Psychotherapy, 30 min",
+   "codes": [
+    "90832"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 2,
+   "desc": "Psychotherapy, 45 min",
+   "codes": [
+    "90834"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 3,
+   "desc": "Psychotherapy, 60 min",
+   "codes": [
+    "90837"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 4,
+   "desc": "Family psychotherapy, not including patient, 50 min",
+   "codes": [
+    "90846"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 5,
+   "desc": "Family psychotherapy, including patient, 50 min",
+   "codes": [
+    "90847"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 6,
+   "desc": "Group psychotherapy",
+   "codes": [
+    "90853"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 7,
+   "desc": "New patient office visit, typically 30 min",
+   "codes": [
+    "99203"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 8,
+   "desc": "New patient office visit, typically 45 min",
+   "codes": [
+    "99204"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 9,
+   "desc": "New patient office visit, typically 60 min",
+   "codes": [
+    "99205"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 10,
+   "desc": "Patient office consultation, typically 40 min",
+   "codes": [
+    "99243"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 11,
+   "desc": "Patient office consultation, typically 60 min",
+   "codes": [
+    "99244"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 12,
+   "desc": "Preventive medicine evaluation (18-39 years)",
+   "codes": [
+    "99385"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 13,
+   "desc": "Preventive medicine evaluation (40-64 years)",
+   "codes": [
+    "99386"
+   ],
+   "category": "E&M"
+  },
+  {
+   "n": 14,
+   "desc": "Basic metabolic panel",
+   "codes": [
+    "80048"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 15,
+   "desc": "Comprehensive metabolic panel",
+   "codes": [
+    "80053"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 16,
+   "desc": "Obstetric blood test panel",
+   "codes": [
+    "80055"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 17,
+   "desc": "Lipid panel",
+   "codes": [
+    "80061"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 18,
+   "desc": "Kidney function panel",
+   "codes": [
+    "80069"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 19,
+   "desc": "Liver function panel",
+   "codes": [
+    "80076"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 20,
+   "desc": "Manual urinalysis with microscopy",
+   "codes": [
+    "81000",
+    "81001"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 21,
+   "desc": "Automated urinalysis",
+   "codes": [
+    "81002",
+    "81003"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 22,
+   "desc": "PSA (prostate specific antigen)",
+   "codes": [
+    "84153",
+    "84154"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 23,
+   "desc": "Thyroid stimulating hormone (TSH)",
+   "codes": [
+    "84443"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 24,
+   "desc": "CBC with differential, automated",
+   "codes": [
+    "85025"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 25,
+   "desc": "Complete blood count, automated",
+   "codes": [
+    "85027"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 26,
+   "desc": "Blood test, clotting time (PT)",
+   "codes": [
+    "85610"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 27,
+   "desc": "Coagulation assessment (PTT)",
+   "codes": [
+    "85730"
+   ],
+   "category": "Lab"
+  },
+  {
+   "n": 28,
+   "desc": "CT scan, head/brain, without contrast",
+   "codes": [
+    "70450"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 29,
+   "desc": "MRI scan of brain, before and after contrast",
+   "codes": [
+    "70553"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 30,
+   "desc": "X-Ray, lower back, min 4 views",
+   "codes": [
+    "72110"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 31,
+   "desc": "MRI scan of lower spinal canal",
+   "codes": [
+    "72148"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 32,
+   "desc": "CT scan, pelvis, with contrast",
+   "codes": [
+    "72193"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 33,
+   "desc": "MRI scan of leg joint",
+   "codes": [
+    "73721"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 34,
+   "desc": "CT scan of abdomen and pelvis with contrast",
+   "codes": [
+    "74177"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 35,
+   "desc": "Ultrasound of abdomen",
+   "codes": [
+    "76700"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 36,
+   "desc": "Abdominal ultrasound of pregnant uterus",
+   "codes": [
+    "76805"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 37,
+   "desc": "Ultrasound pelvis through vagina",
+   "codes": [
+    "76830"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 38,
+   "desc": "Mammography of one breast",
+   "codes": [
+    "77065"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 39,
+   "desc": "Mammography of both breasts",
+   "codes": [
+    "77066"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 40,
+   "desc": "Mammography, screening, bilateral",
+   "codes": [
+    "77067"
+   ],
+   "category": "Radiology"
+  },
+  {
+   "n": 41,
+   "desc": "Cardiac valve/cardiothoracic with cath, MCC",
+   "codes": [],
+   "category": "Surgery"
+  },
+  {
+   "n": 42,
+   "desc": "Spinal fusion except cervical without MCC",
+   "codes": [],
+   "category": "Surgery"
+  },
+  {
+   "n": 43,
+   "desc": "Major joint replacement lower extremity w/o MCC",
+   "codes": [],
+   "category": "Surgery"
+  },
+  {
+   "n": 44,
+   "desc": "Cervical spinal fusion without CC/MCC",
+   "codes": [],
+   "category": "Surgery"
+  },
+  {
+   "n": 45,
+   "desc": "Uterine/adnexa procedures for non-malignancy w/o CC/MCC",
+   "codes": [],
+   "category": "Surgery"
+  },
+  {
+   "n": 46,
+   "desc": "Removal of breast growth, open procedure",
+   "codes": [
+    "19120"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 47,
+   "desc": "Shaving of shoulder bone using endoscope",
+   "codes": [
+    "29826"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 48,
+   "desc": "Removal of knee cartilage using endoscope",
+   "codes": [
+    "29881"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 49,
+   "desc": "Removal of tonsils and adenoid glands, age <12",
+   "codes": [
+    "42820"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 50,
+   "desc": "Diagnostic upper GI endoscopy",
+   "codes": [
+    "43235"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 51,
+   "desc": "Biopsy of upper GI using endoscope",
+   "codes": [
+    "43239"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 52,
+   "desc": "Diagnostic colonoscopy",
+   "codes": [
+    "45378"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 53,
+   "desc": "Biopsy of large bowel using endoscope",
+   "codes": [
+    "45380"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 54,
+   "desc": "Removal of polyps of large bowel using endoscope",
+   "codes": [
+    "45385"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 55,
+   "desc": "Ultrasound examination of lower large bowel, endoscope",
+   "codes": [
+    "45391"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 56,
+   "desc": "Laparoscopic cholecystectomy",
+   "codes": [
+    "47562"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 57,
+   "desc": "Repair of groin hernia, age 5+",
+   "codes": [
+    "49505"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 58,
+   "desc": "Biopsy of prostate gland",
+   "codes": [
+    "55700"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 59,
+   "desc": "Laparoscopic prostatectomy with lymph nodes",
+   "codes": [
+    "55866"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 60,
+   "desc": "Obstetric care for vaginal delivery",
+   "codes": [
+    "59400"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 61,
+   "desc": "Obstetric care for cesarean delivery",
+   "codes": [
+    "59510"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 62,
+   "desc": "Obstetric care for VBAC",
+   "codes": [
+    "59610"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 63,
+   "desc": "Injection into spinal canal, lower back, with imaging",
+   "codes": [
+    "62322",
+    "62323"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 64,
+   "desc": "Injection into lumbar/sacral nerve root, with imaging",
+   "codes": [
+    "64483"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 65,
+   "desc": "Laser removal of recurring cataract",
+   "codes": [
+    "66821"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 66,
+   "desc": "Cataract removal with lens insertion",
+   "codes": [
+    "66984"
+   ],
+   "category": "Surgery"
+  },
+  {
+   "n": 67,
+   "desc": "Electrocardiogram (ECG), routine",
+   "codes": [
+    "93000"
+   ],
+   "category": "Medicine"
+  },
+  {
+   "n": 68,
+   "desc": "Cardiac catheterization, left heart, diagnostic",
+   "codes": [
+    "93452"
+   ],
+   "category": "Medicine"
+  },
+  {
+   "n": 69,
+   "desc": "Sleep study",
+   "codes": [
+    "95810"
+   ],
+   "category": "Medicine"
+  },
+  {
+   "n": 70,
+   "desc": "Physical therapy, therapeutic exercise",
+   "codes": [
+    "97110"
+   ],
+   "category": "Medicine"
+  }
+ ],
+ "source": "CMS 70 shoppable services (45 CFR 180), from v9-3 report"
+}

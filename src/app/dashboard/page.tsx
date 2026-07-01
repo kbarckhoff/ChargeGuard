@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { Layers, AlertTriangle, CheckCircle2, Zap, FileSpreadsheet, Upload } from "lucide-react";
-import { KPICard, Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState } from "@/components/ui/shared";
+import { KPICard, Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import Link from "next/link";
 import { ScanButton } from "@/components/audit/ScanButton";
 import { CreateAuditForm } from "@/components/audit/CreateAuditForm";
@@ -36,14 +36,28 @@ export default async function DashboardPage() {
   // Get stats if audit exists
   let stats = null;
   if (audit) {
-    const [findingsRes, chargeCount] = await Promise.all([
-      supabaseAdmin.from("findings").select("severity, status, financial_impact").eq("audit_id", audit.id),
-      supabaseAdmin.from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", audit.id),
-    ]);
+    // Read ALL findings across pages — Supabase caps each response at 1000 rows,
+    // so a single select silently undercounts large audits. Page through them.
+    const findings: { severity: string; status: string; financial_impact: number | null }[] = [];
+    const PAGE = 1000;
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await supabaseAdmin
+        .from("findings")
+        .select("severity, status, financial_impact")
+        .eq("audit_id", audit.id)
+        .range(offset, offset + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      findings.push(...data);
+      if (data.length < PAGE) break;
+    }
 
-    const findings = findingsRes.data || [];
+    const { count: chargeItemsCount } = await supabaseAdmin
+      .from("charge_items")
+      .select("id", { count: "exact", head: true })
+      .eq("audit_id", audit.id);
+
     stats = {
-      chargeItems: chargeCount.count || 0,
+      chargeItems: chargeItemsCount || 0,
       totalFindings: findings.length,
       openFindings: findings.filter((f) => f.status === "open").length,
       acceptedFindings: findings.filter((f) => f.status === "accepted").length,
@@ -132,7 +146,7 @@ export default async function DashboardPage() {
                   icon={AlertTriangle}
                   label="Open Issues"
                   value={stats.openFindings.toString()}
-                  subtext={stats.totalImpact > 0 ? `$${(stats.totalImpact / 1000).toFixed(1)}K est. impact` : undefined}
+                  subtext={stats.totalImpact > 0 ? `${formatImpact(stats.totalImpact)} est. impact` : undefined}
                 />
                 <KPICard
                   icon={CheckCircle2}

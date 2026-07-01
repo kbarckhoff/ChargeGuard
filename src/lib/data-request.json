@@ -1,0 +1,642 @@
+{
+ "items": [
+  {
+   "item": "A.1",
+   "desc": "Active CDM",
+   "owner": "Revenue Cycle",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Kickoff"
+  },
+  {
+   "item": "A.2",
+   "desc": "R&U Rollup (12-month)",
+   "owner": "Revenue Cycle",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Kickoff"
+  },
+  {
+   "item": "A.3",
+   "desc": "CDM Effective Date History",
+   "owner": "Revenue Cycle",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Optional"
+  },
+  {
+   "item": "A.4",
+   "desc": "12-Month Institutional Claims",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.5",
+   "desc": "Claim-Level Modifier Detail",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.6",
+   "desc": "Denial & Adjustment Report",
+   "owner": "Revenue Cycle",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.7",
+   "desc": "Payer Mix Summary",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.8",
+   "desc": "CMS MAC / Locality Information",
+   "owner": "Revenue Cycle",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Kickoff"
+  },
+  {
+   "item": "A.9",
+   "desc": "Managed Care Contract Summary",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance/CFO",
+   "scope": "All",
+   "when": "Optional"
+  },
+  {
+   "item": "A.10",
+   "desc": "CDM Governance Policy",
+   "owner": "Revenue Cycle",
+   "secondary": "Compliance",
+   "scope": "All",
+   "when": "Optional"
+  },
+  {
+   "item": "A.11",
+   "desc": "Billing System Modifier Configuration",
+   "owner": "Revenue Cycle",
+   "secondary": "IT",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.12",
+   "desc": "MRI Encounter Extract",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "A.13",
+   "desc": "ED Visit + Injection Co-Billing Extract",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.1",
+   "desc": "Pharmacy Formulary / Drug Master",
+   "owner": "Pharmacy",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Kickoff"
+  },
+  {
+   "item": "B.2",
+   "desc": "Pharmacy Conversion Rate Source",
+   "owner": "Pharmacy",
+   "secondary": "IT",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.3",
+   "desc": "340B Drug Program Status",
+   "owner": "Pharmacy",
+   "secondary": "Finance",
+   "scope": "OPPS/CAH",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.4",
+   "desc": "Rev 637 Self-Admin Drug Protocol",
+   "owner": "Pharmacy",
+   "secondary": "Revenue Cycle",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.5",
+   "desc": "SI=K/K1 Pass-Through Drug Status",
+   "owner": "Pharmacy",
+   "secondary": "Revenue Cycle",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.6",
+   "desc": "Qualifying Vaccine Administration Volume",
+   "owner": "Pharmacy",
+   "secondary": "Nursing",
+   "scope": "OPPS/RHC/FQHC",
+   "when": "Week 2"
+  },
+  {
+   "item": "B.7",
+   "desc": "MRI Contrast Agent Protocols",
+   "owner": "Pharmacy",
+   "secondary": "Radiology",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "C.1",
+   "desc": "Most Recently Filed Cost Report",
+   "owner": "Finance",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Phase 2"
+  },
+  {
+   "item": "C.2",
+   "desc": "Departmental CCR by Cost Center",
+   "owner": "Finance",
+   "secondary": "\u2014",
+   "scope": "OPPS/CAH",
+   "when": "Phase 2"
+  },
+  {
+   "item": "C.3",
+   "desc": "MRI/Radiology Department CCR",
+   "owner": "Finance",
+   "secondary": "\u2014",
+   "scope": "OPPS",
+   "when": "Phase 2"
+  },
+  {
+   "item": "C.4",
+   "desc": "340B Covered Entity Confirmation",
+   "owner": "Finance",
+   "secondary": "Compliance",
+   "scope": "OPPS/CAH",
+   "when": "Week 2"
+  },
+  {
+   "item": "D.1",
+   "desc": "Rev 278 Device Reference / Classification",
+   "owner": "Supply Chain",
+   "secondary": "Clinical Eng",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "D.2",
+   "desc": "EHR Implant/Device Log",
+   "owner": "Supply Chain",
+   "secondary": "IT",
+   "scope": "OPPS",
+   "when": "Phase 2"
+  },
+  {
+   "item": "D.3",
+   "desc": "Inventory Acquisition Cost File",
+   "owner": "Supply Chain",
+   "secondary": "Finance",
+   "scope": "OPPS",
+   "when": "Phase 2"
+  },
+  {
+   "item": "D.4",
+   "desc": "New Technology / Carve-Out Device List",
+   "owner": "Supply Chain",
+   "secondary": "Clinical Ops",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "E.1",
+   "desc": "EHR Platform Identification",
+   "owner": "HIM / IT",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "E.2",
+   "desc": "New Technology Procedure List",
+   "owner": "HIM",
+   "secondary": "Clinical Ops",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "E.3",
+   "desc": "MRI Under CT Revenue Code Confirmation",
+   "owner": "HIM",
+   "secondary": "Radiology",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "E.4",
+   "desc": "Pneumovax / Admin Influenza HCPCS",
+   "owner": "HIM",
+   "secondary": "Pharmacy",
+   "scope": "OPPS/RHC/FQHC",
+   "when": "Week 2"
+  },
+  {
+   "item": "F.1",
+   "desc": "EHR Implant Log Export (Optime/SurgiNet)",
+   "owner": "IT",
+   "secondary": "Supply Chain",
+   "scope": "OPPS",
+   "when": "Phase 2"
+  },
+  {
+   "item": "F.2",
+   "desc": "Billing System Modifier Config Confirmation",
+   "owner": "IT",
+   "secondary": "Revenue Cycle",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "G.1",
+   "desc": "Department-Level Service Line Confirmation",
+   "owner": "Clinical Ops",
+   "secondary": "\u2014",
+   "scope": "All",
+   "when": "Week 2"
+  },
+  {
+   "item": "G.2",
+   "desc": "29999 Occupational Health Medicare Protocol",
+   "owner": "Clinical Ops",
+   "secondary": "Revenue Cycle",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "G.3",
+   "desc": "Duoneb/Albuterol In-Facility vs Dispensed",
+   "owner": "Clinical Ops",
+   "secondary": "Pharmacy",
+   "scope": "OPPS",
+   "when": "Week 2"
+  },
+  {
+   "item": "H.1",
+   "desc": "340B HRSA Database Confirmation",
+   "owner": "Compliance",
+   "secondary": "Finance",
+   "scope": "OPPS/CAH",
+   "when": "Week 2"
+  },
+  {
+   "item": "H.3",
+   "desc": "Price Transparency \u2014 CDM Layer (Phase 1 Complete) + MRF Compliance (Phase 2)",
+   "owner": "Compliance / Revenue Cycle",
+   "secondary": "Required \u2014 Week 2",
+   "scope": "(1) Is the hospital\u2019s machine-readable file (MRF) currently posted publicly? Please provide the URL. (2) Does the consumer-friendly shoppable services display include at least 300 services (70 CMS-specified + 230 hospital-selected)? (3) For the 17 CMS-specified services not found in the outpatient CDM: confirm for each whether the service is offered and if so whether it is captured elsewhere. (4) Price 93000 (ECG routine) \u2014 currently $0 in CDM; assign current price immediately. NOTE: This engagement validates CDM presence only \u2014 MRF JSON schema compliance, five standard charge types, and consumer display are Phase 2 scope items. CMS CMPs up to $300/day/bed for non-compliance.",
+   "when": ""
+  },
+  {
+   "item": "H.2",
+   "desc": "CDM Review Compliance Policy",
+   "owner": "Compliance",
+   "secondary": "Revenue Cycle",
+   "scope": "All",
+   "when": "Optional"
+  },
+  {
+   "item": "I-CAH.1",
+   "desc": "Method I vs Method II Election",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance",
+   "scope": "CAH only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-CAH.2",
+   "desc": "Swing Bed Census",
+   "owner": "Clinical Ops",
+   "secondary": "Finance",
+   "scope": "CAH only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-CAH.3",
+   "desc": "CMS-2552 Cost Report",
+   "owner": "Finance",
+   "secondary": "\u2014",
+   "scope": "CAH only",
+   "when": "Phase 2"
+  },
+  {
+   "item": "I-CAH.4",
+   "desc": "Cost Report Period Dates",
+   "owner": "Finance",
+   "secondary": "\u2014",
+   "scope": "CAH only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-CAH.5",
+   "desc": "Designated CAH Services List",
+   "owner": "Clinical Ops",
+   "secondary": "Revenue Cycle",
+   "scope": "CAH only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-CAH.6",
+   "desc": "Commercial Payer Rate Sheets",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance",
+   "scope": "CAH only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-CAH.7",
+   "desc": "Lab Arrangement Type",
+   "owner": "HIM",
+   "secondary": "Lab Director",
+   "scope": "CAH only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-RHC.1",
+   "desc": "RHC Designation Type",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance",
+   "scope": "RHC only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-RHC.2",
+   "desc": "Facility-Specific AIR",
+   "owner": "Finance",
+   "secondary": "Revenue Cycle",
+   "scope": "RHC only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-RHC.3",
+   "desc": "Visit Type Distribution",
+   "owner": "Revenue Cycle",
+   "secondary": "Clinical Ops",
+   "scope": "RHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-RHC.4",
+   "desc": "Non-Qualifying Visit Identification",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "RHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-RHC.5",
+   "desc": "Lab Service Arrangement",
+   "owner": "HIM",
+   "secondary": "Lab Director",
+   "scope": "RHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-RHC.6",
+   "desc": "Vaccine & Preventive Service Volume",
+   "owner": "Pharmacy",
+   "secondary": "Nursing",
+   "scope": "RHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-RHC.7",
+   "desc": "Care Management Code Usage",
+   "owner": "HIM",
+   "secondary": "Revenue Cycle",
+   "scope": "RHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.1",
+   "desc": "FQHC Geographic Adjustment Factor",
+   "owner": "Finance",
+   "secondary": "Revenue Cycle",
+   "scope": "FQHC only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-FQHC.2",
+   "desc": "Visit Type Distribution (new vs established)",
+   "owner": "Revenue Cycle",
+   "secondary": "Clinical Ops",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.3",
+   "desc": "New Patient Identification Protocol",
+   "owner": "Clinical Ops",
+   "secondary": "IT",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.4",
+   "desc": "Behavioral Health Integration Model",
+   "owner": "Clinical Ops",
+   "secondary": "HIM",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.5",
+   "desc": "Sliding Fee Scale Documentation",
+   "owner": "Compliance",
+   "secondary": "Finance",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.6",
+   "desc": "Grant Funding Categories",
+   "owner": "Finance",
+   "secondary": "Compliance",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-FQHC.7",
+   "desc": "Vaccine & Preventive Service Volume",
+   "owner": "Pharmacy",
+   "secondary": "Nursing",
+   "scope": "FQHC only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-SNF.1",
+   "desc": "MDS Assessment Data Extract",
+   "owner": "Quality / MDS Coord",
+   "secondary": "HIM",
+   "scope": "SNF only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-SNF.2",
+   "desc": "PDPM Classification Summary",
+   "owner": "Quality / MDS Coord",
+   "secondary": "Finance",
+   "scope": "SNF only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-SNF.3",
+   "desc": "NTA Drug & Supply List",
+   "owner": "Pharmacy",
+   "secondary": "Supply Chain",
+   "scope": "SNF only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-SNF.4",
+   "desc": "Consolidated Billing Exclusion List",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "SNF only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-SNF.5",
+   "desc": "Part A vs Part B Days Breakdown",
+   "owner": "Finance",
+   "secondary": "Revenue Cycle",
+   "scope": "SNF only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-SNF.6",
+   "desc": "Therapy Utilization Report",
+   "owner": "Clinical Ops",
+   "secondary": "Quality",
+   "scope": "SNF only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.1",
+   "desc": "OASIS Assessment Export",
+   "owner": "Quality / Clinical",
+   "secondary": "IT",
+   "scope": "HHA only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-HHA.2",
+   "desc": "Home Health Claims (32X)",
+   "owner": "Revenue Cycle",
+   "secondary": "HIM",
+   "scope": "HHA only",
+   "when": "Kickoff"
+  },
+  {
+   "item": "I-HHA.3",
+   "desc": "HHRG Classification Report",
+   "owner": "Quality / Clinical",
+   "secondary": "Revenue Cycle",
+   "scope": "HHA only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.4",
+   "desc": "LUPA Episode Identification",
+   "owner": "Revenue Cycle",
+   "secondary": "Finance",
+   "scope": "HHA only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.5",
+   "desc": "Outlier Payment Summary",
+   "owner": "Finance",
+   "secondary": "Revenue Cycle",
+   "scope": "HHA only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.6",
+   "desc": "Visit Type Distribution by Discipline",
+   "owner": "Revenue Cycle",
+   "secondary": "Clinical Ops",
+   "scope": "HHA only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.7",
+   "desc": "Payer Mix by Episode",
+   "owner": "Finance",
+   "secondary": "Revenue Cycle",
+   "scope": "HHA only",
+   "when": "Week 2"
+  },
+  {
+   "item": "I-HHA.8",
+   "desc": "HHVBP Quality Measure Performance",
+   "owner": "Quality",
+   "secondary": "Compliance",
+   "scope": "HHA only",
+   "when": "Week 2"
+  }
+ ],
+ "sections": [
+  {
+   "section": "SECTION A \u2014 REVENUE CYCLE / PATIENT FINANCIAL SERVICES",
+   "forward": "Forward this section to: Director of Revenue Cycle, Patient Financial Services, or Charge Capture Manager"
+  },
+  {
+   "section": "SECTION B \u2014 PHARMACY DEPARTMENT",
+   "forward": "Forward this section to: Director of Pharmacy, Pharmacy Informatics, or 340B Coordinator"
+  },
+  {
+   "section": "SECTION C \u2014 FINANCE / CFO / REIMBURSEMENT",
+   "forward": "Forward this section to: CFO, Controller, or Director of Reimbursement"
+  },
+  {
+   "section": "SECTION D \u2014 SUPPLY CHAIN / MATERIALS MANAGEMENT",
+   "forward": "Forward this section to: Director of Supply Chain, Materials Manager, or Purchasing Manager"
+  },
+  {
+   "section": "SECTION E \u2014 HIM / CODING / CLINICAL INFORMATICS",
+   "forward": "Forward this section to: Director of HIM, Coding Manager, or Clinical Informatics Director"
+  },
+  {
+   "section": "SECTION F \u2014 IT / HEALTH INFORMATION TECHNOLOGY",
+   "forward": "Forward this section to: CIO, Director of HIT, or Epic/Cerner System Administrator"
+  },
+  {
+   "section": "SECTION G \u2014 CLINICAL OPERATIONS / DEPARTMENT DIRECTORS",
+   "forward": "Forward this section to: COO, VP of Clinical Operations, or relevant Department Director"
+  },
+  {
+   "section": "SECTION H \u2014 COMPLIANCE / QUALITY",
+   "forward": "Forward this section to: Chief Compliance Officer or VP of Quality"
+  },
+  {
+   "section": "SECTION I \u2014 FACILITY-TYPE SPECIFIC",
+   "forward": "Complete ONLY the sub-section matching your facility type. Forward to the department noted in the routing matrix."
+  }
+ ]
+}

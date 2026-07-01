@@ -1,5 +1,15 @@
 import { type LucideIcon } from "lucide-react";
 
+// ─── Currency formatting ─────────────────────────────────────
+// Compact dollar formatting that scales the suffix: $1,250,600 -> "$1.3M",
+// $12,400 -> "$12.4K", $640 -> "$640".
+export function formatImpact(n: number): string {
+  if (!n || n <= 0) return "$0";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${Math.round(n)}`;
+}
+
 // ─── Badge ───────────────────────────────────────────────────
 const BADGE_VARIANTS: Record<string, string> = {
   default: "bg-[#f0f0ec] text-[#3d3d3a]",

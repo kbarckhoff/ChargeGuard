@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
-import { Badge, EmptyState, SEVERITY_CONFIG } from "@/components/ui/shared";
+import { Badge, EmptyState, SEVERITY_CONFIG, formatImpact } from "@/components/ui/shared";
 import { PieChart, AlertTriangle } from "lucide-react";
 import { ExportForm } from "@/components/reports/ExportForm";
 
@@ -42,11 +42,18 @@ export default async function ReportsPage() {
     );
   }
 
-  // Get finding stats for the summary
-  const { data: findings } = await supabaseAdmin
-    .from("findings")
-    .select("severity, status, category, financial_impact")
-    .eq("audit_id", audit.id);
+  // Get finding stats for the summary — page past Supabase's 1000-row cap
+  const findings: { severity: string; status: string; category: string | null; financial_impact: number | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabaseAdmin
+      .from("findings")
+      .select("severity, status, category, financial_impact")
+      .eq("audit_id", audit.id)
+      .range(offset, offset + 999);
+    if (error || !data || data.length === 0) break;
+    findings.push(...data);
+    if (data.length < 1000) break;
+  }
 
   const total = findings?.length || 0;
   const open = findings?.filter((f) => f.status === "open").length || 0;
@@ -54,7 +61,6 @@ export default async function ReportsPage() {
   const resolved = findings?.filter((f) => f.status === "resolved").length || 0;
   const rejected = findings?.filter((f) => f.status === "rejected").length || 0;
   const totalImpact = findings?.reduce((s, f) => s + (f.financial_impact || 0), 0) || 0;
-  const categories = [...new Set(findings?.map((f) => f.category).filter(Boolean) || [])].sort();
 
   return (
     <>
@@ -92,13 +98,13 @@ export default async function ReportsPage() {
             {totalImpact > 0 && (
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
                 <span className="text-sm text-amber-800">Total Estimated Financial Impact</span>
-                <span className="text-lg font-semibold text-amber-900">${(totalImpact / 1000).toFixed(1)}K</span>
+                <span className="text-lg font-semibold text-amber-900">{formatImpact(totalImpact)}</span>
               </div>
             )}
           </div>
 
           {/* Export Form */}
-          <ExportForm auditId={audit.id} categories={categories} totalFindings={total} />
+          <ExportForm auditId={audit.id} totalFindings={total} />
         </div>
       </div>
     </>

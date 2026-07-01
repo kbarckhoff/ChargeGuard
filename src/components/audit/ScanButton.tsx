@@ -48,7 +48,7 @@ export function ScanButton({ auditId }: { auditId: string }) {
         {scanning ? (
           <>
             <Loader2 size={15} className="animate-spin" />
-            Scanning {">"}40K items…
+            Scanning…
           </>
         ) : (
           <>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules } from "@/lib/cdm-reference-rules";
 
 export const maxDuration = 60;
 
@@ -524,7 +525,7 @@ export async function POST(request: Request) {
     // Fetch ALL charge items (paginated)
     let allItems: any[] = [];
     let offset = 0;
-    const PAGE_SIZE = 5000;
+    const PAGE_SIZE = 1000; // Supabase/PostgREST caps responses at 1000 rows; page in 1000s so all items are scanned
 
     while (true) {
       const { data, error } = await supabaseAdmin
@@ -548,8 +549,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No charge items found for this audit" }, { status: 404 });
     }
 
-    // Run all rules
-    const ruleResults = runRules(allItems);
+    // Load R&U + formulary (by charge code) for the formulary rules, if present.
+    const usageByCode = new Map<string, any>();
+    const formularyByCode = new Map<string, any>();
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("charge_usage").select("charge_code, units, gross").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      for (const u of data) if (u.charge_code) usageByCode.set(String(u.charge_code), u);
+      if (data.length < 1000) break;
+    }
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("charge_formulary").select("charge_code, status, ndc, drug_name, pkg_amt, pkg_unit").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      for (const f of data) if (f.charge_code) formularyByCode.set(String(f.charge_code), f);
+      if (data.length < 1000) break;
+    }
+
+    // Run all rules: self-contained structural rules + CMS reference-driven rules
+    const ruleResults = [
+      ...runRules(allItems),
+      ...runReferenceRules(allItems),
+      ...runDeviceCrosswalkRules(allItems),
+      ...runCodingUpdateRules(allItems),
+      ...runPriceTransparencyRules(allItems),
+      ...runMultiplierRules(allItems),
+      ...runFormularyRules(allItems, formularyByCode, usageByCode),
+    ];
 
     // Get phases for mapping
     const { data: phases } = await supabaseAdmin
@@ -566,17 +591,22 @@ export async function POST(request: Request) {
       const prefix = ruleId.split(".")[0];
       const map: Record<string, number> = {
         "1": 1, "S": 1, "2": 2, "3": 3, "6": 6, "R": 1, "A": 1, "L": 1,
+        // reference-driven rules
+        "8": 3, "15": 3, "12": 1, "10": 6, "U": 6, "637": 2, "2c": 1,
+        "SIA": 6, "2b": 2, "NC": 3, "M": 1, "PT": 6, "7": 2, "INF": 2, "NDC": 2, "UOM": 2, "PBU": 2,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;
     }
 
-    // Clear previous scan findings
+    // Clear previous scan findings for this audit before re-inserting.
+    // (Delete ALL for the audit — the prior `.like("title","%-%")` filter missed
+    // findings whose titles have no hyphen, e.g. Multi Rev Code / New Codes, so
+    // they accumulated as duplicates on every re-scan.)
     await supabaseAdmin
       .from("findings")
       .delete()
-      .eq("audit_id", auditId)
-      .like("title", "%-%");
+      .eq("audit_id", auditId);
 
     // Insert findings in batches
     const findings = ruleResults.map((r) => ({
@@ -638,3 +668,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Scan failed", detail: err?.message }, { status: 500 });
   }
 }
+// engine: structural rules + CMS reference-driven rules (Greg Brazzel methodology)
