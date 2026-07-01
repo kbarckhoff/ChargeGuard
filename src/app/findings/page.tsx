@@ -118,7 +118,7 @@ export default async function FindingsPage({
   const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
 
   // Get unique categories
-  const categories = [...new Set(allFindings?.map((f) => f.category).filter(Boolean) || [])].sort();
+  const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
 
   return (
     <>
