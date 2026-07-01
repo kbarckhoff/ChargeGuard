@@ -72,9 +72,9 @@ export async function GET(request: Request) {
     mws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: items.length, c: headers.length - 1 } }) };
     XLSX.utils.book_append_sheet(wb, mws, "Data Request");
 
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
     const name = (audit?.hospital_name || "Client").replace(/[^a-zA-Z0-9]/g, "_");
-    return new NextResponse(buf, { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="ChargeGuard_${name}_Data_Request_${date}.xlsx"` } });
+    return new NextResponse(new Uint8Array(buf), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="ChargeGuard_${name}_Data_Request_${date}.xlsx"` } });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }
