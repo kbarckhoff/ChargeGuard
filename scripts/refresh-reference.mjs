@@ -2,12 +2,17 @@
 // Pulls the free public CMS files, validates each download, and upserts the
 // owned columns into Supabase cms_reference. Same validate-before-swap guard as
 // the in-app refresher: a bad/format-changed file records an error and leaves
-// the live data untouched. Heavy files belong here (a GH runner has far more
-// headroom than a serverless function).
+// the live data untouched.
 //
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/refresh-reference.mjs
 //   ONLY=clfs,asp node scripts/refresh-reference.mjs      # subset
 //   FORCE=true node scripts/refresh-reference.mjs         # ignore due dates
+//
+// Resolver strategy (CMS landing pages are JS-rendered, so scraping them for a
+// .zip link fails): each source builds an ordered list of DIRECT candidate URLs
+// at https://www.cms.gov/files/zip/<slug>.zip for the most recent quarters and
+// probes them; if none resolve it falls back to scraping a page's HTML for any
+// /files/zip/*.zip href (also unwrapping CMS "?file=" license links).
 import { createClient } from "@supabase/supabase-js";
 import AdmZip from "adm-zip";
 import * as XLSX from "xlsx";
@@ -16,7 +21,7 @@ const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL || !KEY) { console.error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
 const db = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-const UA = "ChargeGuard reference refresher";
+const UA = "Mozilla/5.0 (ChargeGuard reference refresher)";
 
 const norm = (v) => {
   if (v == null) return "";
@@ -25,6 +30,8 @@ const norm = (v) => {
   const m = s.match(/^([A-Z])(\d+)$/);
   return m ? m[1] + m[2].padStart(4, "0") : s;
 };
+const str = (v) => (v == null || v === "" ? null : String(v).trim());
+const num = (v) => { const n = parseFloat(String(v).replace(/[$,]/g, "")); return isNaN(n) ? 0 : n; };
 const pick = (row, ...needles) => {
   const keys = Object.keys(row);
   for (const n of needles) {
@@ -34,45 +41,73 @@ const pick = (row, ...needles) => {
   return undefined;
 };
 
-async function resolveZip(landing, include, exclude = []) {
-  const html = await (await fetch(landing, { headers: { "User-Agent": UA } })).text();
-  const hrefs = Array.from(html.matchAll(/href="([^"]+\.zip)"/gi)).map((m) => m[1]);
-  const abs = hrefs.map((h) => (h.startsWith("http") ? h : `https://www.cms.gov${h}`));
-  let pool = abs.filter((u) => include.every((i) => new RegExp(i, "i").test(u)) && !exclude.some((e) => new RegExp(e, "i").test(u)));
-  if (!pool.length) pool = abs.filter((u) => include.slice(0, 1).every((i) => new RegExp(i, "i").test(u)));
-  if (!pool.length) throw new Error(`no matching zip on ${landing} (layout may have changed)`);
-  pool.sort((a, b) => (b.match(/20\d\d/g)?.pop() || "").localeCompare(a.match(/20\d\d/g)?.pop() || ""));
-  return pool[0];
-}
-
-async function gridFromZip(zipUrl, excludeEntry = "crosswalk|ndc") {
-  const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
-  const zip = new AdmZip(Buffer.from(buf));
-  const entry = zip.getEntries().find((e) => /\.(xlsx|xls|csv)$/i.test(e.entryName) && !new RegExp(excludeEntry, "i").test(e.entryName))
-    || zip.getEntries().find((e) => /\.(xlsx|xls|csv)$/i.test(e.entryName));
-  if (!entry) throw new Error("no xlsx/csv inside zip");
-  const wb = XLSX.read(entry.getData(), { type: "buffer" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-  let hi = grid.findIndex((r) => r.some((c) => String(c).toLowerCase().includes("hcpcs")));
-  if (hi < 0) hi = 0;
-  const headers = grid[hi].map((c) => String(c ?? ""));
-  const rows = [];
-  for (let i = hi + 1; i < grid.length; i++) {
-    const o = {}; grid[i].forEach((c, j) => { o[headers[j] || `c${j}`] = c; }); rows.push(o);
+// ── Robust zip resolution ──
+// The 3 most recent quarter releases (next/current/prev), newest first, so we
+// pick the newest that's actually posted (CMS posts Q4 around Oct 1, etc).
+const QMONTH = ["january", "april", "july", "october"];
+function quarterCandidates(now = new Date()) {
+  const out = [];
+  const y = now.getUTCFullYear();
+  for (const yy of [y + 1, y, y - 1]) {
+    for (let qi = 3; qi >= 0; qi--) {
+      const start = Date.UTC(yy, qi * 3, 1);
+      if (start <= now.getTime() + 35 * 86400000) out.push({ m: QMONTH[qi], y: yy, qn: qi + 1, letter: "ABCD"[qi], start });
+    }
   }
-  return rows;
+  out.sort((a, b) => b.start - a.start);
+  return out.slice(0, 3);
+}
+async function fetchBuf(url) {
+  const res = await fetch(url, { headers: { "User-Agent": UA }, redirect: "follow" });
+  if (!res.ok) return null;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const buf = Buffer.from(await res.arrayBuffer());
+  // A real zip starts with "PK"; guards against HTML 200s / soft-404s.
+  if (buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b) return buf;
+  if (ct.includes("zip")) return buf;
+  return null;
+}
+// Try direct candidate URLs (slugs under /files/zip/), first hit wins.
+async function tryDirect(slugs) {
+  for (const s of slugs) {
+    const url = s.startsWith("http") ? s : `https://www.cms.gov/files/zip/${s}`;
+    try { const buf = await fetchBuf(url); if (buf) return { buf, url }; } catch { /* next */ }
+  }
+  return null;
+}
+// Fallback: scrape a page's HTML for any /files/zip/*.zip href (unwrapping the
+// CMS "?file=/files/zip/..." AMA-license links), filter by include/exclude, pick
+// the newest by embedded 20xx, and download it.
+async function scrapePage(pageUrl, include = [], exclude = []) {
+  let html;
+  try { html = await (await fetch(pageUrl, { headers: { "User-Agent": UA } })).text(); } catch { return null; }
+  const zips = new Set();
+  for (const m of html.matchAll(/(?:href|file)=["']?([^"'&> ]*\/files\/zip\/[^"'&> ]+\.zip)/gi)) {
+    let u = m[1];
+    if (u.includes("file=")) u = decodeURIComponent(u.split("file=").pop());
+    zips.add(u.startsWith("http") ? u : `https://www.cms.gov${u}`);
+  }
+  let pool = [...zips].filter((u) => include.every((i) => new RegExp(i, "i").test(u)) && !exclude.some((e) => new RegExp(e, "i").test(u)));
+  if (!pool.length) pool = [...zips];
+  pool.sort((a, b) => (b.match(/20\d\d/g)?.pop() || "").localeCompare(a.match(/20\d\d/g)?.pop() || ""));
+  for (const u of pool) { try { const buf = await fetchBuf(u); if (buf) return { buf, url: u }; } catch { /* next */ } }
+  return null;
+}
+async function resolveZip({ slugs = [], pages = [], include = [], exclude = [] }) {
+  const direct = await tryDirect(slugs);
+  if (direct) return direct;
+  for (const p of pages) { const hit = await scrapePage(p, include, exclude); if (hit) return hit; }
+  throw new Error("no resolvable zip (tried direct slugs + page scrape; CMS layout/date may have shifted)");
 }
 
-// Read EVERY xlsx/csv entry (and every sheet) in a zip as [{name, rows[][]}].
-// MPFS zips carry several files (PPRRVU, GPCI, OPPSCAP…), so single-sheet
-// reading isn't enough — we pick the right table by name below.
-async function tablesFromZip(zipUrl) {
-  const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
-  const zip = new AdmZip(Buffer.from(buf));
+// ── Spreadsheet extraction ──
+// All tables (every xlsx/csv/txt entry × every sheet) from a zip buffer.
+function tablesFromZip(buf, excludeEntry = "crosswalk|ndc|readme|layout") {
+  const zip = new AdmZip(buf);
   const tables = [];
   for (const e of zip.getEntries()) {
-    if (!/\.(xlsx|xls|csv)$/i.test(e.entryName)) continue;
+    if (!/\.(xlsx|xls|csv|txt)$/i.test(e.entryName)) continue;
+    if (new RegExp(excludeEntry, "i").test(e.entryName)) continue;
     let wb; try { wb = XLSX.read(e.getData(), { type: "buffer" }); } catch { continue; }
     for (const sheet of wb.SheetNames) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, blankrows: false });
@@ -81,7 +116,19 @@ async function tablesFromZip(zipUrl) {
   }
   return tables;
 }
-const numval = (v) => { const n = parseFloat(String(v).replace(/[$,]/g, "")); return isNaN(n) ? 0 : n; };
+// Header-keyed rows from the best table (first whose header row has "hcpcs").
+function rowsFromZip(buf, hint = "hcpcs") {
+  const tables = tablesFromZip(buf);
+  for (const t of tables) {
+    let hi = t.rows.findIndex((r) => r.some((c) => String(c).toLowerCase().includes(hint)));
+    if (hi < 0) continue;
+    const headers = t.rows[hi].map((c) => String(c ?? ""));
+    const out = [];
+    for (let i = hi + 1; i < t.rows.length; i++) { const o = {}; t.rows[i].forEach((c, j) => { o[headers[j] || `c${j}`] = c; }); out.push(o); }
+    if (out.length) return out;
+  }
+  return [];
+}
 function findHeaderRow(rows, hints) {
   for (let i = 0; i < Math.min(rows.length, 40); i++) {
     const short = rows[i].map((c) => String(c)).filter((c) => c.length <= 40).map((c) => c.toLowerCase());
@@ -97,37 +144,46 @@ function pickTable(tables, { prefer = [], avoid = [], hints = [] }) {
 // CY2026 non-QP conversion factor (CMS PFS final rule). UPDATE each January.
 const MPFS_CONVERSION_FACTOR = 33.40;
 
-// key → { cadence, effective(ISO), cmsUrl, owned:[cols], minRows, refresh():ParsedRow[] }
+// key → { cadence, effective, owned:[cols], minRows, refresh():ParsedRow[] }
 const SOURCES = {
   asp: {
     cadence: "quarterly", effective: "2026-07-01", owned: ["asp", "dosage"], minRows: 400,
-    cmsUrl: "https://www.cms.gov/medicare/payment/part-b-drugs/asp-pricing-files",
-    refresh: async (s) => {
-      const url = await resolveZip(s.cmsUrl, ["asp", "pric"], ["crosswalk", "ndc"]);
-      const rows = await gridFromZip(url);
-      return rows.map((r) => ({ hcpcs: norm(pick(r, "hcpcs code", "hcpcs")), asp: str(pick(r, "payment limit", "limit")), dosage: str(pick(r, "dosage")) }))
-        .filter((r) => r.hcpcs);
+    refresh: async () => {
+      const q = quarterCandidates();
+      const slugs = q.flatMap((c) => [
+        `${c.m}-${c.y}-medicare-part-b-payment-limit-files.zip`,
+        `${c.m}-${c.y}-medicare-part-b-payment-limit-files-final-file.zip`,
+        `${c.m}-${c.y}-medicare-part-b-payment-limit-files-preliminary.zip`,
+        `${c.m}-${c.y}-asp-pricing-file.zip`,
+      ]);
+      const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/part-b-drugs/asp-pricing-files"], include: ["payment-limit|asp"], exclude: ["crosswalk", "ndc"] });
+      return rowsFromZip(buf).map((r) => ({ hcpcs: norm(pick(r, "hcpcs code", "hcpcs")), asp: str(pick(r, "payment limit", "limit")), dosage: str(pick(r, "dosage")) })).filter((r) => r.hcpcs);
     },
   },
   clfs: {
-    cadence: "annual", effective: "2026-01-01", owned: ["clfs"], minRows: 1000,
-    cmsUrl: "https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule/clinical-laboratory-fee-schedule-files",
-    refresh: async (s) => {
-      const url = await resolveZip(s.cmsUrl, ["clfs"]);
-      const rows = await gridFromZip(url);
-      return rows.map((r) => ({ hcpcs: norm(pick(r, "hcpcs")), clfs: str(pick(r, "rate", "payment")) }))
-        .filter((r) => r.hcpcs && r.clfs);
+    cadence: "quarterly", effective: "2026-01-01", owned: ["clfs"], minRows: 800,
+    refresh: async () => {
+      const q = quarterCandidates();
+      const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
+      const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
+      // CLFS files are usually a delimited .txt: HCPCS + payment/NLA amount.
+      const rows = rowsFromZip(buf, "hcpcs");
+      return rows.map((r) => ({ hcpcs: norm(pick(r, "hcpcs", "code")), clfs: str(pick(r, "payment", "rate", "amount", "nla", "limitation")) })).filter((r) => r.hcpcs && r.clfs);
     },
   },
   addendum_b: {
-    // Addendum B carries the per-HCPCS status indicator, short description AND the
-    // OPPS payment rate, so it feeds apc_payment directly (no separate A→B join).
+    // Addendum B carries per-HCPCS Status Indicator, short description AND the
+    // OPPS payment rate, so it feeds apc_payment directly (no separate A join).
     cadence: "quarterly", effective: "2026-04-01", owned: ["si", "short_desc", "apc_payment"], minRows: 8000,
-    cmsUrl: "https://www.cms.gov/medicare/payment/prospective-payment-systems/hospital-outpatient/addendum-and-addendum-b-updates",
-    refresh: async (s) => {
-      const url = await resolveZip(s.cmsUrl, ["b"], ["addendum.?a\\b"]);
-      const rows = await gridFromZip(url);
-      return rows.map((r) => ({
+    refresh: async () => {
+      const q = quarterCandidates();
+      const slugs = q.flatMap((c) => [`${c.m}-${c.y}-opps-addendum-b.zip`, `${c.m}-${c.y}-addendum-b.zip`]);
+      const { buf } = await resolveZip({
+        slugs,
+        pages: ["https://www.cms.gov/medicare/payment/prospective-payment-systems/hospital-outpatient-pps/quarterly-addenda-updates"],
+        include: ["addendum.?b"], exclude: [],
+      });
+      return rowsFromZip(buf).map((r) => ({
         hcpcs: norm(pick(r, "hcpcs")),
         si: str(pick(r, "status indicator", "si")),
         short_desc: str(pick(r, "short desc", "descriptor")),
@@ -136,14 +192,19 @@ const SOURCES = {
     },
   },
   mpfs: {
-    // National fee = total RVUs x conversion factor. Uses the PPRRVU file (nonQPP
-    // variant), reading the fixed positional columns; base codes only (no 26/TC).
+    // National fee = total RVUs x conversion factor, from the PPRRVU file.
     cadence: "quarterly", effective: "2026-01-01", owned: ["mc_fee", "pf_fee"], minRows: 5000,
-    cmsUrl: "https://www.cms.gov/medicare/payment/fee-schedules/physician/pfs-relative-value-files",
-    refresh: async (s) => {
-      const url = await resolveZip(s.cmsUrl, ["rvu"], ["gpci", "oppscap"]);
-      const tables = await tablesFromZip(url);
-      const t = pickTable(tables, { prefer: [/pprrvu.*nonqpp.*\.xlsx/i, /pprrvu.*\.xlsx/i, /pprrvu/i], avoid: [/gpci|oppscap|narrative|readme|layout|[^n]qpp/i], hints: ["hcpcs"] });
+    refresh: async () => {
+      const q = quarterCandidates();
+      // The RVU zip often carries a "-updated-MM-DD-YYYY" suffix, so scrape the
+      // per-release detail page for the exact /files/zip/rvuNNx*.zip link; also
+      // try the bare slug in case it's un-suffixed.
+      const slugs = q.map((c) => `rvu${String(c.y).slice(2)}${c.letter.toLowerCase()}.zip`);
+      const pages = q.map((c) => `https://www.cms.gov/medicare/payment/fee-schedules/physician/pfs-relative-value-files/rvu${String(c.y).slice(2)}${c.letter.toLowerCase()}`);
+      pages.push("https://www.cms.gov/medicare/payment/fee-schedules/physician/pfs-relative-value-files");
+      const { buf } = await resolveZip({ slugs, pages, include: ["rvu"], exclude: ["gpci", "oppscap"] });
+      const tables = tablesFromZip(buf, "gpci|oppscap|anes|readme|layout|ndc|crosswalk");
+      const t = pickTable(tables, { prefer: [/pprrvu.*nonqpp.*\.xlsx/i, /pprrvu.*\.xlsx/i, /pprrvu/i], avoid: [/gpci|oppscap|[^n]qpp/i], hints: ["hcpcs"] });
       if (!t) return [];
       const hi = t.rows.findIndex((r) => String(r[0]).trim().toUpperCase() === "HCPCS");
       if (hi < 0) return [];
@@ -154,8 +215,8 @@ const SOURCES = {
         if (String(r[C.mod] ?? "").trim() !== "") continue; // base code only
         const code = norm(r[C.hcpcs]);
         if (!/^[A-Z0-9]{5}$/.test(code)) continue;
-        const nonFac = numval(r[C.nonfacTotal]) || (numval(r[C.work]) + numval(r[C.nonfacPE]) + numval(r[C.mp]));
-        const fac = numval(r[C.facTotal]) || (numval(r[C.work]) + numval(r[C.facPE]) + numval(r[C.mp]));
+        const nonFac = num(r[C.nonfacTotal]) || (num(r[C.work]) + num(r[C.nonfacPE]) + num(r[C.mp]));
+        const fac = num(r[C.facTotal]) || (num(r[C.work]) + num(r[C.facPE]) + num(r[C.mp]));
         const rec = { hcpcs: code };
         if (nonFac > 0) rec.mc_fee = (nonFac * cf).toFixed(2);
         if (fac > 0) rec.pf_fee = (fac * cf).toFixed(2);
@@ -164,14 +225,27 @@ const SOURCES = {
       return out;
     },
   },
-  // HCPCS retired-code flagging stays manual on purpose: auto-marking codes retired
-  // from a possibly-partial active list can wrongly flag many codes. Enable only
-  // after a validated set-difference pass (see scripts/fee-schedules).
-  hcpcs: { cadence: "quarterly", effective: "2026-04-01", owned: ["retired"], minRows: 5000,
-    cmsUrl: "https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system/quarterly-update", refresh: null },
+  hcpcs: {
+    // Alpha-numeric HCPCS (ANWEB) file → retired-code flag from the termination
+    // date / action code, so deleted codes get flagged for replacement.
+    cadence: "quarterly", effective: "2026-04-01", owned: ["retired"], minRows: 5000,
+    refresh: async () => {
+      const q = quarterCandidates();
+      const slugs = q.flatMap((c) => [`${c.m}-${c.y}-alpha-numeric-hcpcs-file.zip`, `${c.m}-${c.y}-alpha-numeric-hcpcs-files.zip`]);
+      const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system/quarterly-update"], include: ["hcpcs"], exclude: ["record", "layout"] });
+      const rows = rowsFromZip(buf, "hcpc");
+      const now = Date.now();
+      const isPast = (v) => { if (!v) return false; const t = Date.parse(String(v)); return !isNaN(t) && t < now; };
+      return rows.map((r) => {
+        const code = norm(pick(r, "hcpc"));
+        const term = pick(r, "termination date", "term date");
+        const action = String(pick(r, "action code") || "").trim().toUpperCase();
+        const retired = (isPast(term) || action === "D") ? "YES" : null;
+        return { hcpcs: code, retired };
+      }).filter((r) => r.hcpcs);
+    },
+  },
 };
-
-const str = (v) => (v == null || v === "" ? null : String(v).trim());
 
 function nextRelease(cadence, from) {
   const y = from.getUTCFullYear();
@@ -183,7 +257,7 @@ const isDue = (s) => Date.now() >= nextRelease(s.cadence, new Date(s.effective +
 
 function validate(rows, minRows) {
   if (!rows?.length) return "no rows parsed";
-  if (rows.length < minRows) return `only ${rows.length} rows (expected ≥ ${minRows}) — likely a format change`;
+  if (rows.length < minRows) return `only ${rows.length} rows (expected >= ${minRows}) - likely a format change`;
   if (rows.filter((r) => r.hcpcs).length / rows.length < 0.95) return ">5% of rows missing a HCPCS key";
   return null;
 }
@@ -202,13 +276,11 @@ async function persist(key, owned, rows, vintage) {
 
 const only = (process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
 const force = String(process.env.FORCE).toLowerCase() === "true";
-
 const targets = Object.entries(SOURCES).filter(([k, s]) => (only.length ? only.includes(k) : (force || isDue(s))));
 console.log(`Refreshing: ${targets.map(([k]) => k).join(", ") || "(nothing due)"}`);
 
 let failures = 0;
 for (const [key, s] of targets) {
-  if (!s.refresh) { console.log(`  ${key}: parser pending — skipped`); continue; }
   try {
     const rows = await s.refresh(s);
     const bad = validate(rows, s.minRows);
@@ -217,7 +289,7 @@ for (const [key, s] of targets) {
     console.log(`  ${key}: refreshed ${n} rows`);
   } catch (e) {
     failures++;
-    console.error(`  ${key}: FAILED — ${e.message}`);
+    console.error(`  ${key}: FAILED - ${e.message}`);
     try { await db.from("cms_reference_sources").upsert({ key, status: "error", last_error: e.message, last_checked: new Date().toISOString() }, { onConflict: "key" }); } catch {}
   }
 }
