@@ -1,7 +1,7 @@
 import { referenceCoverage } from "@/lib/cms-reference";
 import { allSourceStatus, nextRelease, type SourceStatus } from "@/lib/reference-sources";
 import { createClient } from "@supabase/supabase-js";
-import { Database, Layers, Stethoscope, FlaskConical, Pill, Archive, ShieldCheck, CalendarClock, Syringe, FileText, AlertTriangle, CheckCircle2, Lock, RefreshCw } from "lucide-react";
+import { Database, Layers, Stethoscope, FlaskConical, Pill, Archive, ShieldCheck, CalendarClock, Syringe, FileText, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 
 const ICONS: Record<string, any> = {
   addendum_b: Layers, addendum_a: Database, mpfs: Stethoscope, clfs: FlaskConical,
@@ -69,7 +69,9 @@ export default async function BenchmarksPage() {
               // Prefer the live refresh metadata: once the job has actually pulled
               // a release, drive "loaded" + "update due" from when it last ran,
               // instead of the static bundled vintage.
-              const meta = refreshByKey[s.key];
+              // Addendum A (APC payment rates) is populated from the Addendum B
+              // file by the same refresh job, so mirror the addendum_b status.
+              const meta = refreshByKey[s.key] || (s.key === "addendum_a" ? refreshByKey["addendum_b"] : undefined);
               let vintage = s.vintage, overdue = s.overdue, nextDue = s.nextDue;
               if (meta?.last_refreshed && s.cadence !== "manual") {
                 const eff = new Date(meta.last_refreshed);
@@ -95,21 +97,6 @@ export default async function BenchmarksPage() {
                     )}
                   </div>
                   <p className="text-[12.5px] text-[#64748b] mt-3 leading-snug">{DESC[s.key]}</p>
-
-                  {(() => {
-                    const m = refreshByKey[s.key];
-                    if (!m) return null;
-                    const when = m.last_refreshed ? fmtDate(new Date(m.last_refreshed)) : "—";
-                    return (
-                      <div className="mt-3 text-[11px]">
-                        {m.status === "error" ? (
-                          <span className="inline-flex items-center gap-1 font-semibold text-[#b42318] bg-[#fdeceb] px-2 py-0.5 rounded" title={m.last_error || ""}><AlertTriangle size={11} /> Last refresh failed{m.last_error ? `: ${m.last_error.slice(0, 60)}` : ""}</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 font-medium text-[#067647] bg-[#e7f7ef] px-2 py-0.5 rounded"><RefreshCw size={11} /> Auto-refreshed {when}{m.row_count ? ` · ${m.row_count.toLocaleString()} rows` : ""}</span>
-                        )}
-                      </div>
-                    );
-                  })()}
 
                   <div className="flex items-center flex-wrap gap-2 mt-3 pt-3 border-t border-[#f1f5f9]">
                     {s.cadence === "manual" ? (

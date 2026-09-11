@@ -26,7 +26,7 @@ export function AppSidebar() {
   return (
     <aside className="w-[224px] shrink-0 bg-[#1f6fd4] text-white flex flex-col min-h-screen">
       <div className="flex items-center gap-2.5 px-5 h-14">
-        <div className="w-[26px] h-[26px] rounded-[7px] bg-white/20 flex items-center justify-center"><span className="w-3 h-3 rounded-[3px] bg-white" /></div>
+        <div className="w-[26px] h-[26px] rounded-[7px] bg-white flex items-center justify-center overflow-hidden"><img src="/logo-icon.png" alt="ChargeGuard" className="w-[19px] h-[19px] object-contain" /></div>
         <span className="font-bold text-[15px] tracking-tight">ChargeGuard</span>
       </div>
       <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">
