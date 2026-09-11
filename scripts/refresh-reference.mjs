@@ -57,14 +57,24 @@ function quarterCandidates(now = new Date()) {
   out.sort((a, b) => b.start - a.start);
   return out.slice(0, 3);
 }
-async function fetchBuf(url) {
-  const res = await fetch(url, { headers: { "User-Agent": UA }, redirect: "follow" });
-  if (!res.ok) return null;
-  const ct = (res.headers.get("content-type") || "").toLowerCase();
-  const buf = Buffer.from(await res.arrayBuffer());
-  // A real zip starts with "PK"; guards against HTML 200s / soft-404s.
-  if (buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b) return buf;
-  if (ct.includes("zip")) return buf;
+async function fetchBuf(url, tries = 3) {
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": UA }, redirect: "follow" });
+      // 5xx / 429 are transient (CMS gateway timeouts) — wait and retry.
+      if ((res.status >= 500 || res.status === 429) && attempt < tries) { await new Promise((r) => setTimeout(r, 3000 * attempt)); continue; }
+      if (!res.ok) return null;
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const buf = Buffer.from(await res.arrayBuffer());
+      // A real zip starts with "PK"; guards against HTML 200s / soft-404s.
+      if (buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b) return buf;
+      if (ct.includes("zip")) return buf;
+      return null;
+    } catch (e) {
+      if (attempt >= tries) throw e;
+      await new Promise((r) => setTimeout(r, 3000 * attempt));
+    }
+  }
   return null;
 }
 // Try direct candidate URLs (slugs under /files/zip/), first hit wins.
