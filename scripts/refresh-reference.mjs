@@ -184,19 +184,45 @@ const SOURCES = {
       const q = quarterCandidates();
       const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
       const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
-      // CLFS is a fixed-width/whitespace .txt: HCPCS then the payment amount(s).
-      // Take the code and the last dollar-like number on each data line.
-      const text = rawTextFromZip(buf, /\.txt$/i) || rawTextFromZip(buf, /\.(csv|xlsx)$/i);
-      const out = [];
-      for (const line of text.split(/\r?\n/)) {
-        const parts = line.trim().split(/[\s,|]+/).filter(Boolean);
-        if (!parts.length) continue;
-        const code = norm(parts[0]);
+      // If CMS ever ships a structured csv/xlsx with a HCPCS header, use it.
+      let out = rowsFromZip(buf, "hcpc")
+        .map((r) => ({ hcpcs: norm(pick(r, "hcpcs", "hcpc")), clfs: str(num(pick(r, "payment", "rate", "amount", "fee"))) }))
+        .filter((r) => r.hcpcs && r.clfs && r.clfs !== "0");
+      if (out.length >= 800) return out;
+      // Otherwise it's the headerless fixed-width CLAB .txt: a 5-char HCPCS, an
+      // optional modifier, then the national payment amount. CMS writes the
+      // amount WITHOUT a decimal point (implied 2 decimals: 1109 => $11.09),
+      // though some vintages use a real decimal - handle both. Lab fees sit in a
+      // narrow $ range, so pick the numeric token that yields a plausible fee
+      // (guards against trailing effective-date / indicator columns).
+      const text = rawTextFromZip(buf, /\.txt$/i) || rawTextFromZip(buf, /\.(csv)$/i);
+      out = [];
+      const samples = [];
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.replace(/\s+$/, "");
+        const m = line.match(/^\s*([A-Z0-9]{5})\b/);
+        if (!m) continue;
+        const code = norm(m[1]);
         if (!/^[A-Z0-9]{5}$/.test(code)) continue;
-        const nums = parts.filter((p) => /^\$?\d+\.\d{1,2}$/.test(p));
-        if (!nums.length) continue;
-        out.push({ hcpcs: code, clfs: nums[nums.length - 1].replace("$", "") });
+        const rest = line.slice(m.index + m[0].length);
+        const toks = rest.match(/\$?\d[\d,]*(?:\.\d{1,2})?/g) || [];
+        const cands = toks
+          .map((t) => { const s = t.replace(/[$,]/g, ""); return s.includes(".") ? { v: parseFloat(s), dec: true } : { v: parseInt(s, 10) / 100, dec: false }; })
+          .filter((c) => c.v > 0);
+        if (!cands.length) continue;
+        // Prefer an explicit decimal amount; else the last implied-cents value in
+        // a plausible lab-fee range; else fall back to the last positive token.
+        const chosen = cands.filter((c) => c.dec).pop()
+          || cands.filter((c) => c.v >= 0.5 && c.v <= 10000).pop()
+          || cands[cands.length - 1];
+        const amt = chosen.v;
+        if (!(amt > 0) || amt > 100000) continue;
+        out.push({ hcpcs: code, clfs: amt.toFixed(2) });
+        if (samples.length < 6) samples.push(`${code} "${line.trim().slice(0, 56)}" => ${amt.toFixed(2)}`);
       }
+      // Print a sample so the CI log lets us confirm the parsed values are real
+      // CLFS prices (not a mis-picked column).
+      if (samples.length) console.log("    clfs sample:\n      " + samples.join("\n      "));
       return out;
     },
   },
