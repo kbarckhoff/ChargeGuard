@@ -24,9 +24,20 @@ export default async function FindingsPage({
 
   const { data: userData } = await supabaseAdmin
     .from("users")
-    .select("org_id")
+    .select("org_id, is_platform_owner")
     .eq("id", user!.id)
     .single();
+
+  // Department gating: a user sees only findings for the departments they belong
+  // to. The platform owner, or a user who belongs to every department, sees all.
+  const [{ data: myDepts }, { count: orgDeptCount }] = await Promise.all([
+    supabaseAdmin.from("user_departments").select("department_id").eq("user_id", user!.id),
+    supabaseAdmin.from("departments").select("id", { count: "exact", head: true }).eq("org_id", userData!.org_id).eq("is_active", true),
+  ]);
+  const myDeptIds = (myDepts || []).map((d) => (d as any).department_id as string);
+  const canSeeAll = !!userData?.is_platform_owner || (orgDeptCount != null && orgDeptCount > 0 && myDeptIds.length >= orgDeptCount);
+  // When scoped, filter to the user's departments (empty set -> match nothing).
+  const scopeIds = myDeptIds.length ? myDeptIds : ["00000000-0000-0000-0000-000000000000"];
 
   // Scope to a specific run when ?auditId is passed (from inside a run);
   // otherwise fall back to the most recent audit.
@@ -76,6 +87,7 @@ export default async function FindingsPage({
     .eq("audit_id", auditId)
     .order("severity", { ascending: true })
     .order("created_at", { ascending: false });
+  if (!canSeeAll) query = query.in("owner_department_id", scopeIds);
 
   if (sp.severity && sp.severity !== "all") {
     query = query.eq("severity", sp.severity);
@@ -101,11 +113,12 @@ export default async function FindingsPage({
   // categories from the filter dropdown).
   const allFindings: { severity: string; status: string; financial_impact: number | null; category: string | null; title: string | null }[] = [];
   for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await supabaseAdmin
+    let statsQuery = supabaseAdmin
       .from("findings")
       .select("severity, status, financial_impact, category, title")
-      .eq("audit_id", auditId)
-      .range(offset, offset + 999);
+      .eq("audit_id", auditId);
+    if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
+    const { data, error } = await statsQuery.range(offset, offset + 999);
     if (error || !data || data.length === 0) break;
     allFindings.push(...data);
     if (data.length < 1000) break;

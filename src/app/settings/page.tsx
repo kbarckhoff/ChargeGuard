@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/shared";
 import { FacilityTypeSetting } from "@/components/settings/FacilityTypeSetting";
+import { TeamManager } from "@/components/settings/TeamManager";
 import type { FacilityType } from "@/lib/rule-catalog";
 
 export default async function SettingsPage() {
@@ -9,6 +11,24 @@ export default async function SettingsPage() {
   const { data: profile } = await supabase.from("users").select("*, organizations(*)").eq("id", user!.id).single();
   const org = profile?.organizations as any;
   const facilityType: FacilityType = (org?.settings?.facility_type as FacilityType) || "opps_outpatient";
+
+  // Team data (service-role read, scoped to this org).
+  const orgId = profile?.org_id as string | undefined;
+  let members: any[] = [], departments: any[] = [], invites: any[] = [];
+  if (orgId) {
+    const db = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    const [{ data: deps }, { data: us }, { data: uds }, { data: invs }] = await Promise.all([
+      db.from("departments").select("id, name").eq("org_id", orgId).eq("is_active", true).order("sort_order"),
+      db.from("users").select("id, full_name, email, is_active, is_platform_owner").eq("org_id", orgId),
+      db.from("user_departments").select("user_id, department_id").eq("org_id", orgId),
+      db.from("invitations").select("id, email, department_ids").eq("org_id", orgId).eq("status", "pending"),
+    ]);
+    departments = deps || [];
+    const byUser: Record<string, string[]> = {};
+    for (const ud of uds || []) (byUser[(ud as any).user_id] ||= []).push((ud as any).department_id);
+    members = (us || []).map((u: any) => ({ ...u, department_ids: byUser[u.id] || [] }));
+    invites = invs || [];
+  }
 
   return (
     <>
@@ -53,6 +73,9 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Team */}
+          <TeamManager members={members} departments={departments} invites={invites} />
         </div>
       </div>
     </>

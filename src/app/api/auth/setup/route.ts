@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { seedOrgDepartments } from "@/lib/departments";
 
 export async function POST(request: Request) {
   try {
@@ -76,6 +77,14 @@ export async function POST(request: Request) {
         { error: "Failed to create user profile", detail: userError.message }, 
         { status: 500 }
       );
+    }
+
+    // Seed the standard departments + revenue-code routing map for the new org.
+    try {
+      await seedOrgDepartments(supabaseAdmin, org.id);
+    } catch (seedErr: any) {
+      console.error("Department seed error:", seedErr?.message || seedErr);
+      // Non-fatal: org + user exist; departments can be re-seeded from Settings.
     }
 
     return NextResponse.json({ org_id: org.id, success: true });

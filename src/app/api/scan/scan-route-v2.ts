@@ -7,6 +7,7 @@ import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
 import { ruleIdsForFacility, type FacilityType } from "@/lib/rule-catalog";
+import { loadDeptMaps, isStructuralCategory } from "@/lib/departments";
 
 export const maxDuration = 60;
 
@@ -776,6 +777,18 @@ export async function POST(request: Request) {
       .delete()
       .eq("audit_id", auditId);
 
+    // Auto-route each finding to a department: structural/coding issues ->
+    // Revenue Cycle/HIM; everything else by the line's UB-04 revenue code; no
+    // match -> Unassigned. Reviewers can override later.
+    const { idByCode, deptIdByPrefix } = await loadDeptMaps(supabaseAdmin, userData.org_id);
+    const revByItem: Record<string, string> = {};
+    for (const it of allItems) revByItem[it.id] = it.revenue_code || "";
+    const deptFor = (category: string, chargeItemId: string | null): string | null => {
+      if (isStructuralCategory(category)) return idByCode["revenue_cycle"] || idByCode["unassigned"] || null;
+      const p3 = (chargeItemId ? revByItem[chargeItemId] || "" : "").replace(/[^0-9]/g, "").slice(0, 3);
+      return (p3 && deptIdByPrefix[p3]) || idByCode["unassigned"] || null;
+    };
+
     // Insert findings in batches
     const findings = ruleResults.map((r) => ({
       audit_id: auditId,
@@ -789,6 +802,7 @@ export async function POST(request: Request) {
       category: r.category,
       financial_impact: r.financial_impact || null,
       recommendation: r.recommendation,
+      owner_department_id: deptFor(r.category, r.charge_item_id),
       created_by: user.id,
     }));
 
