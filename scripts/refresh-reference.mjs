@@ -185,37 +185,48 @@ const SOURCES = {
       const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
       const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
       // The CLFS PUF release ships csv/xlsx/txt that all carry a multi-row
-      // title + AMA-copyright preamble BEFORE the real header row, so parse it as
-      // a structured table: find the header row containing HCPCS, then read the
-      // HCPCS column and the payment-rate column. Prefer the xlsx/csv (skip the
-      // pdf and the headerless legacy txt).
-      const tables = tablesFromZip(buf, "readme|record|layout|\\.pdf$");
-      const preferred = tables.filter((t) => /\.(xlsx|xls|csv)/i.test(t.name));
-      const out = [];
-      let picked = null, chosenHdr = null;
-      for (const t of (preferred.length ? preferred : tables)) {
-        const hi = t.rows.findIndex((r) => r.some((c) => /hcpcs/i.test(String(c))));
-        if (hi < 0) continue;
-        const headers = t.rows[hi].map((c) => String(c ?? "").toLowerCase().replace(/\s+/g, " ").trim());
-        const hc = headers.findIndex((h) => h.includes("hcpcs"));
-        // The payment column is a rate/payment/fee/amount header (not a date, mod,
-        // or code column); take the first such match.
-        const pay = headers.findIndex((h) => /(payment|rate|fee|amount|price)/.test(h) && !/date|effective|hcpcs|mod/.test(h));
-        if (hc < 0 || pay < 0) continue;
-        const rows = [];
-        for (const r of t.rows.slice(hi + 1)) {
-          const code = norm(r[hc]);
-          if (!/^[A-Z0-9]{5}$/.test(code)) continue;
-          const amt = num(r[pay]);
-          if (!(amt > 0)) continue;
-          rows.push({ hcpcs: code, clfs: amt.toFixed(2) });
+      // title + AMA-copyright preamble BEFORE the real header row. Parse the CSV
+      // text directly (quote-aware): find the header line containing HCPCS, then
+      // read the HCPCS column and the payment-rate column.
+      const splitCsv = (line) => {
+        const o = []; let cur = "", q = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+          else if (ch === "," && !q) { o.push(cur); cur = ""; }
+          else cur += ch;
         }
-        if (rows.length > out.length) { out.length = 0; out.push(...rows); picked = t.name; chosenHdr = headers[pay]; }
-        if (out.length >= 800) break;
+        o.push(cur); return o;
+      };
+      const csv = rawTextFromZip(buf, /\.csv$/i) || rawTextFromZip(buf, /\.txt$/i);
+      const lines = csv.split(/\r?\n/);
+      const hi = lines.findIndex((l) => /hcpcs/i.test(l) && l.split(",").length > 1);
+      const out = [];
+      let chosenHdr = null;
+      if (hi >= 0) {
+        const headers = splitCsv(lines[hi]).map((h) => h.replace(/"/g, "").toLowerCase().replace(/\s+/g, " ").trim());
+        const hc = headers.findIndex((h) => h.includes("hcpcs"));
+        // Payment column: a rate/payment/fee/amount header (not a date, mod, or
+        // the code column). Take the first such match.
+        const pay = headers.findIndex((h) => /(payment|rate|fee|amount|price)/.test(h) && !/date|effective|hcpcs|mod/.test(h));
+        chosenHdr = pay >= 0 ? headers[pay] : null;
+        console.log(`    clfs headers (row ${hi}): ${JSON.stringify(headers)}`);
+        if (hc >= 0 && pay >= 0) {
+          for (const l of lines.slice(hi + 1)) {
+            if (!l.trim()) continue;
+            const cols = splitCsv(l);
+            const code = norm((cols[hc] || "").replace(/"/g, ""));
+            if (!/^[A-Z0-9]{5}$/.test(code)) continue;
+            const amt = num((cols[pay] || "").replace(/"/g, ""));
+            if (!(amt > 0)) continue;
+            out.push({ hcpcs: code, clfs: amt.toFixed(2) });
+          }
+        }
+      } else {
+        // No header found — dump the first lines so the true layout is visible.
+        console.log("    clfs: no HCPCS header; first lines: " + JSON.stringify(lines.slice(0, 12)));
       }
-      // Log the table + payment column we locked onto plus a few values, so the
-      // CI log confirms we read the real CLFS price (not a mis-picked column).
-      console.log(`    clfs: ${out.length} rows from ${picked || "(no HCPCS table found)"}${chosenHdr ? ` [pay col: "${chosenHdr}"]` : ""}`);
+      console.log(`    clfs: ${out.length} rows${chosenHdr ? ` [pay col: "${chosenHdr}"]` : ""}`);
       if (out.length) console.log("    clfs sample: " + out.slice(0, 6).map((r) => `${r.hcpcs}=>${r.clfs}`).join(", "));
       return out;
     },
