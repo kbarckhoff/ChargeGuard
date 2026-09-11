@@ -116,18 +116,26 @@ function tablesFromZip(buf, excludeEntry = "crosswalk|ndc|readme|layout") {
   }
   return tables;
 }
-// Header-keyed rows from the best table (first whose header row has "hcpcs").
+// Header-keyed rows from the table that yields the MOST rows (avoids picking a
+// cover/notes sheet that merely mentions "HCPCS").
 function rowsFromZip(buf, hint = "hcpcs") {
   const tables = tablesFromZip(buf);
+  let best = [];
   for (const t of tables) {
-    let hi = t.rows.findIndex((r) => r.some((c) => String(c).toLowerCase().includes(hint)));
+    const hi = t.rows.findIndex((r) => r.some((c) => String(c).toLowerCase().includes(hint)));
     if (hi < 0) continue;
     const headers = t.rows[hi].map((c) => String(c ?? ""));
     const out = [];
     for (let i = hi + 1; i < t.rows.length; i++) { const o = {}; t.rows[i].forEach((c, j) => { o[headers[j] || `c${j}`] = c; }); out.push(o); }
-    if (out.length) return out;
+    if (out.length > best.length) best = out;
   }
-  return [];
+  return best;
+}
+// Raw text of the first zip entry matching `re` (for fixed-width files like CLFS).
+function rawTextFromZip(buf, re) {
+  const zip = new AdmZip(buf);
+  const e = zip.getEntries().find((x) => re.test(x.entryName) && !/readme|layout|record/i.test(x.entryName));
+  return e ? e.getData().toString("latin1") : "";
 }
 function findHeaderRow(rows, hints) {
   for (let i = 0; i < Math.min(rows.length, 40); i++) {
@@ -166,9 +174,20 @@ const SOURCES = {
       const q = quarterCandidates();
       const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
       const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
-      // CLFS files are usually a delimited .txt: HCPCS + payment/NLA amount.
-      const rows = rowsFromZip(buf, "hcpcs");
-      return rows.map((r) => ({ hcpcs: norm(pick(r, "hcpcs", "code")), clfs: str(pick(r, "payment", "rate", "amount", "nla", "limitation")) })).filter((r) => r.hcpcs && r.clfs);
+      // CLFS is a fixed-width/whitespace .txt: HCPCS then the payment amount(s).
+      // Take the code and the last dollar-like number on each data line.
+      const text = rawTextFromZip(buf, /\.txt$/i) || rawTextFromZip(buf, /\.(csv|xlsx)$/i);
+      const out = [];
+      for (const line of text.split(/\r?\n/)) {
+        const parts = line.trim().split(/[\s,|]+/).filter(Boolean);
+        if (!parts.length) continue;
+        const code = norm(parts[0]);
+        if (!/^[A-Z0-9]{5}$/.test(code)) continue;
+        const nums = parts.filter((p) => /^\$?\d+\.\d{1,2}$/.test(p));
+        if (!nums.length) continue;
+        out.push({ hcpcs: code, clfs: nums[nums.length - 1].replace("$", "") });
+      }
+      return out;
     },
   },
   addendum_b: {
@@ -263,9 +282,15 @@ function validate(rows, minRows) {
 }
 
 async function persist(key, owned, rows, vintage) {
+  // A HCPCS can appear more than once in a CMS file; collapse to one row (last
+  // wins) so the batch upsert doesn't hit "ON CONFLICT ... cannot affect row a
+  // second time".
+  const seen = new Map();
+  for (const r of rows) if (r.hcpcs) seen.set(r.hcpcs, r);
+  const uniq = [...seen.values()];
   let written = 0;
-  for (let i = 0; i < rows.length; i += 1000) {
-    const batch = rows.slice(i, i + 1000).map((r) => { const rec = { hcpcs: r.hcpcs }; for (const c of owned) rec[c] = r[c] ?? null; return rec; });
+  for (let i = 0; i < uniq.length; i += 1000) {
+    const batch = uniq.slice(i, i + 1000).map((r) => { const rec = { hcpcs: r.hcpcs }; for (const c of owned) rec[c] = r[c] ?? null; return rec; });
     const { error } = await db.from("cms_reference").upsert(batch, { onConflict: "hcpcs" });
     if (error) throw new Error(error.message);
     written += batch.length;
