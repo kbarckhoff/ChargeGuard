@@ -184,18 +184,28 @@ const SOURCES = {
       const q = quarterCandidates();
       const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
       const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
+      // Diagnostic: the CLAB zip's entry names/extensions vary by vintage, so log
+      // what's actually inside to make any future format shift obvious.
+      const zip = new AdmZip(buf);
+      const entries = zip.getEntries().filter((e) => !e.isDirectory);
+      console.log("    clfs zip entries: " + entries.map((e) => `${e.entryName} (${e.header.size}b)`).join(", "));
       // If CMS ever ships a structured csv/xlsx with a HCPCS header, use it.
       let out = rowsFromZip(buf, "hcpc")
         .map((r) => ({ hcpcs: norm(pick(r, "hcpcs", "hcpc")), clfs: str(num(pick(r, "payment", "rate", "amount", "fee"))) }))
         .filter((r) => r.hcpcs && r.clfs && r.clfs !== "0");
       if (out.length >= 800) return out;
-      // Otherwise it's the headerless fixed-width CLAB .txt: a 5-char HCPCS, an
-      // optional modifier, then the national payment amount. CMS writes the
+      // Otherwise it's the headerless fixed-width CLAB data file: a 5-char HCPCS,
+      // an optional modifier, then the national payment amount. CMS writes the
       // amount WITHOUT a decimal point (implied 2 decimals: 1109 => $11.09),
       // though some vintages use a real decimal - handle both. Lab fees sit in a
       // narrow $ range, so pick the numeric token that yields a plausible fee
-      // (guards against trailing effective-date / indicator columns).
-      const text = rawTextFromZip(buf, /\.txt$/i) || rawTextFromZip(buf, /\.(csv)$/i);
+      // (guards against trailing effective-date / indicator columns). The data
+      // file isn't always named ".txt", so read the LARGEST non-spreadsheet
+      // entry rather than filtering on extension.
+      const dataEntry = entries
+        .filter((e) => !/\.(xlsx|xls|pdf|zip|docx?|rtf)$/i.test(e.entryName) && !/readme|record|layout/i.test(e.entryName))
+        .sort((a, b) => b.header.size - a.header.size)[0];
+      const text = dataEntry ? dataEntry.getData().toString("latin1") : "";
       out = [];
       const samples = [];
       for (const raw of text.split(/\r?\n/)) {
@@ -221,8 +231,10 @@ const SOURCES = {
         if (samples.length < 6) samples.push(`${code} "${line.trim().slice(0, 56)}" => ${amt.toFixed(2)}`);
       }
       // Print a sample so the CI log lets us confirm the parsed values are real
-      // CLFS prices (not a mis-picked column).
+      // CLFS prices (not a mis-picked column); on a miss, dump the raw head so
+      // the true layout is visible without another blind guess.
       if (samples.length) console.log("    clfs sample:\n      " + samples.join("\n      "));
+      else console.log(`    clfs: 0 parsed from ${dataEntry ? dataEntry.entryName : "(no data entry)"}; head=${JSON.stringify(text.slice(0, 300))}`);
       return out;
     },
   },
