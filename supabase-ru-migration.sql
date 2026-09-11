@@ -1,8 +1,8 @@
 -- ChargeGuard R&U (Revenue & Usage) support
 -- Run this in the Supabase SQL editor for the ChargeGuard project.
 -- Stores annual revenue/utilization per charge code so the engine and report can
--- compute R&U-weighted gross, MC+MA impact, payer mix, and department rollups —
--- the data Greg's Executive Summary is built on.
+-- compute R&U-weighted gross, MC+MA impact, payer mix, and department rollups,
+-- the data the executive summary is built on.
 
 create table if not exists charge_usage (
   id          uuid primary key default uuid_generate_v4(),

@@ -2,14 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
+import { ReviewPicker } from "@/components/findings/ReviewPicker";
+import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { AlertTriangle, Zap } from "lucide-react";
 
 export default async function FindingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string }>;
+  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string }>;
 }) {
   const sp = await searchParams;
+  const tab = sp.tab === "peer" ? "peer" : "findings";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -25,21 +28,34 @@ export default async function FindingsPage({
     .eq("id", user!.id)
     .single();
 
-  // Get most recent audit
-  const { data: audits } = await supabaseAdmin
-    .from("audits")
-    .select("id")
-    .eq("org_id", userData!.org_id)
-    .order("created_at", { ascending: false })
-    .limit(1);
+  // Scope to a specific run when ?auditId is passed (from inside a run);
+  // otherwise fall back to the most recent audit.
+  let auditId = sp.auditId;
+  if (auditId) {
+    const { data: check } = await supabaseAdmin
+      .from("audits").select("id").eq("id", auditId).eq("org_id", userData!.org_id).single();
+    if (!check) auditId = undefined;
+  }
+  if (!auditId) {
+    const { data: audits } = await supabaseAdmin
+      .from("audits")
+      .select("id")
+      .eq("org_id", userData!.org_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    auditId = audits?.[0]?.id;
+  }
 
-  const auditId = audits?.[0]?.id;
+  // Review list for the header picker (switch which review's findings to view).
+  const { data: runListRaw } = await supabaseAdmin
+    .from("audits").select("id, name").eq("org_id", userData!.org_id).order("created_at", { ascending: false });
+  const runList = (runListRaw || []).map((r) => ({ id: r.id as string, name: (r.name as string) || "Untitled review" }));
 
   if (!auditId) {
     return (
       <>
-        <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
-          <h1 className="text-base font-semibold text-[#1a1a18]">Findings</h1>
+        <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center flex-shrink-0">
+          <h1 className="text-base font-semibold text-[#0f172a]">Findings</h1>
         </header>
         <div className="flex-1 overflow-y-auto p-6">
           <EmptyState icon={AlertTriangle} title="No audit yet" description="Create an audit and run a scan to see findings." />
@@ -67,8 +83,11 @@ export default async function FindingsPage({
   if (sp.status && sp.status !== "all") {
     query = query.eq("status", sp.status);
   }
-  if (sp.category && sp.category !== "all") {
-    query = query.eq("category", sp.category);
+  const selectedCategories = (sp.category && sp.category !== "all")
+    ? sp.category.split(",").map((c) => c.trim()).filter(Boolean)
+    : [];
+  if (selectedCategories.length > 0) {
+    query = query.in("category", selectedCategories);
   }
   if (sp.search) {
     query = query.ilike("title", `%${sp.search}%`);
@@ -96,7 +115,7 @@ export default async function FindingsPage({
   // filter, so the severity breakdown stays meaningful). The category dropdown
   // still lists every category (built from the full set below).
   const scope = allFindings.filter((f) =>
-    (!sp.category || sp.category === "all" || f.category === sp.category) &&
+    (selectedCategories.length === 0 || (f.category != null && selectedCategories.includes(f.category))) &&
     (!sp.search || (f.title || "").toLowerCase().includes(sp.search.toLowerCase()))
   );
 
@@ -122,32 +141,43 @@ export default async function FindingsPage({
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#1a1a18]">Findings</h1>
+      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-semibold text-[#0f172a]">Findings &amp; Analysis</h1>
+          <ReviewPicker runs={runList} auditId={auditId!} />
+        </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#9a9a95]">{(count || 0).toLocaleString()} total</span>
+          <span className="text-[#94a3b8]">{(count || 0).toLocaleString()} total</span>
           <Badge variant="danger">{statusCounts.open} open</Badge>
-          <Badge variant="success">{statusCounts.resolved} resolved</Badge>
+          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-semibold hover:bg-[#1d4ed8]">Report &amp; export</a>
+          <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
         </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-4">
+          {/* Sub-tabs: Findings | Peer Analysis */}
+          <div className="flex gap-1 border-b border-[#e2e8f0]">
+            <a href={`/findings?auditId=${auditId}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === "findings" ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>Rule Findings</a>
+            <a href={`/findings?auditId=${auditId}&tab=peer`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === "peer" ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>Peer Review Analysis</a>
+          </div>
+
+          {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
           {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
             {Object.entries(SEVERITY_CONFIG).map(([key, cfg]) => (
-              <div key={key} className="bg-white rounded-xl border border-[#e5e5e0] p-4">
+              <div key={key} className="bg-white rounded-xl border border-[#e2e8f0] p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-                  <span className="text-xs text-[#7a7a75]">{cfg.label}</span>
+                  <span className="text-xs text-[#64748b]">{cfg.label}</span>
                 </div>
-                <div className="text-xl font-semibold text-[#1a1a18]">
+                <div className="text-xl font-semibold text-[#0f172a]">
                   {severityCounts[key as keyof typeof severityCounts]}
                 </div>
               </div>
             ))}
-            <div className="bg-white rounded-xl border border-[#e5e5e0] p-4">
-              <div className="text-xs text-[#7a7a75] mb-1">Est. Impact</div>
-              <div className="text-xl font-semibold text-[#1a1a18]">
+            <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
+              <div className="text-xs text-[#64748b] mb-1">Est. Impact</div>
+              <div className="text-xl font-semibold text-[#0f172a]">
                 {formatImpact(totalImpact)}
               </div>
             </div>
@@ -165,6 +195,7 @@ export default async function FindingsPage({
             search={sp.search || ""}
             categories={categories}
           />
+          </>)}
         </div>
       </div>
     </>

@@ -40,8 +40,19 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# client data + Greg's source workbooks — never commit
+# client data + source reference workbooks, never commit
 /data/*.csv
 /data/cms-sources/
 /data/reference-workbooks/
 *.xlsx
+
+# scratch exports (findings dumps, etc.), never commit
+/tmp/
+
+# OS / OneDrive fuse temp handles
+.fuse_hidden*
+
+# OneDrive/FUSE + sed temp artifacts
+.fuse_hidden*
+sed??????
+**/sed??????

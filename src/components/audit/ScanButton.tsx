@@ -25,12 +25,8 @@ export function ScanButton({ auditId }: { auditId: string }) {
         body: JSON.stringify({ auditId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Scan failed");
-      } else {
-        setResult(data);
-        router.refresh();
-      }
+      if (!res.ok) setError(data.error || "Scan failed");
+      else { setResult(data); router.refresh(); }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -38,74 +34,67 @@ export function ScanButton({ auditId }: { auditId: string }) {
     }
   };
 
+  const dot = (sev: string) =>
+    sev === "critical" ? "#dc2626" :
+    sev === "high" ? "#ea580c" :
+    sev === "medium" ? "#ca8a04" :
+    sev === "low" ? "#2563eb" : "#6b7280";
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <button
         onClick={runScan}
         disabled={scanning}
-        className="flex items-center gap-2 px-4 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a] transition-colors disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563eb] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 shadow-sm"
       >
-        {scanning ? (
-          <>
-            <Loader2 size={15} className="animate-spin" />
-            Scanning…
-          </>
-        ) : (
-          <>
-            <Zap size={15} />
-            Run CDM Scan
-          </>
-        )}
+        {scanning ? (<><Loader2 size={15} className="animate-spin" />Scanning…</>) : (<><Zap size={15} />Run CDM Scan</>)}
       </button>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          {error}
-        </div>
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
       )}
 
       {result && (
-        <div className="p-4 bg-white rounded-xl border border-[#e5e5e0] space-y-3">
-          <div className="flex items-center gap-2">
+        <div className="bg-white rounded-xl border border-[#e2e8f0] p-5">
+          <div className="flex items-center gap-2 mb-4">
             <CheckCircle2 size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium text-[#1a1a18]">Scan Complete</span>
+            <span className="text-sm font-semibold text-[#0f172a]">Scan Complete</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-[#f5f5f0] rounded-lg">
-              <div className="text-xs text-[#7a7a75]">Items Scanned</div>
-              <div className="text-lg font-semibold text-[#1a1a18]">{result.itemsScanned.toLocaleString()}</div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="p-3 bg-[#f1f5f9] rounded-lg">
+              <div className="text-xs text-[#64748b]">Items Scanned</div>
+              <div className="text-lg font-semibold text-[#0f172a]">{result.itemsScanned.toLocaleString()}</div>
             </div>
-            <div className="p-3 bg-[#f5f5f0] rounded-lg">
-              <div className="text-xs text-[#7a7a75]">Issues Found</div>
-              <div className="text-lg font-semibold text-[#1a1a18] flex items-center gap-1.5">
+            <div className="p-3 bg-[#f1f5f9] rounded-lg">
+              <div className="text-xs text-[#64748b]">Issues Found</div>
+              <div className="text-lg font-semibold text-[#0f172a] flex items-center gap-1.5">
                 {result.findingsGenerated > 0 && <AlertTriangle size={14} className="text-amber-500" />}
                 {result.findingsGenerated.toLocaleString()}
               </div>
             </div>
+            <div className="p-3 bg-[#f1f5f9] rounded-lg">
+              <div className="text-xs text-[#64748b]">Rules Triggered</div>
+              <div className="text-lg font-semibold text-[#0f172a]">{Object.keys(result.summary).length}</div>
+            </div>
           </div>
+
           {Object.keys(result.summary).length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-[#7a7a75] mt-2">Breakdown by Rule</div>
-              {Object.entries(result.summary)
-                .sort((a, b) => b[1].count - a[1].count)
-                .map(([ruleId, info]) => (
-                  <div key={ruleId} className="flex items-center justify-between text-sm py-1 px-2 rounded-lg bg-[#fafaf8]">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{
-                          backgroundColor:
-                            info.severity === "critical" ? "#dc2626" :
-                            info.severity === "high" ? "#ea580c" :
-                            info.severity === "medium" ? "#ca8a04" :
-                            info.severity === "low" ? "#2563eb" : "#6b7280",
-                        }}
-                      />
-                      <span className="text-[#3d3d3a]">Rule {ruleId}</span>
+            <div>
+              <div className="text-xs font-medium text-[#64748b] mb-2">Breakdown by Rule</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {Object.entries(result.summary)
+                  .sort((a, b) => b[1].count - a[1].count)
+                  .map(([ruleId, info]) => (
+                    <div key={ruleId} className="flex items-center justify-between text-sm py-1.5 px-2.5 rounded-lg bg-[#f4f6f8]">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dot(info.severity) }} />
+                        <span className="text-[#334155] truncate">Rule {ruleId}</span>
+                      </div>
+                      <span className="font-medium text-[#0f172a] flex-shrink-0">{info.count.toLocaleString()}</span>
                     </div>
-                    <span className="font-medium text-[#1a1a18]">{info.count.toLocaleString()}</span>
-                  </div>
-                ))}
+                  ))}
+              </div>
             </div>
           )}
         </div>

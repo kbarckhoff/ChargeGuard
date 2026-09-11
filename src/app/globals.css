@@ -3,8 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --background: #fafaf8;
-  --foreground: #1a1a18;
+  --background: #f4f6f8;   /* cool corporate app background */
+  --foreground: #0f172a;   /* slate-900 primary text */
+  --navy: #1e3a8a;         /* nav / header / dark surfaces */
+  --navy-hover: #163a5f;
+  --accent: #2563eb;       /* orange accent (buttons, links, highlights) */
+  --accent-hover: #1d4ed8;
+  --border: #e2e8f0;       /* slate-200 */
+  --muted: #64748b;        /* slate-500 */
 }
 
 body {
@@ -14,18 +20,18 @@ body {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d5d5d0;
-  border-radius: 3px;
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9a9a95;
+  background: #94a3b8;
 }
 
 /* Line clamp utility */

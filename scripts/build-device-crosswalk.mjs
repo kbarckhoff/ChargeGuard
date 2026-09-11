@@ -1,5 +1,5 @@
 // Regenerates src/lib/device-crosswalk-data.json from the living crosswalk
-// workbook. Run this whenever Carol/CMS updates the workbook each January.
+// workbook. Run this whenever CMS updates the workbook each January.
 // Usage:  node scripts/build-device-crosswalk.mjs [path-to-workbook.xlsx]
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

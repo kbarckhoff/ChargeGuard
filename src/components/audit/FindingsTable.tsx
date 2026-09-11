@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, SeverityDot, SEVERITY_CONFIG } from "@/components/ui/shared";
-import { Search, X, Check, Ban, ChevronRight, Loader2, ExternalLink } from "lucide-react";
+import { Search, X, ChevronRight, Loader2 } from "lucide-react";
 
 interface FindingRow {
   id: string;
@@ -16,6 +16,10 @@ interface FindingRow {
   recommendation: string;
   charge_item_id: string | null;
   created_at: string;
+  applied_field?: string | null;
+  applied_old?: string | null;
+  applied_new?: string | null;
+  resolution_note?: string | null;
   charge_items: {
     procedure_number: string;
     charge_description: string;
@@ -24,6 +28,26 @@ interface FindingRow {
     gross_charge: number;
   } | null;
 }
+
+// Best-guess CDM field to correct, based on the finding's category.
+const FIELD_LABELS: Record<string, string> = {
+  hcpcs_cpt_code: "HCPCS / CPT code",
+  gross_charge: "Gross charge",
+  revenue_code: "Revenue code",
+  charge_description: "Description",
+};
+// Disposition options while we present findings (no file edits yet). Findings
+// tied to non-CDM sources (e.g. formulary) can be marked Not applicable.
+const STATUS_LABELS: Record<string, string> = {
+  open: "Open",
+  in_review: "Reviewed",
+  accepted: "Accepted",
+  rejected: "Not applicable",
+  resolved: "Resolved",
+};
+const statusLabel = (s: string) => STATUS_LABELS[s] || s;
+const statusVariant = (s: string): any =>
+  s === "accepted" ? "success" : s === "rejected" ? "warning" : s === "in_review" ? "purple" : s === "resolved" ? "success" : "default";
 
 export function FindingsTable({
   findings,
@@ -68,7 +92,7 @@ export function FindingsTable({
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex-1 min-w-[200px] relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9a95]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
           <input
             type="text"
             defaultValue={search}
@@ -77,11 +101,11 @@ export function FindingsTable({
               (window as any).__findSearch = setTimeout(() => updateParams({ search: e.target.value }), 400);
             }}
             placeholder="Search findings…"
-            className="w-full pl-9 pr-4 py-2 text-sm border border-[#e5e5e0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+            className="w-full pl-9 pr-4 py-2 text-sm border border-[#e2e8f0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
           />
         </div>
         <select value={severityFilter} onChange={(e) => updateParams({ severity: e.target.value })}
-          className="text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
+          className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white">
           <option value="all">All Severity</option>
           <option value="critical">Critical</option>
           <option value="high">High</option>
@@ -89,63 +113,52 @@ export function FindingsTable({
           <option value="low">Low</option>
         </select>
         <select value={statusFilter} onChange={(e) => updateParams({ status: e.target.value })}
-          className="text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
+          className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white">
           <option value="all">All Status</option>
           <option value="open">Open</option>
+          <option value="in_review">Reviewed</option>
           <option value="accepted">Accepted</option>
-          <option value="rejected">Rejected</option>
-          <option value="resolved">Resolved</option>
+          <option value="rejected">Not applicable</option>
         </select>
-        <select value={categoryFilter} onChange={(e) => updateParams({ category: e.target.value })}
-          className="text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white">
-          <option value="all">All Categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <CategoryMultiSelect categories={categories} selected={categoryFilter} onChange={(v) => updateParams({ category: v })} />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-[#e5e5e0] overflow-hidden">
+      <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#fafaf8] border-b border-[#e5e5e0]">
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs w-6" />
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Finding</th>
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Category</th>
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Charge Item</th>
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Status</th>
-                <th className="px-3 py-2.5 text-right font-medium text-[#5a5a55] text-xs">Impact</th>
-                <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs w-8" />
+              <tr className="bg-[#f4f6f8] border-b border-[#e2e8f0]">
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs w-6" />
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Finding</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Category</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Charge Item</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Status</th>
+                <th className="px-3 py-2.5 text-right font-medium text-[#475569] text-xs">Impact</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs w-8" />
               </tr>
             </thead>
             <tbody>
               {findings.map((f) => (
                 <tr key={f.id}
                   onClick={() => setSelected(f)}
-                  className="border-b border-[#f5f5f0] hover:bg-[#fafaf8] cursor-pointer transition-colors">
+                  className="border-b border-[#f1f5f9] hover:bg-[#f4f6f8] cursor-pointer transition-colors">
                   <td className="px-3 py-2.5"><SeverityDot severity={f.severity} /></td>
                   <td className="px-3 py-2.5 max-w-[350px]">
-                    <div className="text-[#3d3d3a] font-medium truncate">{f.title}</div>
+                    <div className="text-[#334155] font-medium truncate">{f.title}</div>
                   </td>
                   <td className="px-3 py-2.5">
                     <Badge>{f.category}</Badge>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-[#7a7a75]">
+                  <td className="px-3 py-2.5 text-xs text-[#64748b]">
                     {f.charge_items ? (
                       <span>{f.charge_items.procedure_number} — {f.charge_items.hcpcs_cpt_code || "No CPT"}</span>
                     ) : "—"}
                   </td>
                   <td className="px-3 py-2.5">
-                    <Badge variant={
-                      f.status === "accepted" ? "success" :
-                      f.status === "rejected" ? "danger" :
-                      f.status === "resolved" ? "purple" :
-                      "default"
-                    }>
-                      {f.status}
-                    </Badge>
+                    <Badge variant={statusVariant(f.status)}>{statusLabel(f.status)}</Badge>
                   </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-[#5a5a55]">
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-[#475569]">
                     {f.financial_impact ? `$${f.financial_impact.toLocaleString()}` : "—"}
                   </td>
                   <td className="px-3 py-2.5">
@@ -155,7 +168,7 @@ export function FindingsTable({
               ))}
               {findings.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[#9a9a95] text-sm">
+                  <td colSpan={7} className="py-12 text-center text-[#94a3b8] text-sm">
                     No findings match the current filters.
                   </td>
                 </tr>
@@ -164,13 +177,13 @@ export function FindingsTable({
           </table>
         </div>
         {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e5e0] bg-[#fafaf8]">
-          <span className="text-xs text-[#9a9a95]">{total.toLocaleString()} findings • Page {page} of {totalPages || 1}</span>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[#e2e8f0] bg-[#f4f6f8]">
+          <span className="text-xs text-[#94a3b8]">{total.toLocaleString()} findings • Page {page} of {totalPages || 1}</span>
           <div className="flex items-center gap-1">
             <button onClick={() => updateParams({ page: String(Math.max(1, page - 1)) })} disabled={page <= 1}
-              className="px-3 py-1 text-xs border border-[#e5e5e0] rounded-lg hover:bg-white disabled:opacity-40">Prev</button>
+              className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg hover:bg-white disabled:opacity-40">Prev</button>
             <button onClick={() => updateParams({ page: String(Math.min(totalPages, page + 1)) })} disabled={page >= totalPages}
-              className="px-3 py-1 text-xs border border-[#e5e5e0] rounded-lg hover:bg-white disabled:opacity-40">Next</button>
+              className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg hover:bg-white disabled:opacity-40">Next</button>
           </div>
         </div>
       </div>
@@ -188,6 +201,7 @@ export function FindingsTable({
 function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () => void }) {
   const [updating, setUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(finding.status);
+  const [note, setNote] = useState(finding.resolution_note || "");
   const router = useRouter();
 
   const updateStatus = async (newStatus: string) => {
@@ -196,18 +210,18 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
       const res = await fetch("/api/findings/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: finding.id, status: newStatus }),
+        body: JSON.stringify({ findingId: finding.id, status: newStatus, note }),
       });
-      if (res.ok) {
-        setCurrentStatus(newStatus);
-        router.refresh();
-      }
-    } catch {
-      // ignore
-    } finally {
-      setUpdating(false);
-    }
+      if (res.ok) { setCurrentStatus(newStatus); router.refresh(); }
+    } catch { /* ignore */ } finally { setUpdating(false); }
   };
+
+  const DISPOSITIONS: { value: string; label: string }[] = [
+    { value: "open", label: "Open" },
+    { value: "in_review", label: "Reviewed" },
+    { value: "accepted", label: "Accepted" },
+    { value: "rejected", label: "Not applicable" },
+  ];
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -216,7 +230,7 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
         <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}.animate-slide-in{animation:slideIn .2s ease-out}`}</style>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e5e0]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e8f0]">
           <div className="flex items-center gap-2">
             <SeverityDot severity={finding.severity} />
             <Badge variant={
@@ -225,21 +239,15 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
             }>
               {finding.severity}
             </Badge>
-            <Badge variant={
-              currentStatus === "accepted" ? "success" :
-              currentStatus === "rejected" ? "danger" :
-              currentStatus === "resolved" ? "purple" : "default"
-            }>
-              {currentStatus}
-            </Badge>
+            <Badge variant={statusVariant(currentStatus)}>{statusLabel(currentStatus)}</Badge>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg"><X size={18} /></button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           <div>
-            <h3 className="text-base font-semibold text-[#1a1a18] leading-snug">{finding.title}</h3>
+            <h3 className="text-base font-semibold text-[#0f172a] leading-snug">{finding.title}</h3>
             {finding.category && (
               <div className="mt-2"><Badge>{finding.category}</Badge></div>
             )}
@@ -247,29 +255,29 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
 
           {/* Charge Item Info */}
           {finding.charge_items && (
-            <div className="p-4 bg-[#f5f5f0] rounded-xl space-y-2">
-              <div className="text-xs font-medium text-[#7a7a75]">Affected Charge Item</div>
+            <div className="p-4 bg-[#f1f5f9] rounded-xl space-y-2">
+              <div className="text-xs font-medium text-[#64748b]">Affected Charge Item</div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span className="text-xs text-[#9a9a95]">Proc #</span>
-                  <div className="font-mono text-[#1a1a18]">{finding.charge_items.procedure_number}</div>
+                  <span className="text-xs text-[#94a3b8]">Proc #</span>
+                  <div className="font-mono text-[#0f172a]">{finding.charge_items.procedure_number}</div>
                 </div>
                 <div>
-                  <span className="text-xs text-[#9a9a95]">HCPCS/CPT</span>
-                  <div className="font-mono text-[#1a1a18]">{finding.charge_items.hcpcs_cpt_code || "—"}</div>
+                  <span className="text-xs text-[#94a3b8]">HCPCS/CPT</span>
+                  <div className="font-mono text-[#0f172a]">{finding.charge_items.hcpcs_cpt_code || "—"}</div>
                 </div>
                 <div>
-                  <span className="text-xs text-[#9a9a95]">Rev Code</span>
-                  <div className="font-mono text-[#1a1a18]">{finding.charge_items.revenue_code}</div>
+                  <span className="text-xs text-[#94a3b8]">Rev Code</span>
+                  <div className="font-mono text-[#0f172a]">{finding.charge_items.revenue_code}</div>
                 </div>
                 <div>
-                  <span className="text-xs text-[#9a9a95]">Price</span>
-                  <div className="font-mono text-[#1a1a18]">${Number(finding.charge_items.gross_charge).toLocaleString()}</div>
+                  <span className="text-xs text-[#94a3b8]">Price</span>
+                  <div className="font-mono text-[#0f172a]">${Number(finding.charge_items.gross_charge).toLocaleString()}</div>
                 </div>
               </div>
               <div>
-                <span className="text-xs text-[#9a9a95]">Description</span>
-                <div className="text-sm text-[#3d3d3a]">{finding.charge_items.charge_description}</div>
+                <span className="text-xs text-[#94a3b8]">Description</span>
+                <div className="text-sm text-[#334155]">{finding.charge_items.charge_description}</div>
               </div>
             </div>
           )}
@@ -285,72 +293,88 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
           {/* Description */}
           {finding.description && (
             <div>
-              <div className="text-xs font-medium text-[#7a7a75] mb-1.5">Issue Details</div>
-              <div className="text-sm text-[#3d3d3a] leading-relaxed">{finding.description}</div>
+              <div className="text-xs font-medium text-[#64748b] mb-1.5">Issue Details</div>
+              <div className="text-sm text-[#334155] leading-relaxed">{finding.description}</div>
             </div>
           )}
 
           {/* Recommendation */}
           {finding.recommendation && (
             <div>
-              <div className="text-xs font-medium text-[#7a7a75] mb-1.5">Recommendation</div>
-              <div className="text-sm text-[#3d3d3a] leading-relaxed p-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="text-xs font-medium text-[#64748b] mb-1.5">Recommendation</div>
+              <div className="text-sm text-[#334155] leading-relaxed p-3 bg-blue-50 border border-blue-200 rounded-xl">
                 {finding.recommendation}
+              </div>
+            </div>
+          )}
+
+          {/* Applied CDM change (for resolved findings that wrote a fix) */}
+          {finding.applied_field && (
+            <div>
+              <div className="text-xs font-medium text-[#64748b] mb-1.5">Applied to CDM</div>
+              <div className="text-sm text-[#334155] p-3 bg-[#eef2ff] border border-[#c7d2fe] rounded-xl">
+                <b>{FIELD_LABELS[finding.applied_field] || finding.applied_field}</b>: <span className="font-mono">{finding.applied_old || "—"}</span> → <span className="font-mono text-[#2563eb] font-semibold">{finding.applied_new}</span>
+                {finding.resolution_note && <div className="text-xs text-[#64748b] mt-1.5">Note: {finding.resolution_note}</div>}
               </div>
             </div>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="px-5 py-3 border-t border-[#e5e5e0] flex items-center gap-2">
-          {currentStatus === "open" ? (
-            <>
-              <button
-                onClick={() => updateStatus("accepted")}
-                disabled={updating}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {updating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                Accept Finding
-              </button>
-              <button
-                onClick={() => updateStatus("rejected")}
-                disabled={updating}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border border-[#e5e5e0] rounded-lg text-sm font-medium text-[#5a5a55] hover:bg-[#f5f5f0] disabled:opacity-50"
-              >
-                {updating ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
-                Reject
-              </button>
-            </>
-          ) : currentStatus === "accepted" ? (
-            <>
-              <button
-                onClick={() => updateStatus("resolved")}
-                disabled={updating}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a] disabled:opacity-50"
-              >
-                {updating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                Mark Resolved
-              </button>
-              <button
-                onClick={() => updateStatus("open")}
-                disabled={updating}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border border-[#e5e5e0] rounded-lg text-sm font-medium text-[#5a5a55] hover:bg-[#f5f5f0] disabled:opacity-50"
-              >
-                Reopen
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => updateStatus("open")}
-              disabled={updating}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border border-[#e5e5e0] rounded-lg text-sm font-medium text-[#5a5a55] hover:bg-[#f5f5f0] disabled:opacity-50"
-            >
-              Reopen Finding
-            </button>
-          )}
+        {/* Disposition (present-only — no file edits yet) */}
+        <div className="px-5 py-4 border-t border-[#e2e8f0] bg-[#f8fafc] space-y-3">
+          <div>
+            <div className="text-xs font-medium text-[#64748b] mb-1.5">Disposition</div>
+            <div className="flex flex-wrap gap-1.5">
+              {DISPOSITIONS.map((d) => (
+                <button key={d.value} onClick={() => updateStatus(d.value)} disabled={updating}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-50 ${currentStatus === d.value ? "bg-[#2563eb] text-white border-[#2563eb]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f1f5f9]"}`}>
+                  {d.label}
+                </button>
+              ))}
+              {updating && <Loader2 size={14} className="animate-spin text-[#94a3b8] self-center ml-1" />}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#64748b] mb-1">Reviewer note (saved with the disposition)</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="e.g. Formulary item — route to pharmacy, not a CDM change." className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Multi-select category filter ────────────────────────────
+function CategoryMultiSelect({ categories, selected, onChange }: { categories: string[]; selected: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const chosen = (selected && selected !== "all") ? selected.split(",").map((c) => c.trim()).filter(Boolean) : [];
+  const toggle = (c: string) => {
+    const next = chosen.includes(c) ? chosen.filter((x) => x !== c) : [...chosen, c];
+    onChange(next.length ? next.join(",") : "all");
+  };
+  const label = chosen.length === 0 ? "All Categories" : chosen.length === 1 ? chosen[0] : `${chosen.length} categories`;
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white flex items-center gap-2 min-w-[160px] justify-between">
+        <span className="truncate max-w-[200px]">{label}</span>
+        <ChevronRight size={14} className={`text-[#94a3b8] transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-64 max-h-72 overflow-y-auto bg-white border border-[#e2e8f0] rounded-lg shadow-lg py-1">
+            <button onClick={() => { onChange("all"); }} className="w-full text-left px-3 py-1.5 text-sm text-[#2563eb] hover:bg-[#f1f5f9]">Clear all</button>
+            {categories.map((c) => (
+              <label key={c} className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#334155] hover:bg-[#f1f5f9] cursor-pointer">
+                <input type="checkbox" checked={chosen.includes(c)} onChange={() => toggle(c)} />
+                <span className="truncate">{c}</span>
+              </label>
+            ))}
+            {categories.length === 0 && <div className="px-3 py-2 text-xs text-[#94a3b8]">No categories</div>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

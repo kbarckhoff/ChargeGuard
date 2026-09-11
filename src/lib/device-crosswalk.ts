@@ -1,4 +1,4 @@
-// Device-Procedure Crosswalk reference (Greg Brazzel methodology, Formula Library
+// Device-Procedure Crosswalk reference (an expert consultant methodology, Formula Library
 // Step 2c). Data generated from CMS_Device_Procedure_Crosswalk_Reference.xlsx via
 // scripts/build-device-crosswalk.mjs — a "living reference" updated each January
 // from the CMS I/OCE Edit Specs + OPPS device list.

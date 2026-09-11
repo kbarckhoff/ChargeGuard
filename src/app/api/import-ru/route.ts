@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { isAuditLocked } from "@/lib/audit-lock";
 
 export const maxDuration = 60;
 
@@ -34,6 +35,9 @@ export async function POST(request: Request) {
     if (!userData) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const { auditId, rows, replace = true } = await request.json();
+    if (auditId && await isAuditLocked(supabaseAdmin, auditId)) {
+      return NextResponse.json({ error: "This quarter is completed (locked)." }, { status: 409 });
+    }
     if (!auditId || !Array.isArray(rows)) {
       return NextResponse.json({ error: "Missing auditId or rows" }, { status: 400 });
     }

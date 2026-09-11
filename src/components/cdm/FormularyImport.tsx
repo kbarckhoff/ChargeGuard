@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { Upload, Loader2 } from "lucide-react";
 
-export function FormularyImport({ auditId }: { auditId: string }) {
+export function FormularyImport({ auditId, label = "Import Formulary" }: { auditId: string; label?: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,14 +41,14 @@ export function FormularyImport({ auditId }: { auditId: string }) {
   };
 
   return (
-    <div className="flex flex-col items-end">
+    <div className="flex flex-col items-stretch">
       <input ref={fileRef} type="file" accept=".csv" onChange={onFile} className="hidden" />
       <button onClick={() => fileRef.current?.click()} disabled={busy}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-[#e5e5e0] text-[#3d3d3a] rounded-lg text-sm font-medium hover:bg-[#f5f5f0] disabled:opacity-50"
+        className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-[#e2e6ec] text-[#374151] rounded-lg text-sm font-medium hover:bg-[#f6f7f9] disabled:opacity-50"
         title="Import pharmacy formulary / drug master (status, NDC, package) by charge code">
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Import Formulary
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {label}
       </button>
-      {msg && <p className="text-xs text-[#7a7a75] mt-1">{msg}</p>}
+      {msg && <p className="text-xs text-[#64748b] mt-1">{msg}</p>}
     </div>
   );
 }

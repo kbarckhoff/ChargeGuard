@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { isAuditLocked } from "@/lib/audit-lock";
 
 // Vercel Hobby: API routes get 60s (vs 10s for Server Actions)
 export const maxDuration = 60;
@@ -30,10 +31,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { auditId, items, columnMappings, saveMappingAs } = await request.json();
+    const { auditId, items, columnMappings, saveMappingAs, replace } = await request.json();
 
     if (!auditId || !items || !columnMappings) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (await isAuditLocked(supabaseAdmin, auditId)) {
+      return NextResponse.json({ error: "This quarter is completed (locked). Reopen it to import." }, { status: 409 });
+    }
+
+    // Replace existing charge items for this audit (first chunk of a fresh upload)
+    if (replace) {
+      await supabaseAdmin.from("charge_items").delete().eq("audit_id", auditId);
     }
 
     // Optionally save the column mapping for reuse

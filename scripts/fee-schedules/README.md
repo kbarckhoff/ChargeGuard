@@ -4,7 +4,7 @@ Keeps ChargeGuard's reference data (status indicators, APC payments, ASP limits,
 retired codes) current with CMS releases — **auto-detect + download to staging +
 you approve + promote**. Nothing overwrites the live reference without your sign-off.
 
-Source list and cadence come from Greg's Maintenance Calendar (Formula Library Step 16).
+Source list and cadence come from the expert's Maintenance Calendar (Formula Library Step 16).
 v1 covers the three sources that power the current rules; more are listed (disabled)
 in `sources.mjs` to switch on as parsers are confirmed.
 

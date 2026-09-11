@@ -1,7 +1,7 @@
 // ─── CMS Reference Layer ─────────────────────────────────────
 // Status Indicator (SI), APC payment, fee schedule, ASP, and retired-code
-// reference data, keyed by normalized HCPCS. Starter set extracted from Greg
-// Brazzel's v9-3 CDM Analysis Report ("Hospital CDM + All Flags" tab); replace
+// reference data, keyed by normalized HCPCS. Starter set extracted from the reference methodology
+// the expert's v9-3 CDM Analysis Report ("Hospital CDM + All Flags" tab); replace
 // with full CMS source files (Addendum A/B, MPFS, CLFS, ASP) when available.
 //
 // Implements Formula Library Step 1 (HCPCS normalization) and Step 2/3
@@ -24,6 +24,43 @@ export interface CmsReference {
 }
 
 const REF: Record<string, CmsReference> = referenceData as Record<string, CmsReference>;
+
+// Live overlay loaded from the cms_reference table when available. When set, it
+// takes precedence over the bundled JSON so the automatic quarterly refresh
+// takes effect without a redeploy. Falls back to REF (bundled) if the table is
+// empty or unreachable.
+let LIVE: Record<string, CmsReference> | null = null;
+
+const DB_COLUMNS = "hcpcs,short_desc,si,apc_payment,mc_fee,mc_rvu,pf_fee,pf_rvu,clfs,asp,dosage,retired";
+
+/**
+ * Load the reference table from Supabase into the in-memory overlay. Call once
+ * at the start of a scan with a service-role client. Returns the row count
+ * loaded (0 = kept the bundled fallback). Never throws.
+ */
+export async function loadReferenceFromDb(db: any): Promise<number> {
+  try {
+    const map: Record<string, CmsReference> = {};
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await db.from("cms_reference").select(DB_COLUMNS).range(off, off + 999);
+      if (error || !data || data.length === 0) break;
+      for (const row of data) {
+        const { hcpcs, ...rest } = row as any;
+        if (hcpcs) map[String(hcpcs)] = rest as CmsReference;
+      }
+      if (data.length < 1000) break;
+    }
+    if (Object.keys(map).length > 0) { LIVE = map; return Object.keys(map).length; }
+    return 0;
+  } catch {
+    return 0; // keep bundled fallback
+  }
+}
+
+/** Which reference set the lookups are currently using. */
+export function referenceSource(): "db" | "bundled" {
+  return LIVE ? "db" : "bundled";
+}
 
 /**
  * Normalize a raw HCPCS/CPT value to the canonical key used by the reference
@@ -49,7 +86,7 @@ export function normalizeHcpcs(raw: string | null | undefined): string {
 export function getReference(rawHcpcs: string | null | undefined): CmsReference | null {
   const key = normalizeHcpcs(rawHcpcs);
   if (!key) return null;
-  return REF[key] ?? null;
+  return (LIVE ?? REF)[key] ?? null;
 }
 
 /** Parse a possibly-blank numeric reference field to a number (0 if blank/NaN). */
@@ -60,3 +97,19 @@ export function refNum(v: string | undefined): number {
 }
 
 export const referenceCodeCount = Object.keys(REF).length;
+
+/** Coverage counts per fee schedule — how many codes carry each reference value.
+ * Used by the Benchmarks page so the numbers reflect the actual bundled data. */
+export function referenceCoverage() {
+  const keys = Object.keys(REF);
+  const nonEmpty = (v: string | undefined) => v != null && String(v).trim() !== "";
+  return {
+    total: keys.length,
+    si: keys.filter((k) => nonEmpty(REF[k].si)).length,
+    apc: keys.filter((k) => nonEmpty(REF[k].apc_payment)).length,
+    mpfs: keys.filter((k) => nonEmpty(REF[k].mc_fee)).length,
+    clfs: keys.filter((k) => nonEmpty(REF[k].clfs)).length,
+    asp: keys.filter((k) => nonEmpty(REF[k].asp)).length,
+    retired: keys.filter((k) => String(REF[k].retired || "").toUpperCase() === "YES").length,
+  };
+}

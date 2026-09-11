@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { findingId, status } = await request.json();
+    const { findingId, status, note } = await request.json();
 
     if (!findingId || !status) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     }
 
     const updates: Record<string, unknown> = { status };
+    if (typeof note === "string") updates.resolution_note = note;
     if (status === "resolved") {
       updates.resolved_at = new Date().toISOString();
       updates.resolved_by = user.id;

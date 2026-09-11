@@ -1,0 +1,39 @@
+name: Refresh CMS reference data
+
+# Runs on the CMS release calendar (06:00 UTC on the 1st of Jan/Apr/Jul/Oct),
+# and can be triggered manually. Pulls the free public CMS files, validates each
+# download, and upserts into the Supabase cms_reference table. A GitHub runner
+# has far more memory/time headroom than a serverless function, which matters for
+# the large files (MPFS, OPPS Addenda).
+on:
+  schedule:
+    - cron: "0 6 1 1,4,7,10 *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Comma-separated source keys to refresh (blank = all due)"
+        required: false
+        default: ""
+      force:
+        description: "Refresh even if not due (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: npm install @supabase/supabase-js adm-zip xlsx --no-save
+      - name: Refresh reference data
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ONLY: ${{ github.event.inputs.only }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: node scripts/refresh-reference.mjs

@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
-import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules } from "@/lib/cdm-reference-rules";
+import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules } from "@/lib/cdm-reference-rules";
+import { runClaimsRules } from "@/lib/claims-rules";
+import { runPeerCompetitorRules } from "@/lib/peer-rules";
+import { isAuditLocked } from "@/lib/audit-lock";
+import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
+import { ruleIdsForFacility, type FacilityType } from "@/lib/rule-catalog";
 
 export const maxDuration = 60;
 
@@ -18,7 +23,7 @@ interface RuleResult {
   rule_id: string;
 }
 
-// ─── Reference Data from Carol's CDM Review Tool ─────────────
+// ─── Reference Data from the reference CDM Review Tool ─────────────
 
 // Revenue codes that REQUIRE a CPT/HCPCS code on outpatient claims
 const REV_CODES_REQUIRING_HCPCS = [
@@ -30,43 +35,179 @@ const REV_CODES_REQUIRING_HCPCS = [
   "080", "082", "083", "084", "085", "088", "090", "091", "094",
 ];
 
-// Lab Panel Crosswalk (from Carol's "Lab Panel Crosswalk" tab)
+// Lab Panel Crosswalk (from the reference "Lab Panel Crosswalk" tab)
 const LAB_PANELS: Record<string, { name: string; components: string[]; allRequired: boolean }> = {
-  "80048": { name: "Basic Metabolic Panel (BMP)", components: ["82310", "82947", "84075", "84132", "84295", "84460", "84520", "82565"], allRequired: true },
-  "80053": { name: "Comprehensive Metabolic Panel (CMP)", components: ["82310", "82947", "84075", "84132", "84295", "84460", "84520", "82565", "82040", "82248", "84155"], allRequired: true },
+  "80047": { name: "Basic Metabolic Panel (Calcium, Ionized)", components: ["82330", "82374", "82435", "82565", "82947", "84132", "84295", "84520"], allRequired: true },
+  "80048": { name: "Basic Metabolic Panel (Calcium, Total)", components: ["82310", "82374", "82435", "82565", "82974", "84132", "84295", "84520"], allRequired: true },
+  "80051": { name: "Electrolyte Panel", components: ["82374", "82435", "84132", "84295"], allRequired: true },
+  "80053": { name: "Comprehensive Metabolic Panel", components: ["82040", "82247", "82310", "82374", "82435", "82565", "82947", "84132", "84155", "84295", "84460", "84450", "84520"], allRequired: true },
+  "80055": { name: "Obstetric Panel", components: ["85027", "85007", "85009", "85025", "85027", "85004", "86900", "86901", "87340", "86850", "86762", "86592"], allRequired: true },
   "80061": { name: "Lipid Panel", components: ["82465", "83718", "84478"], allRequired: true },
-  "80076": { name: "Hepatic Function Panel", components: ["82040", "82248", "84075", "84450", "84460", "84155"], allRequired: true },
-  "85025": { name: "CBC w/ Differential", components: ["85027"], allRequired: true },
+  "80069": { name: "Renal Function Panel", components: ["82040", "82310", "82374", "82435", "82565", "82947", "84100", "84132", "84295", "84520"], allRequired: true },
+  "80074": { name: "Acute Hepatitis Panel", components: ["86709", "86705", "87340", "86803"], allRequired: true },
+  "80076": { name: "Hepatic Function Panel", components: ["82040", "82248", "82247", "84075", "84155", "84460", "84450"], allRequired: true },
+  "80081": { name: "Obstetric Panel (includes HIV testing)", components: ["85027", "85007", "85009", "85205", "85027", "85004", "86900", "86901", "87340", "87389", "86850", "86762", "86592"], allRequired: true },
 };
 
-// Radiology Crosswalk (from Carol's "Radiology Crosswalk" tab)
+// Radiology Crosswalk (from the reference "Radiology Crosswalk" tab)
 const RADIOLOGY_LATERALITY: Record<string, { desc: string; lateralityReq: boolean; allowedMods: string[]; bilateral: string }> = {
-  "77065": { desc: "Diagnostic Mammography Unilateral", lateralityReq: true, allowedMods: ["LT", "RT"], bilateral: "2 lines LT/RT" },
-  "77066": { desc: "Diagnostic Mammography Bilateral", lateralityReq: false, allowedMods: [], bilateral: "N/A" },
-  "76641": { desc: "Breast Ultrasound Complete", lateralityReq: true, allowedMods: ["LT", "RT"], bilateral: "2 lines" },
-  "73030": { desc: "Shoulder X-ray", lateralityReq: true, allowedMods: ["LT", "RT", "50"], bilateral: "Payer dependent" },
-  "73562": { desc: "Knee X-ray 3 views", lateralityReq: true, allowedMods: ["LT", "RT", "50"], bilateral: "2 lines preferred" },
-  "73721": { desc: "MRI Lower Extremity", lateralityReq: true, allowedMods: ["LT", "RT"], bilateral: "2 lines" },
-  "73221": { desc: "MRI Upper Extremity", lateralityReq: true, allowedMods: ["LT", "RT"], bilateral: "2 lines" },
-  "93971": { desc: "Duplex Extremity Veins Unilateral", lateralityReq: true, allowedMods: ["LT", "RT"], bilateral: "2 lines" },
-  // Codes that should NOT have laterality
-  "74177": { desc: "CT Abdomen/Pelvis w contrast", lateralityReq: false, allowedMods: [], bilateral: "N/A" },
-  "71260": { desc: "CT Chest w contrast", lateralityReq: false, allowedMods: [], bilateral: "N/A" },
-  "72148": { desc: "MRI Lumbar Spine", lateralityReq: false, allowedMods: [], bilateral: "N/A" },
-  "93970": { desc: "Duplex Extremity Veins Bilateral", lateralityReq: false, allowedMods: [], bilateral: "Already bilateral" },
+  "70030": { desc: "Radiologic examination, eye, for detection of ", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "70120": { desc: "Radiologic examination, mastoids; less than 3 ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "70130": { desc: "Radiologic examination, mastoids; complete, mi", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "70328": { desc: "Radiologic examination, temporomandibular join", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "71100": { desc: "Radiologic examination, ribs, unilateral; 2 vi", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "71101": { desc: "Radiologic examination, ribs, unilateral; incl", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "73000": { desc: "Radiologic examination, clavicle; complete", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73010": { desc: "Radiologic examination, scapula; complete", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73020": { desc: "Radiologic examination, shoulder; 1 view", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73030": { desc: "Radiologic examination, shoulder, complete, mi", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73040": { desc: "Radiologic examination, shoulder; arthrography", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73060": { desc: "Radiologic examination, humerus; minimum 2 vie", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73070": { desc: "Radiologic examination, elbow; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73080": { desc: "Radiologic examination, elbow; minimum 3 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73085": { desc: "Radiologic examination, elbow; arthrography, r", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73090": { desc: "Radiologic examination, forearm; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73092": { desc: "Radiologic examination, infant upper extremity", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73100": { desc: "Radiologic examination, wrist; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73110": { desc: "Radiologic examination, wrist; complete, minim", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73115": { desc: "Radiologic examination, wrist; arthrography, r", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73120": { desc: "Radiologic examination, hand; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73130": { desc: "Radiologic examination, hand; minimum 3 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73140": { desc: "Radiologic examination, finger(s), minimum 2 v", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73200": { desc: "Computed tomography, upper extremity; without ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73201": { desc: "Computed tomography, upper extremity; with con", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73202": { desc: "Computed tomography, upper extremity; without ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73206": { desc: "Computed tomographic angiography, upper extrem", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73218": { desc: "Magnetic resonance (eg, proton) imaging, upper", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73219": { desc: "Magnetic resonance (eg, proton) imaging, upper", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73220": { desc: "Magnetic resonance (eg, proton) imaging, upper", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73221": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73222": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73223": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73225": { desc: "Magnetic resonance angiography, upper extremit", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73501": { desc: "Radiologic examination, hip unilateral, with p", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73502": { desc: "Radiologic examination, hip unilateral, with p", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73503": { desc: "Radiologic examination, hip unilateral, with p", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73525": { desc: "Radiologic examination, hip, arthrography, rad", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73551": { desc: "Radiologic examination, femur; 1 view", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73552": { desc: "Radiologic examination, femur; minimum 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73560": { desc: "Radiologic examination, knee; 1 or 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73562": { desc: "Radiologic examination, knee; 3 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73564": { desc: "Radiologic examination, knee; complete, 4 or m", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73580": { desc: "Radiologic examination, knee, arthrography, ra", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73590": { desc: "Radiologic examination, tibia and fibula; 2 vi", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73592": { desc: "Radiologic examination, infant lower extremity", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73600": { desc: "Radiologic examination, ankle; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73610": { desc: "Radiologic examination, ankle; complete, minim", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73615": { desc: "Radiologic examination, ankle; arthrography, r", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73620": { desc: "Radiologic examination, foot; 2 views", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73630": { desc: "Radiologic examination, foot; complete, minimu", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73650": { desc: "Radiologic examination, calcaneus; minimum 2 v", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73660": { desc: "Radiologic examination, toe(s), minimum 2 view", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73700": { desc: "Computed tomography, lower extremity; without ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73701": { desc: "Computed tomography, lower extremity; with con", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73702": { desc: "Computed tomography, lower extremity; without ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73706": { desc: "Computed tomographic angiography, lower extrem", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73718": { desc: "Magnetic resonance (eg, proton) imaging, lower", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73719": { desc: "Magnetic resonance (eg, proton) imaging, lower", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73720": { desc: "Magnetic resonance (eg, proton) imaging, lower", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73721": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73722": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73723": { desc: "Magnetic resonance (eg, proton) imaging, any j", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "73725": { desc: "Magnetic resonance angiography, lower extremit", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "74470": { desc: "Radiologic examination, renal cyst study, tran", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "74485": { desc: "Dialtion of ureter(s) or urethra, radiological", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "74742": { desc: "Transcervical catheterizaion of fallopian tube", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "75716": { desc: "Angiography, extremity, bilateral, radiologica", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "75741": { desc: "Angiography, pulmonary, unilateral, selective,", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "75746": { desc: "Angiography, pulmonary, by nonselective cathet", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "75756": { desc: "Angiography, internal mammary, radiological su", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "75801": { desc: "Lymphangiography, extremity only, unilateral, ", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "75805": { desc: "Lymphangiography, pelvic/abdominal, unilateral", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "75820": { desc: "Venography, extremity, unilateral, radiologica", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "75831": { desc: "Venography, renal, unilateral, selective, radi", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "75840": { desc: "Venography, adrenal, unilateral, selecive, rad", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "76510": { desc: "Ophthalmic ultrasound, diagnostic; B-scan and ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76511": { desc: "Ophthalmic ultrasound, diagnostic; quantitativ", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76512": { desc: "Ophthalmic ultrasound, diagnostic; B-scan (wit", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76529": { desc: "Opthalmic ultrasonic FB localization", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "76641": { desc: "Ultrasound, breast, unilateral, real time with", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "76642": { desc: "Ultrasound, breast, unilateral, real time with", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "76881": { desc: "Ultrasound, complete joint (ie, joint space an", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76882": { desc: "Ultrasound, limited, joint or focal evaluation", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76883": { desc: "Ultrasound, nerve(s) and accompanying structur", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76885": { desc: "Ultrasound, infant hips, real-time with imagin", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "76886": { desc: "Ultrasound, infant hips, real-time with imagin", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "77046": { desc: "Magnetic resonance imaging, breast, without co", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "77048": { desc: "Magnetic resonance imaging, breast, without an", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "77053": { desc: "Mammary ductogram or galactogram, single duct,", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "77054": { desc: "Mammary ductogram or galactogram, multiple duc", lateralityReq: true, allowedMods: ["RT", "LT", "50"], bilateral: "" },
+  "77061": { desc: "Diagnostic digital breast tomosynthesis; unila", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
+  "77065": { desc: "Diagnostic mammography, including computer-aid", lateralityReq: true, allowedMods: ["RT", "LT"], bilateral: "" },
 };
 
-// Add-On CPT Crosswalk (from Carol's "Add-On CPT Crosswalk" tab)
+// Add-On CPT Crosswalk (from the reference "Add-On CPT Crosswalk" tab)
 const ADDON_CODES: Record<string, { desc: string; primaryRange: string[]; primaryRequired: boolean }> = {
-  "11046": { desc: "Debridement add-on", primaryRange: ["11042", "11043", "11044"], primaryRequired: true },
-  "99153": { desc: "Moderate sedation add-on", primaryRange: ["99151", "99152", "99153", "99155", "99156", "99157"], primaryRequired: true },
-  "64480": { desc: "Injection add-on", primaryRange: ["64479"], primaryRequired: true },
-  "22585": { desc: "Spine add-on level", primaryRange: ["22554", "22558"], primaryRequired: true },
-  "22614": { desc: "Spinal fusion add-on", primaryRange: ["22612", "22630"], primaryRequired: true },
-  "22842": { desc: "Instrumentation add-on", primaryRange: ["22600", "22610", "22612", "22630", "22800"], primaryRequired: true },
-  "76937": { desc: "US guidance add-on", primaryRange: ["36000", "36010", "36100", "36200", "36400", "36410", "36420", "36500"], primaryRequired: true },
-  "77012": { desc: "CT guidance add-on", primaryRange: [], primaryRequired: true }, // primary is any 10000-69990
-  "96366": { desc: "IV infusion add-on hour", primaryRange: ["96365"], primaryRequired: true },
+  "11001": { desc: "Debridement add'l 20 sq cm", primaryRange: ["11000"], primaryRequired: true },
+  "11102": { desc: "Tangential biopsy add'l lesion", primaryRange: ["11100"], primaryRequired: true },
+  "11104": { desc: "Punch biopsy add'l lesion", primaryRange: ["11103"], primaryRequired: true },
+  "13102": { desc: "Repair complex wound add'l 5 cm", primaryRange: ["13101"], primaryRequired: true },
+  "15003": { desc: "Skin graft wound prep add'l 100 sq cm", primaryRange: ["15002"], primaryRequired: true },
+  "15101": { desc: "Split thickness autograft trunk/arm/leg", primaryRange: ["15100"], primaryRequired: true },
+  "15777": { desc: "Biologic implant soft tissue reinforcement", primaryRange: ["19340", "19342", "19357", "19361", "19364", "19367", "19368", "19369", "19380"], primaryRequired: true },
+  "17003": { desc: "Destruction benign/premalignant lesions", primaryRange: ["17000"], primaryRequired: true },
+  "22585": { desc: "Anterior interbody arthrodesis add'l interspace", primaryRange: ["22554", "22556", "22558"], primaryRequired: true },
+  "22614": { desc: "Posterior/posterolateral arthrodesis add'l", primaryRange: ["22590", "22595", "22600", "22610", "22612"], primaryRequired: true },
+  "22632": { desc: "Posterior interbody arthrodesis add'l interspace", primaryRange: ["22630"], primaryRequired: true },
+  "22634": { desc: "Posterior/transforaminal interbody arthrodesis add'l", primaryRange: ["22633"], primaryRequired: true },
+  "22840": { desc: "Posterior non-segmental instrumentation", primaryRange: ["22590", "22595", "22600", "22610", "22612", "22614", "22630", "22632", "22633", "22634", "22800", "22802", "22804", "22808", "22810", "22812"], primaryRequired: true },
+  "22842": { desc: "Posterior segmental instrumentation 3-6", primaryRange: ["22590", "22595", "22600", "22610", "22612", "22614", "22630", "22632", "22633", "22634", "22800", "22802", "22804", "22808", "22810", "22812"], primaryRequired: true },
+  "22843": { desc: "Posterior segmental instrumentation 7-12", primaryRange: ["22590", "22595", "22600", "22610", "22612", "22614", "22630", "22632", "22633", "22800", "22802", "22804", "22808", "22810", "22812"], primaryRequired: true },
+  "22845": { desc: "Anterior instrumentation 2-3 vertebral segments", primaryRange: ["22554", "22556", "22558", "22585", "22808", "22810", "22812"], primaryRequired: true },
+  "22846": { desc: "Anterior instrumentation 4-7 vertebral segments", primaryRange: ["22554", "22556", "22558", "22585", "22808", "22810", "22812"], primaryRequired: true },
+  "22853": { desc: "Insertion interbody biomechanical device", primaryRange: ["22558", "22612", "22630", "22633"], primaryRequired: true },
+  "33141": { desc: "Endoscopic vessel harvesting add'l vessel", primaryRange: ["33140"], primaryRequired: true },
+  "33225": { desc: "Pacemaker LV lead placement add'l venous access", primaryRange: ["33206", "33207", "33208", "33212", "33213", "33214", "33221", "33224", "33227", "33228", "33229", "33230", "33231", "33233", "33234", "33235", "33240", "33249"], primaryRequired: true },
+  "44015": { desc: "Tube/needle catheter jejunostomy add'l", primaryRange: ["44005", "44010", "44020", "44120", "44130", "44140", "44141", "44143", "44144", "44145", "44146", "44147", "44150", "44151", "44155", "44160"], primaryRequired: true },
+  "44121": { desc: "Small intestine resection add'l segment", primaryRange: ["44120"], primaryRequired: true },
+  "45392": { desc: "Colonoscopy snare polypectomy add'l lesion", primaryRange: ["45385"], primaryRequired: true },
+  "61517": { desc: "Infusion pharmacological agent brain add'l", primaryRange: ["61516"], primaryRequired: true },
+  "63035": { desc: "Laminotomy add'l interspace", primaryRange: ["63030", "63040", "63042", "63020"], primaryRequired: true },
+  "63048": { desc: "Laminectomy add'l segment", primaryRange: ["63045", "63046", "63047"], primaryRequired: true },
+  "63076": { desc: "Discectomy anterior add'l interspace, cervical", primaryRange: ["63075"], primaryRequired: true },
+  "66990": { desc: "Ophthalmic endoscope add'l", primaryRange: ["66982", "66983", "66984"], primaryRequired: true },
+  "69990": { desc: "Microsurgical techniques add'l", primaryRange: [], primaryRequired: true },
+  "76937": { desc: "US guidance vascular access add'l", primaryRange: ["36555", "36556", "36557", "36558", "36560", "36561", "36563", "36565", "36566", "36568", "36569", "36570", "36571"], primaryRequired: true },
+  "77001": { desc: "Fluoroscopic guidance central venous access add'l", primaryRange: ["36555", "36556", "36557", "36558", "36560", "36561", "36563", "36565", "36566", "36568", "36569", "36570", "36571"], primaryRequired: true },
+  "77003": { desc: "Fluoroscopic guidance spinal injection add'l", primaryRange: ["62320", "62321", "62322", "62323", "64479", "64480", "64483", "64484", "64490", "64491", "64492", "64493", "64494", "64495"], primaryRequired: true },
+  "77012": { desc: "CT guidance needle placement add'l", primaryRange: [], primaryRequired: true },
+  "78496": { desc: "Cardiac blood pool SPECT add'l", primaryRange: ["78491"], primaryRequired: true },
+  "88185": { desc: "Flow cytometry add'l marker", primaryRange: ["88184"], primaryRequired: true },
+  "88314": { desc: "Special stain group II add'l", primaryRange: ["88313"], primaryRequired: true },
+  "88334": { desc: "Pathology consultation intraoperative add'l", primaryRange: ["88333"], primaryRequired: true },
+  "90833": { desc: "Psychotherapy add'l 30 min with E&M", primaryRange: ["99202", "99212", "99213", "99214", "99215", "99221", "99222", "99223", "99231", "99232", "99233"], primaryRequired: true },
+  "90836": { desc: "Psychotherapy add'l 45 min with E&M", primaryRange: ["99202", "99212", "99213", "99214", "99215", "99221", "99222", "99223", "99231", "99232", "99233"], primaryRequired: true },
+  "90838": { desc: "Psychotherapy add'l 60 min with E&M", primaryRange: ["99202", "99212", "99213", "99214", "99215", "99221", "99222", "99223", "99231", "99232", "99233"], primaryRequired: true },
+  "96366": { desc: "IV infusion add'l hour", primaryRange: ["96365", "96367", "96374"], primaryRequired: true },
+  "96375": { desc: "IV push new drug add'l", primaryRange: ["96365", "96374", "96409", "96413"], primaryRequired: true },
+  "99100": { desc: "Anesthesia, unusual patient age", primaryRange: [], primaryRequired: true },
+  "99116": { desc: "Anesthesia, utilization of hypothermia", primaryRange: [], primaryRequired: true },
+  "99135": { desc: "Anesthesia, controlled hypotension", primaryRange: [], primaryRequired: true },
+  "99140": { desc: "Anesthesia, emergency conditions", primaryRange: [], primaryRequired: true },
+  "99153": { desc: "Moderate sedation add'l 15 min, same provider", primaryRange: ["99151", "99152"], primaryRequired: true },
+  "99157": { desc: "Moderate sedation add'l 15 min, second provider", primaryRange: ["99155", "99156"], primaryRequired: true },
+  "99292": { desc: "Critical care add'l 30 min", primaryRange: ["99291"], primaryRequired: true },
+  "99354": { desc: "Prolonged outpatient service add'l", primaryRange: ["99205", "99215", "99245", "99483"], primaryRequired: true },
+  "99356": { desc: "Prolonged inpatient/observation add'l", primaryRange: ["99223", "99233", "99236"], primaryRequired: true },
+  "99417": { desc: "Prolonged outpatient visit add'l 15 min", primaryRange: ["99205", "99215"], primaryRequired: true },
+  "99418": { desc: "Prolonged inpatient/observation add'l 15 min", primaryRange: ["99223", "99233", "99236"], primaryRequired: true },
+  "0164T": { desc: "Total disc arthroplasty add'l interspace", primaryRange: ["22857"], primaryRequired: true },
+  "64480": { desc: "Transforaminal epidural injection add'l, cervical", primaryRange: ["64479"], primaryRequired: true },
+  "64484": { desc: "Transforaminal epidural injection add'l, lumbar", primaryRange: ["64483"], primaryRequired: true },
+  "64491": { desc: "Paravertebral facet injection add'l, cervical 2nd", primaryRange: ["64490"], primaryRequired: true },
+  "64492": { desc: "Paravertebral facet injection add'l, cervical 3rd", primaryRange: ["64490", "64491"], primaryRequired: true },
+  "64494": { desc: "Paravertebral facet injection add'l, lumbar 2nd", primaryRange: ["64493"], primaryRequired: true },
+  "64495": { desc: "Paravertebral facet injection add'l, lumbar 3rd", primaryRange: ["64493", "64494"], primaryRequired: true },
 };
 
 // Keywords for various categories
@@ -97,7 +238,7 @@ const NON_BILLABLE_KEYWORDS = [
   "self-care", "elective non-covered",
 ];
 
-// Modifiers that should NEVER be hard-coded in CDM (from Carol's call notes)
+// Modifiers that should NEVER be hard-coded in CDM (from the reference call notes)
 const NEVER_HARDCODE_MODS = ["59", "XE", "XS", "XP", "XU", "25", "76", "77"];
 
 // Revenue code to CPT range mapping
@@ -130,7 +271,6 @@ function runRules(items: any[]): RuleResult[] {
 
   // Pre-compute groupings
   const codeGroups = new Map<string, any[]>();
-  const revCodePrices = new Map<string, number[]>();
   const allCodeSet = new Set<string>(); // all CPT codes in CDM
 
   for (const item of items) {
@@ -143,20 +283,6 @@ function runRules(items: any[]): RuleResult[] {
       const key = `${code}|${rev}`;
       if (!codeGroups.has(key)) codeGroups.set(key, []);
       codeGroups.get(key)!.push(item);
-    }
-    if (rev) {
-      const rev3 = rev.substring(0, 3);
-      if (!revCodePrices.has(rev3)) revCodePrices.set(rev3, []);
-      if (price > 0) revCodePrices.get(rev3)!.push(price);
-    }
-  }
-
-  // Compute medians for outlier detection
-  const revCodeMedians = new Map<string, number>();
-  for (const [rev3, prices] of revCodePrices) {
-    if (prices.length >= 5) {
-      const sorted = [...prices].sort((a, b) => a - b);
-      revCodeMedians.set(rev3, sorted[Math.floor(sorted.length / 2)]);
     }
   }
 
@@ -210,41 +336,24 @@ function runRules(items: any[]): RuleResult[] {
       });
     }
 
-    // ─── Rule 6.5: Zero/Null Price ─────────────────────
+    // ─── Rule 6.5: Zero/Null Price (three-category framework) ──
+    // A $0 price is only a problem for some lines. Exclude the categories the
+    // reference method treats as correctly $0: global-surgery follow-up (99024),
+    // unlisted/NOS codes (x9999, priced at time of service), and any SI=B
+    // (always bundled). Everything else with active use is a real pricing gap.
     if (price <= 0 && item.is_active !== false) {
-      results.push({
-        rule_id: "6.5", charge_item_id: item.id,
-        title: `Zero or missing price - ${procNum} (${code || "no code"})`,
-        description: `Active charge item "${item.charge_description}" has a price of $${price.toFixed(2)}.`,
-        severity: "high", category: "Pricing - Missing",
-        recommendation: "Set an appropriate charge amount or deactivate this line item if no longer in use.",
-      });
-    }
-
-    // ─── Rule 6.6: Extreme Price Outlier ───────────────
-    if (price > 0 && rev3 && revCodeMedians.has(rev3)) {
-      const median = revCodeMedians.get(rev3)!;
-      if (median > 0) {
-        const ratio = price / median;
-        if (ratio > 5) {
-          results.push({
-            rule_id: "6.6", charge_item_id: item.id,
-            title: `Price outlier (${ratio.toFixed(1)}x median) - ${procNum}`,
-            description: `"${item.charge_description}" is priced at $${price.toLocaleString()} which is ${ratio.toFixed(1)}x the median ($${median.toLocaleString()}) for revenue code family ${rev3}x.`,
-            severity: "medium", category: "Pricing - Outlier",
-            financial_impact: Math.abs(price - median),
-            recommendation: "Review pricing. This item is significantly higher than similar services in the same department.",
-          });
-        } else if (ratio < 0.05 && price > 0) {
-          results.push({
-            rule_id: "6.6", charge_item_id: item.id,
-            title: `Price outlier (${(ratio * 100).toFixed(1)}% of median) - ${procNum}`,
-            description: `"${item.charge_description}" is priced at $${price.toFixed(2)} which is only ${(ratio * 100).toFixed(1)}% of the median ($${median.toLocaleString()}) for revenue code family ${rev3}x.`,
-            severity: "medium", category: "Pricing - Outlier",
-            financial_impact: Math.abs(median - price),
-            recommendation: "Review pricing. This item is significantly lower than similar services. May indicate a data entry error.",
-          });
-        }
+      const cn = normalizeHcpcs(code);
+      const si = getReference(cn)?.si;
+      const isNOS = /^\d{5}$/.test(cn) && cn.endsWith("9999");
+      const expectedZero = cn === "99024" || isNOS || si === "B";
+      if (!expectedZero) {
+        results.push({
+          rule_id: "6.5", charge_item_id: item.id,
+          title: `Zero or missing price - ${procNum} (${code || "no code"})`,
+          description: `Active charge item "${item.charge_description}" has a price of $${price.toFixed(2)}. (Excludes global-surgery 99024, unlisted x9999, and SI=B lines, which are correctly $0.)`,
+          severity: "high", category: "Pricing - Missing",
+          recommendation: "Set an appropriate charge amount or deactivate this line item if no longer in use.",
+        });
       }
     }
 
@@ -310,7 +419,7 @@ function runRules(items: any[]): RuleResult[] {
       });
     }
 
-    // ─── Rule R1: Radiology Missing Laterality (Carol's Radiology QA) ──
+    // ─── Rule R1: Radiology Missing Laterality (the reference Radiology QA) ──
     if (code && RADIOLOGY_LATERALITY[code]) {
       const radInfo = RADIOLOGY_LATERALITY[code];
       if (radInfo.lateralityReq) {
@@ -339,7 +448,7 @@ function runRules(items: any[]): RuleResult[] {
       }
     }
 
-    // ─── Rule A1: Add-On Code Without Primary (Carol's Add-On QA) ──
+    // ─── Rule A1: Add-On Code Without Primary (the reference Add-On QA) ──
     if (code && ADDON_CODES[code]) {
       const addon = ADDON_CODES[code];
       if (addon.primaryRequired) {
@@ -366,7 +475,7 @@ function runRules(items: any[]): RuleResult[] {
       }
     }
 
-    // ─── Rule L1: Lab Panel + Components Billed (Carol's Lab QA) ──
+    // ─── Rule L1: Lab Panel + Components Billed (the reference Lab QA) ──
     if (code && LAB_PANELS[code]) {
       const panel = LAB_PANELS[code];
       // Check if any component codes also exist as separate CDM items
@@ -443,7 +552,7 @@ function runRules(items: any[]): RuleResult[] {
         if (prices.length > 1) {
           const minP = Math.min(...prices);
           const maxP = Math.max(...prices);
-          if (minP > 0 && maxP / minP > 1.2) {
+          if (minP > 0 && maxP / minP > 3.0) {
             const varKey = `3.2|${code}|${rev}`;
             if (!flaggedDupes.has(varKey)) {
               flaggedDupes.add(varKey);
@@ -521,6 +630,9 @@ export async function POST(request: Request) {
     if (!auditId) {
       return NextResponse.json({ error: "Missing auditId" }, { status: 400 });
     }
+    if (await isAuditLocked(supabaseAdmin, auditId)) {
+      return NextResponse.json({ error: "This quarter is completed (locked). Reopen it to run a scan." }, { status: 409 });
+    }
 
     // Fetch ALL charge items (paginated)
     let allItems: any[] = [];
@@ -565,16 +677,67 @@ export async function POST(request: Request) {
       if (data.length < 1000) break;
     }
 
+    // Load imported 837 claim lines (if any) for the Phase-2 claims rules.
+    const claimLines: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("claim_lines").select("claim_id, rev_code, hcpcs, mod1, mod2, mod3, mod4, units, line_charge, service_date, dx_primary").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      claimLines.push(...data);
+      if (data.length < 1000) break;
+    }
+
+    // Load competitor peer prices (if any) for the named-competitor benchmark.
+    const peerRows: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("peer_prices").select("hcpcs, gross_charge, competitor").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      peerRows.push(...data);
+      if (data.length < 1000) break;
+    }
+
+    // Optional: benchmark against the client's own state if the audit records one;
+    // otherwise the peer-pricing rule falls back to the national average.
+    // select("*") avoids a hard error if the state column doesn't exist yet.
+    let auditState: string | null = null;
+    // Rules the client deactivated on the Intake page (empty = all active).
+    const disabledRules = new Set<string>();
+    // Facility type scopes which rules run (inpatient/SNF drop OPPS-only rules).
+    let facilityType: FacilityType = "opps_outpatient";
+    try {
+      const { data: auditRow } = await supabaseAdmin.from("audits").select("*").eq("id", auditId).single();
+      const raw = (auditRow?.state || auditRow?.hospital_state || auditRow?.state_code || "") as string;
+      if (raw) auditState = String(raw).trim().toUpperCase().slice(0, 2);
+      const dr = auditRow?.disabled_rules;
+      if (Array.isArray(dr)) for (const r of dr) disabledRules.add(String(r));
+      const ft = String(auditRow?.facility_type || "").trim();
+      if (["opps_outpatient", "short_term_acute", "inpatient", "snf"].includes(ft)) facilityType = ft as FacilityType;
+    } catch { /* national fallback */ }
+    // Only the non-OPPS settings drop rules; outpatient/acute run the full set.
+    const facilityAllowed = (facilityType === "inpatient" || facilityType === "snf")
+      ? ruleIdsForFacility(facilityType) : null;
+
+    // Load the live CMS reference set from the DB (falls back to bundled JSON),
+    // so the automatic quarterly refresh takes effect for every scan.
+    await loadReferenceFromDb(supabaseAdmin);
+
     // Run all rules: self-contained structural rules + CMS reference-driven rules
-    const ruleResults = [
+    const ruleResultsAll = [
       ...runRules(allItems),
-      ...runReferenceRules(allItems),
+      ...runReferenceRules(allItems, usageByCode),
       ...runDeviceCrosswalkRules(allItems),
       ...runCodingUpdateRules(allItems),
       ...runPriceTransparencyRules(allItems),
       ...runMultiplierRules(allItems),
       ...runFormularyRules(allItems, formularyByCode, usageByCode),
+      ...runBenchmarkRules(allItems, auditState),
+      ...runClaimsRules(allItems, claimLines),
+      ...runPeerCompetitorRules(allItems, peerRows),
     ];
+    // Drop findings the client deactivated, and any rule not in scope for the
+    // facility type (inpatient/SNF exclude OPPS-only rules).
+    const ruleResults = ruleResultsAll.filter(
+      (r) => !disabledRules.has(r.rule_id) && (!facilityAllowed || facilityAllowed.has(r.rule_id))
+    );
 
     // Get phases for mapping
     const { data: phases } = await supabaseAdmin
@@ -593,7 +756,12 @@ export async function POST(request: Request) {
         "1": 1, "S": 1, "2": 2, "3": 3, "6": 6, "R": 1, "A": 1, "L": 1,
         // reference-driven rules
         "8": 3, "15": 3, "12": 1, "10": 6, "U": 6, "637": 2, "2c": 1,
-        "SIA": 6, "2b": 2, "NC": 3, "M": 1, "PT": 6, "7": 2, "INF": 2, "NDC": 2, "UOM": 2, "PBU": 2,
+        "SIA": 6, "2b": 2, "NC": 3, "M": 1, "PT": 6, "7": 2, "INF": 2, "NDC": 2, "UOM": 2, "PBU": 2, "MK": 6,
+        "BM": 6,
+        // Phase-2 claims (837) rules
+        "C25": 2, "C59": 2, "CNIC": 2, "CUNIT": 2,
+        // Named-competitor peer pricing
+        "PC": 6,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;
@@ -668,4 +836,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Scan failed", detail: err?.message }, { status: 500 });
   }
 }
-// engine: structural rules + CMS reference-driven rules (Greg Brazzel methodology)
+// engine: structural rules + CMS reference-driven rules (an expert consultant methodology)

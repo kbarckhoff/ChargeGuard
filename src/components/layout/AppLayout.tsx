@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/layout/Sidebar";
+import TopNav from "@/components/layout/TopNav";
 
 export default async function AppLayout({
   children,
@@ -15,8 +15,8 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex h-screen bg-[#fafaf8] overflow-hidden">
-      <Sidebar />
+    <div className="flex flex-col h-screen bg-[#f4f6f8] overflow-hidden">
+      <TopNav />
       <main className="flex-1 flex flex-col overflow-hidden">
         {children}
       </main>

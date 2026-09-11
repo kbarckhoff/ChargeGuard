@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
-import { Layers, AlertTriangle, CheckCircle2, Zap, FileSpreadsheet, Upload } from "lucide-react";
-import { KPICard, Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
+import { Layers, AlertTriangle, Zap, FileSpreadsheet, Upload, DollarSign, ListChecks, Download } from "lucide-react";
+import { KPICard, Badge, SeverityBar, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import Link from "next/link";
 import { ScanButton } from "@/components/audit/ScanButton";
 import { CreateAuditForm } from "@/components/audit/CreateAuditForm";
@@ -75,9 +75,9 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#1a1a18]">Dashboard</h1>
-        <div className="w-8 h-8 rounded-full bg-[#1a1a18] flex items-center justify-center text-white text-xs font-medium">
+      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
+        <h1 className="text-base font-semibold text-[#0f172a]">Dashboard</h1>
+        <div className="w-8 h-8 rounded-full bg-[#0f172a] flex items-center justify-center text-white text-xs font-medium">
           {profile?.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "U"}
         </div>
       </header>
@@ -95,13 +95,13 @@ export default async function DashboardPage() {
         ) : (
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-[#1a1a18]">{audit.hospital_name}</h2>
-                <p className="text-sm text-[#7a7a75] mt-0.5">{audit.name}</p>
-              </div>
-              <ScanButton auditId={audit.id} />
+            <div>
+              <h2 className="text-xl font-semibold text-[#0f172a]">{audit.hospital_name}</h2>
+              <p className="text-sm text-[#64748b] mt-0.5">{audit.name}</p>
             </div>
+
+            {/* Scan action + full-width result */}
+            <ScanButton auditId={audit.id} />
 
             {/* Workflow Steps */}
             {stats && stats.chargeItems === 0 && (
@@ -137,66 +137,41 @@ export default async function DashboardPage() {
             {/* KPIs */}
             {stats && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard
-                  icon={FileSpreadsheet}
-                  label="Charge Items"
-                  value={stats.chargeItems.toLocaleString()}
-                />
-                <KPICard
-                  icon={AlertTriangle}
-                  label="Open Issues"
-                  value={stats.openFindings.toString()}
-                  subtext={stats.totalImpact > 0 ? `${formatImpact(stats.totalImpact)} est. impact` : undefined}
-                />
-                <KPICard
-                  icon={CheckCircle2}
-                  label="Accepted"
-                  value={stats.acceptedFindings.toString()}
-                  subtext={`${stats.resolvedFindings} resolved`}
-                />
-                <KPICard
-                  icon={Zap}
-                  label="Total Findings"
-                  value={stats.totalFindings.toString()}
-                  subtext={`${stats.rejectedFindings} rejected`}
-                />
+                <KPICard color="blue" icon={FileSpreadsheet} label="Charge lines" value={stats.chargeItems.toLocaleString()} />
+                <KPICard color="orange" icon={AlertTriangle} label="Open issues" value={stats.openFindings.toLocaleString()} />
+                <KPICard color="green" icon={DollarSign} label="Est. impact" value={formatImpact(stats.totalImpact)} />
+                <KPICard color="purple" icon={ListChecks} label="Total findings" value={stats.totalFindings.toLocaleString()} />
               </div>
             )}
 
-            {/* Severity Breakdown */}
+            {/* Findings by severity (segmented bar) */}
+            {stats && stats.totalFindings > 0 && (
+              <div className="bg-white rounded-2xl border border-[#edf0f4] p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-[#111827]">Findings by severity</h3>
+                  <Badge variant="default">{stats.openFindings.toLocaleString()} open</Badge>
+                </div>
+                <SeverityBar counts={stats.severityCounts} />
+              </div>
+            )}
+
+            {/* Review progress + Reports */}
             {stats && stats.totalFindings > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-                  <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Issues by Severity</h3>
-                  <div className="space-y-3">
-                    {Object.entries(SEVERITY_CONFIG).filter(([k]) => k !== "info").map(([key, cfg]) => {
-                      const count = stats!.severityCounts[key as keyof typeof stats.severityCounts] || 0;
-                      return (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-                          <span className="text-sm text-[#5a5a55] w-16">{cfg.label}</span>
-                          <div className="flex-1"><ProgressBar value={count} max={Math.max(stats!.totalFindings, 1)} color={cfg.color} height={6} /></div>
-                          <span className="text-sm font-semibold text-[#1a1a18] w-10 text-right">{count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-                  <h3 className="text-sm font-semibold text-[#3d3d3a] mb-4">Review Progress</h3>
+                <div className="bg-white rounded-2xl border border-[#edf0f4] p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)]">
+                  <h3 className="text-sm font-bold text-[#111827] mb-4">Review progress</h3>
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm text-[#7a7a75]">Reviewed</span>
-                        <span className="text-sm font-medium text-[#1a1a18]">
+                        <span className="text-sm text-[#64748b]">Reviewed</span>
+                        <span className="text-sm font-medium text-[#0f172a]">
                           {stats.acceptedFindings + stats.rejectedFindings + stats.resolvedFindings} / {stats.totalFindings}
                         </span>
                       </div>
                       <ProgressBar
                         value={stats.acceptedFindings + stats.rejectedFindings + stats.resolvedFindings}
                         max={Math.max(stats.totalFindings, 1)}
-                        color="#1a1a18"
+                        color="#0f172a"
                         height={8}
                         showLabel
                       />
@@ -216,9 +191,24 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  <Link href="/findings" className="block mt-4 text-center text-sm text-[#1a1a18] font-medium hover:underline">
+                  <Link href="/findings" className="block mt-4 text-center text-sm text-[#2563eb] font-medium hover:underline">
                     Review all findings →
                   </Link>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-[#edf0f4] p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)]">
+                  <h3 className="text-sm font-bold text-[#111827] mb-4">Reports &amp; deliverables</h3>
+                  <div className="flex flex-col gap-2.5">
+                    <Link href="/reports" className="flex items-center gap-2 px-4 py-2.5 bg-[#2563eb] text-white rounded-lg text-sm font-semibold hover:bg-[#1d4ed8] transition-colors">
+                      <Download size={15} /> CDM Analysis Report
+                    </Link>
+                    <Link href="/reports" className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e2e6ec] text-[#374151] rounded-lg text-sm font-medium hover:bg-[#f6f7f9] transition-colors">
+                      <Download size={15} /> Peer Pricing Analysis
+                    </Link>
+                    <Link href="/reports" className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#e2e6ec] text-[#374151] rounded-lg text-sm font-medium hover:bg-[#f6f7f9] transition-colors">
+                      <Download size={15} /> Client Data Request
+                    </Link>
+                  </div>
                 </div>
               </div>
             )}

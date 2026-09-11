@@ -1,9 +1,9 @@
-// CMS fee-schedule source registry — driven by Greg Brazzel's Maintenance Calendar
-// (Formula Library Step 16). Each entry tells the refresh pipeline where to look,
-// how often, and which reference columns it feeds.
+// CMS fee-schedule source registry — driven by the reference maintenance
+// calendar. Each entry tells the refresh pipeline where to look, how often, and
+// which reference columns it feeds.
 //
 // "start small": the three sources that power the rules already built
-// (SI / APC / pass-through / retired). The rest of Greg's 17 sources are listed
+// (SI / APC / pass-through / retired). The remaining sources are listed
 // at the bottom as `enabled: false` so we can switch them on as parsers are added.
 //
 // IMPORTANT: `landingUrl` is the stable CMS page. The actual quarterly file link
@@ -70,7 +70,7 @@ export const SOURCES = [
     parser: "clfsRate",
   },
 
-  // ── Remaining sources from Greg's Maintenance Calendar (enable as parsers land) ──
+  // ── Remaining sources from the maintenance calendar (enable as parsers land) ──
   { key: "opps_addendum_a", name: "OPPS Addendum A (APC rates)", cadence: "quarterly", enabled: false,
     landingUrl: "https://www.cms.gov/medicare/payment/prospective-payment-systems/hospital-outpatient-pps/quarterly-addenda-updates", feeds: ["apc_payment"] },
   { key: "ndc_hcpcs_crosswalk", name: "NDC-HCPCS Crosswalk", cadence: "quarterly", enabled: false,

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeGuard — Flow Prototype</title>
+<style>
+  :root{
+    --navy:#0f2a47; --orange:#f26a3d; --orange2:#e15a2e;
+    --bg:#f6f7f9; --card:#ffffff; --border:#edf0f4; --border2:#e2e6ec;
+    --text:#111827; --muted:#6b7280; --faint:#9aa2af; --slate:#374151;
+    --blue:#3b82f6; --bluebg:#eaf1fe;
+    --green:#12b76a; --greenbg:#e7f7ef;
+    --amber:#f59e0b; --amberbg:#fef4e2;
+    --red:#ef4444; --redbg:#fdeceb;
+    --purple:#7c3aed; --purplebg:#f1ebfe;
+    --orangebg:#fdeee7;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-md:0 4px 12px rgba(16,24,40,.07);
+    --r:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .proto{background:#0f172a;color:#fff;font-size:12px;text-align:center;padding:7px}
+  /* top bar (white, no tabs) */
+  .top{background:#fff;height:60px;display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--navy);cursor:pointer}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:15px}
+  .search{flex:1;display:flex;justify-content:center}
+  .search input{width:100%;max-width:420px;height:38px;border-radius:10px;border:1px solid var(--border2);background:var(--bg);padding:0 14px;font-size:13px;color:var(--text)}
+  .search input:focus{outline:none;border-color:var(--orange);background:#fff}
+  .top .right{display:flex;align-items:center;gap:16px;color:var(--faint)}
+  .iconbtn{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+  .iconbtn:hover{background:var(--bg)}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:600}
+  .engpill{font-size:12px;background:var(--bg);border:1px solid var(--border2);padding:6px 12px;border-radius:20px;color:var(--slate);font-weight:500}
+  /* stepper */
+  .stepper{background:#fff;border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;gap:2px;overflow-x:auto}
+  .step{display:flex;align-items:center;gap:11px;cursor:pointer;padding:8px 12px;border-radius:12px;white-space:nowrap}
+  .step:hover{background:var(--bg)}
+  .step .num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;background:#eef1f5;color:var(--faint);flex-shrink:0}
+  .step .lbl{font-size:13px;color:var(--muted);font-weight:600;line-height:1.2}
+  .step .sub{font-size:11px;color:var(--faint)}
+  .step.done .num{background:var(--greenbg);color:var(--green)}
+  .step.active{background:var(--orangebg)}
+  .step.active .num{background:var(--orange);color:#fff}
+  .step.active .lbl{color:var(--text)}
+  .connector{width:22px;height:2px;background:var(--border2);flex-shrink:0;border-radius:2px}
+  /* layout */
+  .wrap{max-width:1200px;margin:0 auto;padding:26px}
+  .pagehead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;gap:16px}
+  h1{font-size:23px;font-weight:700;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .card h3{font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .col{flex:1;min-width:220px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--slate);margin-bottom:6px}
+  input.f,select.f{width:100%;height:40px;border:1px solid var(--border2);border-radius:10px;padding:0 12px;font-size:13px;background:#fff;color:var(--text)}
+  input.f:focus,select.f:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(242,106,61,.14)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .btn{border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  .btn.primary{background:var(--orange);color:#fff;box-shadow:var(--shadow)}.btn.primary:hover{background:var(--orange2)}
+  .btn.ghost{background:#fff;border:1px solid var(--border2);color:var(--slate)}.btn.ghost:hover{background:var(--bg)}
+  .btn.dark{background:var(--navy);color:#fff}
+  .footer-bar{display:flex;justify-content:space-between;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+  .chip.green{background:var(--greenbg);color:#067647} .chip.amber{background:var(--amberbg);color:#b45309}
+  .chip.red{background:var(--redbg);color:#b42318} .chip.gray{background:#eef1f5;color:var(--muted)}
+  .chip.blue{background:var(--bluebg);color:#1d4ed8} .chip.orange{background:var(--orangebg);color:var(--orange2)}
+  .chip.purple{background:var(--purplebg);color:#6d28d9}
+  /* KPI */
+  .kpi{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+  .kpi .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:18px}
+  .ic.blue{background:var(--bluebg);color:var(--blue)} .ic.orange{background:var(--orangebg);color:var(--orange)}
+  .ic.green{background:var(--greenbg);color:var(--green)} .ic.purple{background:var(--purplebg);color:var(--purple)}
+  .kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
+  .kpi .l{font-size:12.5px;color:var(--muted);margin-top:3px}
+  /* segmented status bar (Riskora style) */
+  .segbar{display:flex;gap:4px;height:26px;border-radius:8px;overflow:hidden;margin-bottom:14px}
+  .segbar > div{height:100%;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.22) 0 6px,transparent 6px 12px)}
+  .seglegend{display:flex;flex-wrap:wrap;gap:18px}
+  .seglegend .it{display:flex;align-items:center;gap:8px;font-size:13px}
+  .seglegend .sw{width:12px;height:12px;border-radius:4px}
+  .seglegend b{font-weight:700}
+  /* tiles */
+  .tile{border:1px solid var(--border);border-radius:14px;padding:18px;background:#fff;display:flex;flex-direction:column;gap:11px;box-shadow:var(--shadow)}
+  .tile .t-ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px}
+  .tile .t-title{font-weight:700;font-size:14px}
+  .tile .t-desc{font-size:12px;color:var(--muted)}
+  .drop{border:1.5px dashed var(--border2);border-radius:11px;padding:15px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer}
+  .drop:hover{border-color:var(--orange);color:var(--orange2);background:var(--orangebg)}
+  /* tables */
+  .tablecard{background:#fff;border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+  .tabletools{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);gap:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);padding:11px 18px;background:#fbfcfd;border-bottom:1px solid var(--border)}
+  td{padding:13px 18px;border-bottom:1px solid var(--border);color:var(--slate)}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fbfcfd}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px}
+  .banner{border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;margin-bottom:18px}
+  .banner.amber{background:var(--amberbg);border:1px solid #f6dfa8} .banner.blue{background:var(--bluebg);border:1px solid #c7dbfb}
+  .ownerbadge{background:var(--navy);color:#fff;font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px}
+  .err{background:#fbfcfd;border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-top:9px;font-size:12px;display:flex;gap:11px;align-items:flex-start}
+  .err .rc{font-family:ui-monospace,Menlo,monospace;color:var(--red);font-weight:700;white-space:nowrap}
+  .muted{color:var(--muted)} .small{font-size:12px}
+  .tabs{display:flex;gap:6px;margin-bottom:18px}
+  .tabs .tb{padding:8px 15px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:9px;background:#fff;border:1px solid var(--border)}
+  .tabs .tb.active{color:#fff;background:var(--navy);border-color:var(--navy)}
+  .progressbar{height:9px;border-radius:6px;background:#eef1f5;overflow:hidden}
+  .progressbar > span{display:block;height:100%;background:var(--orange);border-radius:6px}
+  .compbox{border:1px solid var(--border);border-radius:12px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}
+  .note{font-size:12px;color:var(--faint);margin-top:12px}
+  .avatar-sm{width:26px;height:26px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;vertical-align:middle}
+  .ck{width:16px;height:16px;border:1.5px solid var(--border2);border-radius:5px;display:inline-block;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="proto">Design prototype — click the steps or buttons to move through the flow. Not connected to live data.</div>
+
+<div class="top">
+  <div class="brand" onclick="go('home')"><span class="logo">🛡️</span> ChargeGuard</div>
+  <div class="search"><input placeholder="Search charge codes, findings, tasks…"></div>
+  <div class="right">
+    <span class="engpill">Sample Hospital · Q3 2026</span>
+    <span class="iconbtn" onclick="go('home')" title="Home">🏠</span>
+    <span class="iconbtn">🔔</span>
+    <span class="iconbtn">⚙️</span>
+    <span class="avatar">KB</span>
+  </div>
+</div>
+
+<div class="stepper" id="stepper"></div>
+<div id="screen"></div>
+
+<script>
+const STEPS = [
+  {key:"intake", n:1, label:"Intake", sub:"Company profile"},
+  {key:"imports", n:2, label:"Imports", sub:"Upload files"},
+  {key:"review", n:3, label:"Review Imports", sub:"Validate & errors"},
+  {key:"peer", n:4, label:"Peer Setup", sub:"Owner / admin"},
+  {key:"analysis", n:5, label:"Analysis & Findings", sub:"Results & PM"},
+];
+const state = { step:3, view:"home" };
+const AV = ["#3b82f6","#12b76a","#7c3aed","#f59e0b","#ef4444"];
+
+function renderStepper(){
+  document.getElementById("stepper").innerHTML = STEPS.map((s,i)=>{
+    const cls = state.view==="flow" ? (i<state.step?"done":(i===state.step?"active":"")) : "";
+    return `<div class="step ${cls}" onclick="go(${i})">
+      <span class="num">${state.view==="flow"&&i<state.step?"✓":s.n}</span>
+      <span><span class="lbl">${s.label}</span><br><span class="sub">${s.sub}</span></span>
+    </div>${i<STEPS.length-1?'<span class="connector"></span>':''}`;
+  }).join("");
+}
+function go(t){
+  if(t==="home"){state.view="home";renderHome();}
+  else{state.view="flow";state.step=Number(t);renderStep();}
+  renderStepper();window.scrollTo(0,0);
+}
+function footer(backTxt,nextTxt,nextT,backT){
+  return `<div class="footer-bar">
+    ${backT!=null?`<button class="btn ghost" onclick="go(${backT})">← ${backTxt}</button>`:'<span></span>'}
+    ${nextTxt?`<button class="btn primary" onclick="go(${nextT})">${nextTxt} →</button>`:''}</div>`;
+}
+function segbar(){
+  const segs=[["Critical",71,"#ef4444"],["High",3168,"#f97316"],["Medium",4319,"#f59e0b"],["Low",1301,"#3b82f6"]];
+  const tot=segs.reduce((a,b)=>a+b[1],0);
+  return `<div class="segbar">${segs.map(s=>`<div style="flex:${s[1]};background-color:${s[2]}"></div>`).join("")}</div>
+    <div class="seglegend">${segs.map(s=>`<div class="it"><span class="sw" style="background:${s[2]}"></span>${s[0]} <b>${s[1].toLocaleString()}</b></div>`).join("")}
+    <div class="it" style="margin-left:auto;color:var(--muted)">Total findings <b style="color:var(--text)">${tot.toLocaleString()}</b></div></div>`;
+}
+function av(i,initials){return `<span class="avatar-sm" style="background:${AV[i%AV.length]}">${initials}</span>`;}
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  document.getElementById("screen").innerHTML = `<div class="wrap">
+    <div class="pagehead">
+      <div><h1>Sample Hospital</h1><div class="sub">Q3 2026 CDM Review · Jul 1 – Sep 30, 2026 · Owner: Kaylee B.</div></div>
+      <button class="btn primary" onclick="go(state.step)">Continue assessment →</button>
+    </div>
+
+    <div class="grid4" style="margin-bottom:18px">
+      <div class="kpi"><div class="ic blue">📄</div><div class="v">8,080</div><div class="l">Charge lines</div></div>
+      <div class="kpi"><div class="ic orange">⚠️</div><div class="v">312</div><div class="l">Action required</div></div>
+      <div class="kpi"><div class="ic green">💲</div><div class="v">$4.2M</div><div class="l">Est. impact</div></div>
+      <div class="kpi"><div class="ic purple">📈</div><div class="v">58th</div><div class="l">Peer price percentile</div></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0">Findings by severity</h3><span class="chip gray">Last scan · Aug 26</span></div>
+      ${segbar()}
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0">Assessment progress</h3><span class="small muted">Step 4 of 5 · Peer Setup</span></div>
+      <div class="progressbar"><span style="width:70%"></span></div>
+      <div class="grid4" style="margin-top:18px">
+        ${STEPS.map((s,i)=>`<div class="tile" style="cursor:pointer;gap:8px" onclick="go(${i})">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="num" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;${i<3?'background:var(--greenbg);color:var(--green)':(i===3?'background:var(--orange);color:#fff':'background:#eef1f5;color:var(--faint)')}">${i<3?'✓':s.n}</span>
+            ${i<3?'<span class="chip green">Done</span>':(i===3?'<span class="chip orange">Active</span>':'<span class="chip gray">Upcoming</span>')}
+          </div>
+          <div class="t-title" style="font-size:13px">${s.label}</div>
+          <div class="t-desc">${s.sub}</div></div>`).join("")}
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><h3>Imports</h3>
+        <div class="small" style="line-height:2.4">
+          <span class="chip green">✓ Valid</span> Charge Master · 8,080 rows<br>
+          <span class="chip green">✓ Valid</span> Revenue &amp; Usage · 3,717<br>
+          <span class="chip green">✓ Valid</span> Formulary · 1,315<br>
+          <span class="chip red">✕ 3 errors</span> 837 Claims · needs attention</div>
+      </div>
+      <div class="card"><h3>Reports &amp; deliverables</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn primary" onclick="alert('Prototype: full Excel report')">⬇ CDM Analysis Report</button>
+          <button class="btn ghost" onclick="alert('Prototype: peer analysis')">⬇ Peer Pricing Analysis</button>
+          <button class="btn ghost" onclick="alert('Prototype: client data request')">⬇ Client Data Request</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- STEP ROUTER ---------- */
+function renderStep(){
+  const k=STEPS[state.step].key;
+  document.getElementById("screen").innerHTML =
+    ({intake:stepIntake,imports:stepImports,review:stepReview,peer:stepPeer,analysis:stepAnalysis}[k])();
+  if(k==="intake") renderCompRows(compData);
+}
+
+/* STEP 1 — INTAKE */
+function stepIntake(){
+  return `<div class="wrap">
+    <div class="pagehead"><div><h1>Intake</h1><div class="sub">Set up the engagement and the competitors to benchmark against.</div></div></div>
+    <div class="card"><h3>Company profile</h3>
+      <div class="grid2">
+        <div><label>Hospital name</label><input class="f" value="Sample Hospital"></div>
+        <div><label>Facility type</label><select class="f"><option>OPPS Outpatient</option><option>Critical Access</option><option>SNF</option></select></div>
+        <div><label>Quarter</label><select class="f"><option>Q3 2026</option><option>Q2 2026</option><option>Q4 2026</option></select></div>
+        <div><label>Engagement owner</label><input class="f" value="Kaylee B."></div>
+        <div><label>Review start date</label><input class="f" type="date" value="2026-07-01"></div>
+        <div><label>Review end date</label><input class="f" type="date" value="2026-09-30"></div>
+      </div></div>
+    <div class="card"><h3>Competitors for peer analysis (up to 5)</h3>
+      <div id="comps"></div>
+      <button class="btn ghost" onclick="addComp()">+ Add competitor</button>
+      <div class="note">These hospitals are benchmarked against Sample Hospital's pricing. You (the tool owner) load their price-transparency files in the Peer Setup step.</div></div>
+    ${footer("","Save & continue to Imports",1,null)}
+  </div>`;
+}
+let compData=[{n:"Riverside Medical Center",c:"Miami, FL"},{n:"Bayfront Health",c:"St. Petersburg, FL"},{n:"Mercy Regional",c:"Orlando, FL"},{n:"St. Vincent's",c:"Jacksonville, FL"},{n:"Coastal Community Hospital",c:"Tampa, FL"}];
+function addComp(){compData.push({n:"",c:""});renderCompRows(compData);}
+function rmComp(i){compData.splice(i,1);renderCompRows(compData);}
+function renderCompRows(data){const el=document.getElementById("comps");if(!el)return;
+  el.innerHTML=data.map((c,i)=>`<div class="row" style="margin-bottom:11px;align-items:center">
+    <span class="avatar-sm" style="background:${AV[i%AV.length]}">${(c.n||'?')[0]}</span>
+    <div class="col"><input class="f" placeholder="Competitor hospital name" value="${c.n}"></div>
+    <div class="col"><input class="f" placeholder="City, State" value="${c.c}"></div>
+    <button class="btn ghost" onclick="rmComp(${i})">✕</button></div>`).join("");}
+
+/* STEP 2 — IMPORTS */
+function stepImports(){
+  const t=[
+    {ic:"📄",bg:"blue",t:"Charge Master (CDM)",d:"The chargemaster export (.xlsx/.csv)",s:"green",st:"Uploaded · 8,080 rows"},
+    {ic:"📊",bg:"green",t:"Revenue & Usage",d:"Volumes, payer mix, MC+MA by charge code",s:"green",st:"Uploaded · 3,717 rows"},
+    {ic:"💊",bg:"purple",t:"Formulary",d:"Pharmacy formulary with NDC + package units",s:"green",st:"Uploaded · 1,315 rows"},
+    {ic:"🧾",bg:"orange",t:"837 Claims",d:"837P/837I claims for Phase-2 checks",s:"amber",st:"Uploaded · 1 claim (errors)"},
+  ];
+  return `<div class="wrap">
+    <div class="pagehead"><div><h1>Imports</h1><div class="sub">Upload the client's files. Each is validated in the next step.</div></div></div>
+    <div class="grid2">
+      ${t.map(x=>`<div class="tile">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="t-ic ic ${x.bg}">${x.ic}</div><span class="chip ${x.s}">${x.s==='green'?'✓ Ready':'! Check'}</span></div>
+        <div><div class="t-title">${x.t}</div><div class="t-desc">${x.d}</div></div>
+        <div class="drop">⬆ Drop file here or <b>browse</b></div>
+        <div class="small muted">${x.st}</div></div>`).join("")}
+    </div>
+    <div style="margin-top:18px">${footer("Back to Intake","Continue to Review",2,0)}</div>
+  </div>`;
+}
+
+/* STEP 3 — REVIEW IMPORTS */
+function stepReview(){
+  return `<div class="wrap">
+    <div class="pagehead"><div><h1>Review Imports</h1><div class="sub">Validation results for every uploaded file.</div></div></div>
+    <div class="banner amber"><span>⚠️</span><div><b>3 of 4 files validated cleanly. 1 file has errors.</b><br><span class="small">Fix or acknowledge the errors below to continue.</span></div></div>
+    <div class="tablecard" style="margin-bottom:18px">
+      <table><thead><tr><th>File</th><th>Uploaded by</th><th>Uploaded</th><th>Rows</th><th>Status</th><th>Errors</th></tr></thead><tbody>
+        <tr><td><b>Charge Master.xlsx</b></td><td>${av(0,'C')} client@samplehosp.org</td><td>Aug 26, 9:14 AM</td><td>8,080</td><td><span class="chip green">✓ Valid</span></td><td>0</td></tr>
+        <tr><td><b>Revenue_Usage.csv</b></td><td>${av(0,'C')} client@samplehosp.org</td><td>Aug 26, 9:15 AM</td><td>3,717</td><td><span class="chip green">✓ Valid</span></td><td>0</td></tr>
+        <tr><td><b>Formulary.csv</b></td><td>${av(0,'C')} client@samplehosp.org</td><td>Aug 26, 9:16 AM</td><td>1,315</td><td><span class="chip green">✓ Valid</span></td><td>0</td></tr>
+        <tr><td><b>837P-claims.dat</b></td><td>${av(0,'C')} client@samplehosp.org</td><td>Aug 26, 9:18 AM</td><td>4 lines</td><td><span class="chip red">✕ 3 errors</span></td><td>3</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><h3>Errors — 837P-claims.dat</h3>
+      <div class="small muted" style="margin-bottom:4px">Uploaded by client@samplehosp.org · Aug 26, 9:18 AM</div>
+      <div class="err"><span class="rc">Line 2 · SV1</span><div>HCPCS <b>87099</b> not found in the current CMS code list — verify the code is valid for the service quarter.</div></div>
+      <div class="err"><span class="rc">Line 1 · DTP*472</span><div>Service date is a range (20050314–20050325) on a professional line; expected a single date.</div></div>
+      <div class="err"><span class="rc">Header · CLM05</span><div>Place of service <b>11</b> (office) on a facility engagement — confirm this is an 837I institutional file.</div></div>
+      <div class="row" style="margin-top:14px"><button class="btn ghost">Re-upload file</button><button class="btn ghost">Download error report</button></div></div>
+    ${footer("Back to Imports","Acknowledge & continue",3,1)}
+  </div>`;
+}
+
+/* STEP 4 — PEER SETUP */
+function stepPeer(){
+  const comps=["Riverside Medical Center","Bayfront Health","Mercy Regional","St. Vincent's","Coastal Community Hospital"];
+  const st=["green","green","amber","gray","gray"], stt=["Loaded · MRF 2026","Loaded · MRF 2026","Processing…","Not loaded","Not loaded"];
+  return `<div class="wrap">
+    <div class="pagehead"><div style="display:flex;align-items:center;gap:12px"><h1>Peer Setup</h1><span class="ownerbadge">Tool Owner · Admin</span></div></div>
+    <div class="banner blue"><span>🔒</span><div><b>Owner-only step.</b> Load each competitor's price-transparency file so ChargeGuard can benchmark against the market. The client does not see this step.</div></div>
+    <div class="card"><h3>Competitor price-transparency files (from Intake)</h3>
+      ${comps.map((c,i)=>`<div class="compbox">
+        <div style="display:flex;align-items:center;gap:10px;min-width:240px">${av(i,c[0])}<div><b>${c}</b><div class="small muted">CMS standard machine-readable file</div></div></div>
+        <input class="f" style="max-width:300px" placeholder="Source URL or drop file" value="${st[i]==='green'?'https://…/cms-hpt.json':''}">
+        <span class="chip ${st[i]}">${stt[i]}</span></div>`).join("")}
+      <div class="note">Tier-0 benchmark uses the free CMS outpatient charge file automatically; these files add named-competitor comparison.</div></div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+      <div><h3 style="margin:0">Run peer analysis</h3><div class="small muted">Benchmarks every priced CDM line vs. these 5 hospitals + national/state CMS averages.</div></div>
+      <button class="btn primary" onclick="go(4)">⚡ Run peer analysis</button></div>
+    ${footer("Back to Review","Go to Analysis",4,2)}
+  </div>`;
+}
+
+/* STEP 5 — ANALYSIS & FINDINGS */
+let aTab="findings";
+function stepAnalysis(){
+  return `<div class="wrap">
+    <div class="pagehead"><div><h1>Analysis & Findings</h1><div class="sub">Sample Hospital · Q3 2026 · complete results, peer analysis, and project management.</div></div>
+      <button class="btn primary" onclick="alert('Prototype: export report')">⬇ Export report</button></div>
+    <div class="grid4" style="margin-bottom:18px">
+      <div class="kpi"><div class="ic blue">📄</div><div class="v">8,080</div><div class="l">Charge lines</div></div>
+      <div class="kpi"><div class="ic orange">⚠️</div><div class="v">312</div><div class="l">Action required</div></div>
+      <div class="kpi"><div class="ic green">💲</div><div class="v">$4.2M</div><div class="l">Est. impact</div></div>
+      <div class="kpi"><div class="ic purple">📈</div><div class="v">58th</div><div class="l">Peer price percentile</div></div>
+    </div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0">Findings by severity</h3><span class="chip gray">312 need action</span></div>${segbar()}</div>
+    <div class="tabs">
+      <div class="tb ${aTab==='findings'?'active':''}" onclick="aTab='findings';renderStep()">CDM Findings</div>
+      <div class="tb ${aTab==='peer'?'active':''}" onclick="aTab='peer';renderStep()">Peer Pricing Analysis</div>
+      <div class="tb ${aTab==='pm'?'active':''}" onclick="aTab='pm';renderStep()">Project Management</div>
+    </div>
+    ${aTab==='findings'?findingsTab():aTab==='peer'?peerTab():pmTab()}
+    <div style="margin-top:18px">${footer("Back to Peer Setup","",null,3)}</div>
+  </div>`;
+}
+function tabletools(title,extra){return `<div class="tabletools"><b style="font-size:13px">${title}</b><div class="row" style="gap:8px">${extra||''}<button class="btn ghost">⛃ Filter</button><button class="btn ghost">↕ Sort</button></div></div>`;}
+function findingsTab(){
+  const rows=[
+    ["#dc2626","Critical","Retired HCPCS","J1885","Ketorolac 15mg","$44,200","Open","gray",0,"KB"],
+    ["#f97316","High","Pass-Through","C1778","Neurostim lead","$210,500","In progress","amber",1,"KB"],
+    ["#f97316","High","Peer Comparison","70450","CT head w/o dye","$88,000","Open","gray",-1,""],
+    ["#f59e0b","Medium","Conditional Packaging","Q4 drug","Various","$12,300","Open","gray",-1,""],
+    ["#3b82f6","Low","Multi Rev Code","85025","CBC w/ diff","$3,100","Resolved","green",2,"KB"],
+  ];
+  return `<div class="tablecard">${tabletools("All findings")}
+    <table><thead><tr><th style="width:34px"><span class="ck"></span></th><th>Severity</th><th>Category</th><th>Code</th><th>Description</th><th>Impact</th><th>Status</th><th>Assignee</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><span class="ck"></span></td>
+      <td><span class="dot" style="background:${r[0]}"></span>${r[1]}</td><td>${r[2]}</td><td><b>${r[3]}</b></td><td>${r[4]}</td><td>${r[5]}</td>
+      <td><span class="chip ${r[7]}">${r[6]}</span></td><td>${r[8]>=0?av(r[8],r[9]):'<span class="muted">—</span>'}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="note">Every row links to the charge line, the CMS rule it triggered, and a recommendation. Assign an owner and set status inline.</div>`;
+}
+function peerTab(){
+  const rows=[["70450","CT head w/o dye","$1,900","$3,050","62%","Below market","blue"],["93000","ECG","$210","$96","219%","Above market","red"],["80053","Comprehensive metabolic panel","$142","$150","95%","At market","green"],["77067","Screening mammography","$385","$520","74%","Below market","blue"]];
+  return `<div class="tablecard">${tabletools("Peer pricing — vs. 5 competitors + CMS averages")}
+    <table><thead><tr><th>Code</th><th>Description</th><th>Your price</th><th>Peer avg</th><th>% of peer</th><th>Position</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td><span class="chip ${r[6]}">${r[5]}</span></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="note">Benchmarked against the 5 competitors from Intake plus national and state CMS averages.</div>`;
+}
+function pmTab(){
+  return `<div class="grid3" style="margin-bottom:16px">
+      <div class="kpi"><div class="l">Open</div><div class="v" style="font-size:22px">248</div></div>
+      <div class="kpi"><div class="l">In progress</div><div class="v" style="font-size:22px">41</div></div>
+      <div class="kpi"><div class="l">Resolved</div><div class="v" style="font-size:22px">23</div></div></div>
+    <div class="tablecard">${tabletools("Remediation tasks",'<button class="btn primary" style="padding:8px 14px">+ New task</button>')}
+    <table><thead><tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>
+      <tr><td>Fix 131 retired HCPCS codes</td><td>${av(0,'KB')} Kaylee</td><td>Sep 5</td><td><span class="chip amber">In progress</span></td></tr>
+      <tr><td>Reprice 88 below-market outpatient services</td><td>${av(0,'KB')} Kaylee</td><td>Sep 12</td><td><span class="chip gray">Open</span></td></tr>
+      <tr><td>Confirm pass-through device pricing vs ASP</td><td><span class="muted">Unassigned</span></td><td>—</td><td><span class="chip gray">Open</span></td></tr>
+      <tr><td>Resolve 837 import errors with client</td><td>${av(0,'KB')} Kaylee</td><td>Aug 30</td><td><span class="chip green">Resolved</span></td></tr>
+    </tbody></table></div>
+    <div class="note">The findings tab doubles as a project tracker: assign owners, set due dates, and move items Open → In progress → Resolved.</div>`;
+}
+
+go('home');
+</script>
+</body>
+</html>

@@ -21,8 +21,8 @@ export default async function AuditsPage() {
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#1a1a18]">Audits</h1>
+      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
+        <h1 className="text-base font-semibold text-[#0f172a]">Audits</h1>
         <NewAuditDialog />
       </header>
 
@@ -41,17 +41,17 @@ export default async function AuditsPage() {
                 <Link
                   key={audit.id}
                   href={`/audits/${audit.id}`}
-                  className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#e5e5e0] hover:shadow-sm transition-shadow"
+                  className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#e2e8f0] hover:shadow-sm transition-shadow"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-semibold text-[#1a1a18]">{audit.hospital_name}</span>
+                      <span className="text-sm font-semibold text-[#0f172a]">{audit.hospital_name}</span>
                       <Badge variant={STATUS_BADGE[audit.status] || "default"}>
                         {audit.status.replace("_", " ")}
                       </Badge>
                     </div>
-                    <div className="text-sm text-[#5a5a55]">{audit.name}</div>
-                    <div className="text-xs text-[#9a9a95] mt-1">
+                    <div className="text-sm text-[#475569]">{audit.name}</div>
+                    <div className="text-xs text-[#94a3b8] mt-1">
                       {audit.total_charge_items?.toLocaleString() || 0} charge items •{" "}
                       {audit.total_findings || 0} findings •{" "}
                       Started {audit.start_date ? new Date(audit.start_date).toLocaleDateString() : "Not set"}

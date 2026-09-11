@@ -4,7 +4,12 @@ import { Badge, EmptyState, SEVERITY_CONFIG, formatImpact } from "@/components/u
 import { PieChart, AlertTriangle } from "lucide-react";
 import { ExportForm } from "@/components/reports/ExportForm";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ auditId?: string }>;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -20,20 +25,29 @@ export default async function ReportsPage() {
     .eq("id", user!.id)
     .single();
 
-  const { data: audits } = await supabaseAdmin
-    .from("audits")
-    .select("id, hospital_name, name")
-    .eq("org_id", userData!.org_id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  const audit = audits?.[0];
+  // Scope to a specific run when ?auditId is passed (from inside a run);
+  // otherwise fall back to the most recent audit.
+  let audit: { id: string; hospital_name: string; name: string } | null = null;
+  if (sp.auditId) {
+    const { data } = await supabaseAdmin
+      .from("audits").select("id, hospital_name, name").eq("id", sp.auditId).eq("org_id", userData!.org_id).single();
+    audit = data;
+  }
+  if (!audit) {
+    const { data: audits } = await supabaseAdmin
+      .from("audits")
+      .select("id, hospital_name, name")
+      .eq("org_id", userData!.org_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    audit = audits?.[0] ?? null;
+  }
 
   if (!audit) {
     return (
       <>
-        <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
-          <h1 className="text-base font-semibold text-[#1a1a18]">Reports</h1>
+        <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center flex-shrink-0">
+          <h1 className="text-base font-semibold text-[#0f172a]">Reports</h1>
         </header>
         <div className="flex-1 overflow-y-auto p-6">
           <EmptyState icon={PieChart} title="No audit yet" description="Create an audit and run a scan to generate reports." />
@@ -64,19 +78,19 @@ export default async function ReportsPage() {
 
   return (
     <>
-      <header className="h-14 border-b border-[#e5e5e0] bg-white px-6 flex items-center flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#1a1a18]">Reports</h1>
+      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center flex-shrink-0">
+        <h1 className="text-base font-semibold text-[#0f172a]">Reports</h1>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Summary */}
-          <div className="bg-white rounded-xl border border-[#e5e5e0] p-5">
-            <h3 className="text-sm font-semibold text-[#3d3d3a] mb-1">{audit.hospital_name}</h3>
-            <p className="text-sm text-[#7a7a75] mb-4">{audit.name}</p>
+          <div className="bg-white rounded-xl border border-[#e2e8f0] p-5">
+            <h3 className="text-sm font-semibold text-[#334155] mb-1">{audit.hospital_name}</h3>
+            <p className="text-sm text-[#64748b] mb-4">{audit.name}</p>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div className="p-3 bg-[#f5f5f0] rounded-xl text-center">
-                <div className="text-lg font-semibold text-[#1a1a18]">{total}</div>
-                <div className="text-xs text-[#7a7a75]">Total</div>
+              <div className="p-3 bg-[#f1f5f9] rounded-xl text-center">
+                <div className="text-lg font-semibold text-[#0f172a]">{total}</div>
+                <div className="text-xs text-[#64748b]">Total</div>
               </div>
               <div className="p-3 bg-amber-50 rounded-xl text-center">
                 <div className="text-lg font-semibold text-amber-700">{open}</div>

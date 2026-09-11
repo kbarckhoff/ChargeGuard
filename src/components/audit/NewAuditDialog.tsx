@@ -32,7 +32,7 @@ export function NewAuditDialog() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a] transition-colors"
+        className="flex items-center gap-2 px-4 py-2 bg-[#0f172a] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b] transition-colors"
       >
         <Plus size={15} /> New Audit
       </button>
@@ -42,9 +42,9 @@ export function NewAuditDialog() {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e0]">
-          <h2 className="text-lg font-semibold text-[#1a1a18]">Create New Audit</h2>
-          <button onClick={() => setOpen(false)} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0]">
+          <h2 className="text-lg font-semibold text-[#0f172a]">Create New Audit</h2>
+          <button onClick={() => setOpen(false)} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg">
             <X size={18} />
           </button>
         </div>
@@ -55,61 +55,57 @@ export function NewAuditDialog() {
           )}
 
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Hospital Name</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Hospital Name</label>
             <input
               name="hospital_name"
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="Mercy General Hospital"
               required
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Audit Name</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Audit Name</label>
             <input
               name="name"
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="CDM Comprehensive Review 2026"
               required
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Description (optional)</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Description (optional)</label>
             <textarea
               name="description"
               rows={2}
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10 resize-none"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10 resize-none"
               placeholder="Annual comprehensive charge master review…"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Start Date</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Start Date</label>
             <input
               name="start_date"
               type="date"
               defaultValue={new Date().toISOString().split("T")[0]}
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
             />
-          </div>
-
-          <div className="p-3 bg-[#f5f5f0] rounded-xl text-xs text-[#7a7a75]">
-            This will automatically create 7 audit phases with 62 pre-configured tasks from the PARA CDM audit process.
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="px-4 py-2.5 text-sm font-medium text-[#5a5a55] hover:bg-[#f5f5f0] rounded-xl"
+              className="px-4 py-2.5 text-sm font-medium text-[#475569] hover:bg-[#f1f5f9] rounded-xl"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 bg-[#1a1a18] text-white rounded-xl text-sm font-medium hover:bg-[#2d2d2a] disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 bg-[#0f172a] text-white rounded-xl text-sm font-medium hover:bg-[#1e293b] disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
               Create Audit

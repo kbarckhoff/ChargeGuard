@@ -1,13 +1,13 @@
-# ChargeGuard vs. Greg Brazzel CDM — Coverage Audit
+# ChargeGuard vs. the source CDM files — Coverage Audit
 
-Verifies what ChargeGuard automates against every file Greg delivered in
-`Greg Brazzel CDM`. Status key:
-**✅ Automated** · **◑ Partial** (works, but narrower than Greg or needs richer input) ·
+Verifies what ChargeGuard automates against every file the reference methodology delivered in
+`the source CDM files`. Status key:
+**✅ Automated** · **◑ Partial** (works, but narrower than the reference methodology or needs richer input) ·
 **⛔ Data-gated** (logic ready/not built — needs a client file the tool doesn't import yet) ·
 **▢ Out of scope** (different engagement type) · **📄 Deliverable** (the tool generates it).
 
 ## Verdict
-For a **single-hospital OPPS outpatient CDM review**, ChargeGuard automates Greg's
+For a **single-hospital OPPS outpatient CDM review**, ChargeGuard automates the expert's
 methodology end to end — import → scan → findings → his report, verified to his
 exact numbers. Every remaining gap is **data-gated** (needs the client's formulary,
 12-month 13X claims, cost-report CCR, or anesthesia base-unit file) or a **different
@@ -17,9 +17,9 @@ facility type** (SNF/HHA/etc.). None are methodology gaps.
 
 ## 1. CDM_Analysis_Report_v9-3.xlsx — the 32 output tabs
 
-| # | Greg tab | ChargeGuard | Notes |
+| # | the reference methodology tab | ChargeGuard | Notes |
 |---|----------|-------------|-------|
-| 0 | Executive Summary | ✅ | Report exec summary — scope, payer mix, flag table (Gross/MC+MA), Greg's layout/colors |
+| 0 | Executive Summary | ✅ | Report exec summary — scope, payer mix, flag table (Gross/MC+MA), the expert's layout/colors |
 | 1 | Impact Analysis | ✅ | Report tab, ranked by R&U gross |
 | 2 | Pass-Through & NT Leakage | ◑ | CDM-side SI=G/K/K1 ✅; the Phase-2 **CCR leakage** ⛔ (needs 13X claims + CCR + implant log) |
 | 3 | MRI Bundling Analysis | ◑ | A9585 multiplier ✅ + SI=Q3 packaging ✅; no dedicated MRI tab |
@@ -38,7 +38,7 @@ facility type** (SNF/HHA/etc.). None are methodology gaps.
 | 16 | Retired HCPCS | ✅ | 131 lines, exact |
 | 17 | Bundled SI=B | ✅ | 321, exact |
 | 18 | SI Q1-Q4 Packaging | ✅ | 2,185, exact ($ ties to the penny) |
-| 19 | Zero Price | ◑ | $0 flagged (Pricing - Missing); Greg's 3-way categorization not split out |
+| 19 | Zero Price | ◑ | $0 flagged (Pricing - Missing); the expert's 3-way categorization not split out |
 | 20 | Vaccine Admin Codes | ✅ | G0008/9/10 vs 90471 |
 | 21 | Modifier Issues | ✅ | Hard-coded modifier + radiology laterality |
 | 22 | Co-Billing Patterns | ⛔ | Needs 13X claims (Mod-25 CCI co-billing) |
@@ -87,7 +87,7 @@ facility type** (SNF/HHA/etc.). None are methodology gaps.
 
 ## What would close the remaining gaps (by unlock)
 - **Client formulary export** → Pharmacy NDC/Formulary, Inactive Formulary, UOM mismatch, full billing-unit ratio (Step 5; tabs 13/14/15).
-- **12-month 13X claims (835) + cost-report CCR + EHR implant log** → Co-Billing, Modifier-25 CCI, CCR leakage (Step 13b/15; tabs 2/22) — Greg's Phase 2.
+- **12-month 13X claims (835) + cost-report CCR + EHR implant log** → Co-Billing, Modifier-25 CCI, CCR leakage (Step 13b/15; tabs 2/22) — the expert's Phase 2.
 - **CMS anesthesia base-unit file** → anesthesia fee calc (Step 4) — add as a 6th refresh source.
 - **Build standalone facility modules** → SNF/HHA/LTCH/IRF/IPF/ASC/REH (Steps 18-24) — separate engagement types.
 - **Cosmetic parity**: dedicated Pharmacy/Lab/Supply summary tabs, MRI Bundling tab, zero-price categorization, full 9-payer mix (needs payer columns in the R&U file).

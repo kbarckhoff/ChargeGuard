@@ -1,5 +1,5 @@
 // ─── Reference-Driven CDM Rules ──────────────────────────────
-// Greg Brazzel methodology, the rules that require CMS reference data
+// an expert consultant methodology, the rules that require CMS reference data
 // (Status Indicator, APC, fee schedule, ASP). Complements the self-contained
 // structural rules in the scan route. Each function returns RuleResult[] using
 // the same shape the scan route inserts as Findings.
@@ -11,6 +11,7 @@
 import { getReference, refNum, normalizeHcpcs } from "./cms-reference";
 import { getProcDevice, classifyDevice, getVaccine, NEW_CODES } from "./device-crosswalk";
 import ptData from "./price-transparency-data.json";
+import { getBenchmark } from "./pricing-benchmark";
 
 export interface RuleResult {
   title: string;
@@ -44,7 +45,18 @@ function num(v: any): number {
   return isNaN(n) ? 0 : n;
 }
 
-export function runReferenceRules(items: any[]): RuleResult[] {
+// Annual R&U units for a charge line (by charge master code), used to
+// volume-weight the repricing opportunity the way the impact analysis does.
+// Falls back to 1 (per-unit gap) when R&U is not loaded.
+function usageUnits(usageByCode: Map<string, any> | undefined, item: any): number {
+  if (!usageByCode) return 1;
+  const cc = String(item.procedure_number ?? "").replace(/\.0+$/, "").trim();
+  const u = usageByCode.get(cc);
+  const n = u ? parseFloat(u.units) : 0;
+  return n > 0 ? n : 1;
+}
+
+export function runReferenceRules(items: any[], usageByCode?: Map<string, any>): RuleResult[] {
   const out: RuleResult[] = [];
 
   // ── Per-item, reference-driven flags ──────────────────────
@@ -138,8 +150,39 @@ export function runReferenceRules(items: any[]): RuleResult[] {
       }
     }
 
-    // ── SI=A non-OPPS fee schedule gap vs generic underpricing ──
-    if (si === "A") {
+    // ── Laboratory (CLFS-first) ─────────────────────────────
+    // Per the reference method's "if it has a lab code, use the CLFS" rule, any
+    // HCPCS with a published Clinical Lab Fee Schedule rate is priced against
+    // CLFS regardless of department/revenue code — and owns its own Lab pricing
+    // category so it isn't double-flagged by the generic Medicare-markup band.
+    const clfsRate = refNum(ref.clfs);
+    const labScope = clfsRate > 0;
+    if (labScope) {
+      if (price > 0) {
+        const markup = price / clfsRate;
+        if (markup < 2.5) {
+          const floor = 2.5 * clfsRate;
+          out.push({
+            rule_id: "L3.low", charge_item_id: item.id,
+            title: `Lab priced below CLFS band — ${code} at ${markup.toFixed(1)}x CLFS - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x CLFS, so repricing to the 2.5x floor ($${floor.toFixed(2)}) is a revenue opportunity.`,
+            severity: markup < 1.0 ? "high" : "medium",
+            category: "Laboratory Pricing (CLFS)",
+            financial_impact: floor - price,
+            recommendation: `Reprice toward the 2.5x CLFS floor ($${floor.toFixed(2)}) per the facility's lab markup policy.`,
+          });
+        } else if (markup > 5.0) {
+          out.push({
+            rule_id: "L3.high", charge_item_id: item.id,
+            title: `Lab priced ${markup.toFixed(1)}x CLFS (>5x) — ${code} - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)} — above the 5x lab review threshold. Lab overpricing draws payer and price-transparency scrutiny.`,
+            severity: markup > 10 ? "high" : "medium",
+            category: "Laboratory Pricing (CLFS)",
+            recommendation: `Confirm the charge for ${code} is defensible relative to CLFS; consider aligning toward the 2.5x-3.0x band unless there is a documented justification.`,
+          });
+        }
+      }
+    } else if (si === "A") {
       // SI=A codes are paid under a non-OPPS fee schedule (MPFS/CLFS), not OPPS.
       const rate = Math.max(refNum(ref.mc_fee), refNum(ref.clfs));
       if (rate > 0 && price > 0 && price < rate) {
@@ -153,17 +196,39 @@ export function runReferenceRules(items: any[]): RuleResult[] {
         });
       }
     } else {
-      // ── Underpriced vs Medicare fee schedule (non SI=A codes) ──
-      const mcFee = refNum(ref.mc_fee);
-      if (mcFee > 0 && price > 0 && price < mcFee) {
-        out.push({
-          rule_id: "U", charge_item_id: item.id,
-          title: `Charge below Medicare fee schedule - ${code} - ${procNum}`,
-          description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, below the Medicare fee schedule of $${mcFee.toFixed(2)}. Charging below the allowable leaves reimbursement on the table for non-Medicare payers and signals a pricing error.`,
-          severity: "medium", category: "Underpriced vs Fee Schedule",
-          financial_impact: mcFee - price,
-          recommendation: "Raise the charge to at least the fee-schedule amount (per the facility's markup policy). Charges below the Medicare allowable cap payment from percent-of-charge payers.",
-        });
+      // ── Markup over the MC Fee Schedule (MPFS) vs the 2.5x-3.0x band ──
+      // The methodology defines the 2.5x-3.0x self-pay/commercial band strictly
+      // over the MC Fee Schedule (MPFS facility rate), and only on lines that
+      // carry an MPFS value. OPPS/APC-only lines are out of scope for this band,
+      // so we key on mc_fee alone (not APC payment) to match his process.
+      const rate = refNum(ref.mc_fee);
+      if (rate > 0 && price > 0) {
+        const markup = price / rate;
+        if (markup < 2.5) {
+          const floor = 2.5 * rate;
+          const units = usageUnits(usageByCode, item);
+          out.push({
+            rule_id: "U", charge_item_id: item.id,
+            title: `Underpriced vs MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x (target 2.5-3.0x) - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x, so repricing to the 2.5x floor ($${floor.toFixed(2)})${units > 1 ? ` across ${units.toLocaleString()} R&U units` : ""} is a revenue opportunity.`,
+            severity: markup < 1.0 ? "high" : "medium",
+            category: "Medicare Markup (Underpriced)",
+            financial_impact: (floor - price) * units,
+            recommendation: `Reprice toward the 2.5x floor ($${floor.toFixed(2)}) per the facility's markup policy.`,
+          });
+        } else if (markup > 5.0) {
+          // Most lines sit above 3.0x already, so only flag extreme outliers
+          // here; ordinary above-market pricing is covered by the peer/CMS
+          // benchmark rules.
+          out.push({
+            rule_id: "MK.high", charge_item_id: item.id,
+            title: `Far above MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}, well above the 3.0x top of the target band. Confirm the charge is defensible for transparency and patient-complaint risk.`,
+            severity: "medium",
+            category: "Medicare Markup (Above Target)",
+            recommendation: `Review whether ${code} should be repriced toward the 2.5x-3.0x band.`,
+          });
+        }
       }
     }
   }
@@ -318,7 +383,7 @@ function runBilateralRules(items: any[]): RuleResult[] {
 }
 
 /**
- * Coding-update rules (Greg Brazzel methodology):
+ * Coding-update rules (an expert consultant methodology):
  *  - Vaccine admin G-codes (Step 2b): a qualifying vaccine is in the CDM but its
  *    required admin G-code (G0008/G0009/G0010) is not — silent ~$12.44/admin gap.
  *  - New / recommended codes: 2026 MRI-safety codes (76014-76019) absent from CDM.
@@ -391,7 +456,7 @@ export function runCodingUpdateRules(items: any[]): RuleResult[] {
 
 // Known HCPCS billing-unit / multiplier traps (Formula Library Step 7). These
 // codes are billed per a sub-unit, so the CDM HCPCS multiplier must be set or the
-// line is massively under-billed. Greg flagged A9585 and J1885 specifically.
+// line is massively under-billed. the reference methodology flagged A9585 and J1885 specifically.
 const MULTIPLIER_CODES: Record<string, { mult: string; note: string }> = {
   A9585: { mult: "10", note: "Gadobutrol/Gadavist is billed per 0.1 mL — multiplier must be 10 (e.g., 1 mL = 10 units). Multiplier of 1 under-bills ~90% per scan." },
   J1885: { mult: "per 15 mg", note: "Ketorolac is billed per 15 mg — a 60 mg dose = 4 units. Multiplier of 1 under-bills 75%." },
@@ -564,6 +629,65 @@ export function runPriceTransparencyRules(items: any[]): RuleResult[] {
         description: `CMS shoppable service "${s.desc}" (${s.codes.join("/")}) is in the CDM with a $0 price. Required shoppable services must carry a price for transparency compliance.`,
         severity: "high", category: "Price Transparency (Shoppable Services)",
         recommendation: `Assign a price to ${s.codes.join("/")} immediately (no client input needed).`,
+      });
+    }
+  }
+  return out;
+}
+
+// ─── Peer Pricing Benchmark (Tier 0) ─────────────────────────
+// Compares each priced CDM line's gross charge to what other OPPS hospitals
+// actually charge for the same HCPCS (CMS Geography-and-Service average
+// submitted charge). Flags lines priced well below peers (revenue left on the
+// table) and lines priced far above peers (price-transparency / PR / payer
+// risk). `state` is an optional 2-letter code to benchmark against the client's
+// own state instead of the national average.
+//
+// Thresholds are deliberately conservative so the flag list stays actionable:
+//   below  75% of peer avg  → revenue opportunity
+//   above 300% of peer avg  → over-market risk
+// Both are configurable here.
+const BM_LOW = 0.75;   // client charge below this fraction of peer avg = underpriced
+const BM_HIGH = 3.0;   // client charge above this multiple of peer avg = over-market
+
+export function runBenchmarkRules(items: any[], state?: string | null): RuleResult[] {
+  const out: RuleResult[] = [];
+  for (const item of items) {
+    const price = num(item.gross_charge);
+    if (price <= 0) continue;
+    const code = (item.hcpcs_cpt_code || "").trim();
+    if (!code) continue;
+
+    const bench = getBenchmark(code, state);
+    if (!bench || bench.chg <= 0) continue;
+    // CMS suppresses cells with <11 services; skip thin samples if present.
+    if (bench.srvcs != null && bench.srvcs < 11) continue;
+
+    const procNum = item.procedure_number || item.id;
+    const ratio = price / bench.chg;
+    const geoLabel = bench.level === "state" ? `${bench.geo} hospitals` : "hospitals nationally";
+    const peer = `$${bench.chg.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    const pctOfPeer = Math.round(ratio * 100);
+
+    if (ratio < BM_LOW) {
+      const gap = bench.chg - price;
+      out.push({
+        rule_id: "BM.low", charge_item_id: item.id,
+        title: `Priced below market — ${code} at ${pctOfPeer}% of peer average - ${procNum}`,
+        description: `"${item.charge_description}" (${code}) is priced at $${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}, only ${pctOfPeer}% of the ${peer} average submitted charge for ${geoLabel} (CMS OPPS data). This is potential revenue left on the table on every unit billed.`,
+        severity: ratio < 0.5 ? "high" : "medium",
+        category: "Pricing Benchmark (Peer Comparison)",
+        financial_impact: gap > 0 ? gap : undefined,
+        recommendation: `Review whether the charge for ${code} should be raised toward the market rate (peer average ${peer}). Multiply the per-unit gap by annual volume to size the opportunity.`,
+      });
+    } else if (ratio > BM_HIGH) {
+      out.push({
+        rule_id: "BM.high", charge_item_id: item.id,
+        title: `Priced far above market — ${code} at ${pctOfPeer}% of peer average - ${procNum}`,
+        description: `"${item.charge_description}" (${code}) is priced at $${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}, ${(ratio).toFixed(1)}× the ${peer} average submitted charge for ${geoLabel} (CMS OPPS data). Outlier gross charges draw patient complaints, media attention, and payer scrutiny under price-transparency rules.`,
+        severity: ratio > 5 ? "high" : "medium",
+        category: "Pricing Benchmark (Peer Comparison)",
+        recommendation: `Confirm the charge for ${code} is intentional and defensible relative to peers (${peer} average). Consider aligning toward market unless there is a documented justification.`,
       });
     }
   }

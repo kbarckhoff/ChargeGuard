@@ -49,7 +49,7 @@ export function CDMTable({
           .map(([key, cfg]) => (
             <div key={key} className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: cfg.color }} />
-              <span className="text-xs text-[#5a5a55]">{cfg.label}</span>
+              <span className="text-xs text-[#475569]">{cfg.label}</span>
             </div>
           ))}
       </div>
@@ -57,7 +57,7 @@ export function CDMTable({
       {/* Search + Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex-1 min-w-[200px] relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9a95]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
           <input
             type="text"
             defaultValue={search}
@@ -66,13 +66,13 @@ export function CDMTable({
               (window as any).__cdmSearchTimeout = setTimeout(() => updateParams("search", e.target.value), 400);
             }}
             placeholder="Search by description, HCPCS, or proc number…"
-            className="w-full pl-9 pr-4 py-2 text-sm border border-[#e5e5e0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+            className="w-full pl-9 pr-4 py-2 text-sm border border-[#e2e8f0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
           />
         </div>
         <select
           value={colorFilter}
           onChange={(e) => updateParams("color", e.target.value)}
-          className="text-sm border border-[#e5e5e0] rounded-lg px-3 py-2 bg-white focus:outline-none"
+          className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white focus:outline-none"
         >
           <option value="all">All Status</option>
           <option value="red">🔴 Invalid</option>
@@ -83,7 +83,7 @@ export function CDMTable({
         </select>
         <button
           onClick={() => setShowMapper(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#0f172a] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b]"
         >
           <Upload size={14} /> Import CSV
         </button>
@@ -98,44 +98,44 @@ export function CDMTable({
           action={
             <button
               onClick={() => setShowMapper(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0f172a] text-white rounded-lg text-sm font-medium"
             >
               <Upload size={14} /> Import CSV
             </button>
           }
         />
       ) : (
-        <div className="bg-white rounded-xl border border-[#e5e5e0] overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#fafaf8] border-b border-[#e5e5e0]">
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs w-8" />
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Proc #</th>
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Description</th>
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">HCPCS/CPT</th>
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Rev Code</th>
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Dept</th>
-                  <th className="px-3 py-2.5 text-right font-medium text-[#5a5a55] text-xs">Gross Charge</th>
-                  <th className="px-3 py-2.5 text-left font-medium text-[#5a5a55] text-xs">Mod</th>
+                <tr className="bg-[#f4f6f8] border-b border-[#e2e8f0]">
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs w-8" />
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Proc #</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Description</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">HCPCS/CPT</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Rev Code</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Dept</th>
+                  <th className="px-3 py-2.5 text-right font-medium text-[#475569] text-xs">Gross Charge</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Mod</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    className="border-b border-[#f5f5f0] hover:bg-[#fafaf8] transition-colors"
+                    className="border-b border-[#f1f5f9] hover:bg-[#f4f6f8] transition-colors"
                     style={item.cdm_color !== "none" ? { backgroundColor: CDM_COLORS[item.cdm_color]?.bg } : {}}
                   >
                     <td className="px-3 py-2"><CDMColorDot color={item.cdm_color} /></td>
-                    <td className="px-3 py-2 text-[#5a5a55]">{item.procedure_number}</td>
+                    <td className="px-3 py-2 text-[#475569]">{item.procedure_number}</td>
                     <td
                       className="px-3 py-2 font-medium max-w-[250px] truncate"
                       style={
                         item.cdm_color === "red" ? { color: "#dc2626" } :
                         item.cdm_color === "green" ? { color: "#16a34a" } :
                         item.cdm_color === "purple" ? { color: "#9333ea" } :
-                        { color: "#3d3d3a" }
+                        { color: "#334155" }
                       }
                     >
                       {item.charge_description}
@@ -145,39 +145,39 @@ export function CDMTable({
                       style={
                         item.cdm_color === "red" ? { color: "#dc2626", fontWeight: 600 } :
                         item.cdm_color === "blue" ? { color: "#2563eb", fontWeight: 600 } :
-                        { color: "#3d3d3a" }
+                        { color: "#334155" }
                       }
                     >
                       {item.hcpcs_cpt_code}
                     </td>
-                    <td className="px-3 py-2 text-[#5a5a55]">{item.revenue_code}</td>
-                    <td className="px-3 py-2 text-[#5a5a55] text-xs">{item.department}</td>
-                    <td className="px-3 py-2 text-right font-mono text-[#3d3d3a]">
+                    <td className="px-3 py-2 text-[#475569]">{item.revenue_code}</td>
+                    <td className="px-3 py-2 text-[#475569] text-xs">{item.department}</td>
+                    <td className="px-3 py-2 text-right font-mono text-[#334155]">
                       {item.gross_charge ? `$${Number(item.gross_charge).toLocaleString()}` : "—"}
                     </td>
-                    <td className="px-3 py-2 text-xs text-[#7a7a75]">{item.modifier_1}</td>
+                    <td className="px-3 py-2 text-xs text-[#64748b]">{item.modifier_1}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e5e0] bg-[#fafaf8]">
-            <span className="text-xs text-[#9a9a95]">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#e2e8f0] bg-[#f4f6f8]">
+            <span className="text-xs text-[#94a3b8]">
               {total.toLocaleString()} items • Page {page} of {totalPages}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => updateParams("page", String(Math.max(1, page - 1)))}
                 disabled={page === 1}
-                className="px-3 py-1 text-xs border border-[#e5e5e0] rounded-lg hover:bg-white disabled:opacity-40"
+                className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg hover:bg-white disabled:opacity-40"
               >
                 Prev
               </button>
               <button
                 onClick={() => updateParams("page", String(Math.min(totalPages, page + 1)))}
                 disabled={page === totalPages}
-                className="px-3 py-1 text-xs border border-[#e5e5e0] rounded-lg hover:bg-white disabled:opacity-40"
+                className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg hover:bg-white disabled:opacity-40"
               >
                 Next
               </button>
@@ -354,27 +354,27 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e0]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0]">
           <div>
-            <h2 className="text-lg font-semibold text-[#1a1a18]">Import Charge Master</h2>
-            <p className="text-sm text-[#7a7a75]">
+            <h2 className="text-lg font-semibold text-[#0f172a]">Import Charge Master</h2>
+            <p className="text-sm text-[#64748b]">
               {step === 1 ? "Upload file" : step === 2 ? "Map columns" : step === 3 ? "Review & confirm" : "Import complete"}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg"><X size={18} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {step === 1 && (
             <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-[#f5f5f0] flex items-center justify-center mb-4">
-                <Upload size={28} className="text-[#5a5a55]" />
+              <div className="w-16 h-16 rounded-2xl bg-[#f1f5f9] flex items-center justify-center mb-4">
+                <Upload size={28} className="text-[#475569]" />
               </div>
-              <p className="text-[#3d3d3a] font-medium mb-1">Upload your hospital&apos;s CDM export</p>
-              <p className="text-sm text-[#9a9a95] mb-4">Supports .xlsx, .xls, and .csv files</p>
+              <p className="text-[#334155] font-medium mb-1">Upload your hospital&apos;s CDM export</p>
+              <p className="text-sm text-[#94a3b8] mb-4">Supports .xlsx, .xls, and .csv files</p>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.xlsm" className="hidden" onChange={handleFile} />
               <button onClick={() => fileRef.current?.click()}
-                className="px-5 py-2.5 bg-[#1a1a18] text-white rounded-lg text-sm font-medium hover:bg-[#2d2d2a]">
+                className="px-5 py-2.5 bg-[#0f172a] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b]">
                 Choose File
               </button>
             </div>
@@ -383,19 +383,19 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
           {step === 2 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-[#7a7a75]">
+                <p className="text-sm text-[#64748b]">
                   {headers.length} columns detected • {allRows.length.toLocaleString()} rows
                 </p>
                 {/* Saved Mappings Dropdown */}
                 {savedConfigs.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[#9a9a95]">Load saved:</span>
+                    <span className="text-xs text-[#94a3b8]">Load saved:</span>
                     <select
                       onChange={(e) => {
                         const config = savedConfigs.find((c) => c.id === e.target.value);
                         if (config) applySavedMapping(config);
                       }}
-                      className="text-sm border border-[#e5e5e0] rounded-lg px-2 py-1 bg-white focus:outline-none"
+                      className="text-sm border border-[#e2e8f0] rounded-lg px-2 py-1 bg-white focus:outline-none"
                       defaultValue=""
                     >
                       <option value="" disabled>Select mapping…</option>
@@ -408,22 +408,22 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
               </div>
 
               {CDM_TARGET_COLUMNS.map((tc) => (
-                <div key={tc.key} className="flex items-center gap-3 py-2 px-3 rounded-lg border border-[#e5e5e0] bg-[#fafaf8]">
+                <div key={tc.key} className="flex items-center gap-3 py-2 px-3 rounded-lg border border-[#e2e8f0] bg-[#f4f6f8]">
                   <div className="w-44 flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#3d3d3a]">{tc.label}</span>
+                    <span className="text-sm font-medium text-[#334155]">{tc.label}</span>
                     {tc.required && <span className="text-[10px] text-red-500 font-medium">REQ</span>}
                   </div>
                   <ChevronLeft size={14} className="text-[#c5c5c0] rotate-180" />
                   <select
                     value={mappings[tc.key] || ""}
                     onChange={(e) => setMappings((m) => ({ ...m, [tc.key]: e.target.value || "" }))}
-                    className="flex-1 text-sm border border-[#e5e5e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none"
+                    className="flex-1 text-sm border border-[#e2e8f0] rounded-lg px-3 py-1.5 bg-white focus:outline-none"
                   >
                     <option value="">— Skip —</option>
                     {headers.map((h) => <option key={h} value={h}>{h}</option>)}
                   </select>
                   {mappings[tc.key] && rows[0] && (
-                    <span className="text-xs text-[#9a9a95] w-28 truncate">
+                    <span className="text-xs text-[#94a3b8] w-28 truncate">
                       e.g. &quot;{rows[0][mappings[tc.key]]}&quot;
                     </span>
                   )}
@@ -446,31 +446,31 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
               </div>
 
               {/* Save Mapping Option */}
-              <div className="flex items-center gap-3 p-3 border border-[#e5e5e0] rounded-xl bg-[#fafaf8]">
-                <span className="text-sm text-[#5a5a55] whitespace-nowrap">Save this mapping as:</span>
+              <div className="flex items-center gap-3 p-3 border border-[#e2e8f0] rounded-xl bg-[#f4f6f8]">
+                <span className="text-sm text-[#475569] whitespace-nowrap">Save this mapping as:</span>
                 <input
                   type="text"
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
                   placeholder="e.g. Hoag CDM Format"
-                  className="flex-1 text-sm border border-[#e5e5e0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+                  className="flex-1 text-sm border border-[#e2e8f0] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
                 />
               </div>
 
-              <div className="overflow-x-auto border border-[#e5e5e0] rounded-xl">
+              <div className="overflow-x-auto border border-[#e2e8f0] rounded-xl">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[#fafaf8]">
+                    <tr className="bg-[#f4f6f8]">
                       {CDM_TARGET_COLUMNS.filter((c) => mappings[c.key]).map((c) => (
-                        <th key={c.key} className="px-3 py-2 text-left font-medium text-[#5a5a55] text-xs">{c.label}</th>
+                        <th key={c.key} className="px-3 py-2 text-left font-medium text-[#475569] text-xs">{c.label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.slice(0, 5).map((row, ri) => (
-                      <tr key={ri} className="border-t border-[#f0f0ec]">
+                      <tr key={ri} className="border-t border-[#eef2f6]">
                         {CDM_TARGET_COLUMNS.filter((c) => mappings[c.key]).map((c) => (
-                          <td key={c.key} className="px-3 py-2 text-[#3d3d3a]">{row[mappings[c.key]] || "—"}</td>
+                          <td key={c.key} className="px-3 py-2 text-[#334155]">{row[mappings[c.key]] || "—"}</td>
                         ))}
                       </tr>
                     ))}
@@ -485,8 +485,8 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
               <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
                 <Check size={28} className="text-emerald-600" />
               </div>
-              <p className="text-lg font-semibold text-[#1a1a18] mb-1">Import Complete</p>
-              <p className="text-sm text-[#7a7a75]">{result?.inserted.toLocaleString()} charge items imported successfully.</p>
+              <p className="text-lg font-semibold text-[#0f172a] mb-1">Import Complete</p>
+              <p className="text-sm text-[#64748b]">{result?.inserted.toLocaleString()} charge items imported successfully.</p>
               {result?.errors && result.errors.length > 0 && (
                 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 max-w-md">
                   {result.errors.length} batch(es) had errors — {result.inserted.toLocaleString()} of {allRows.length.toLocaleString()} rows imported.
@@ -496,23 +496,23 @@ function CSVImportModal({ auditId, onClose }: { auditId: string; onClose: () => 
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-[#e5e5e0] flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-[#e2e8f0] flex items-center justify-between">
           <div className="flex items-center gap-3">
             {[1, 2, 3, 4].map((s) => (
-              <div key={s} className={`w-2 h-2 rounded-full ${step >= s ? "bg-[#1a1a18]" : "bg-[#e5e5e0]"}`} />
+              <div key={s} className={`w-2 h-2 rounded-full ${step >= s ? "bg-[#0f172a]" : "bg-[#e2e8f0]"}`} />
             ))}
           </div>
           <div className="flex items-center gap-2">
             {step === 4 ? (
-              <button onClick={onClose} className="px-5 py-2 bg-[#1a1a18] text-white rounded-lg text-sm font-medium">Done</button>
+              <button onClick={onClose} className="px-5 py-2 bg-[#0f172a] text-white rounded-lg text-sm font-medium">Done</button>
             ) : (
               <>
                 {step > 1 && step < 4 && (
-                  <button onClick={() => setStep((s) => s - 1)} className="px-4 py-2 text-sm text-[#5a5a55] hover:bg-[#f5f5f0] rounded-lg">Back</button>
+                  <button onClick={() => setStep((s) => s - 1)} className="px-4 py-2 text-sm text-[#475569] hover:bg-[#f1f5f9] rounded-lg">Back</button>
                 )}
                 {step === 2 && (
                   <button onClick={() => setStep(3)} disabled={!requiredMet}
-                    className={`px-5 py-2 text-sm font-medium rounded-lg ${requiredMet ? "bg-[#1a1a18] text-white hover:bg-[#2d2d2a]" : "bg-[#e5e5e0] text-[#9a9a95] cursor-not-allowed"}`}>
+                    className={`px-5 py-2 text-sm font-medium rounded-lg ${requiredMet ? "bg-[#0f172a] text-white hover:bg-[#1e293b]" : "bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed"}`}>
                     Preview
                   </button>
                 )}

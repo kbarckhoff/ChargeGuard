@@ -30,7 +30,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={`${collapsed ? "w-16" : "w-56"} bg-[#1a1a18] text-white flex flex-col transition-all duration-200 flex-shrink-0`}>
+    <aside className={`${collapsed ? "w-16" : "w-56"} bg-[#0f172a] text-white flex flex-col transition-all duration-200 flex-shrink-0`}>
       <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} px-4 h-14 border-b border-white/10`}>
         {!collapsed && (
           <Link href="/dashboard" className="flex items-center gap-2">

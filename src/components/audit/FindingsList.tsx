@@ -23,14 +23,14 @@ export function FindingsList({
       <div className="flex justify-end mb-3">
         <button
           onClick={() => setShowNew(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a18] text-white rounded-lg text-xs font-medium hover:bg-[#2d2d2a]"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0f172a] text-white rounded-lg text-xs font-medium hover:bg-[#1e293b]"
         >
           <Plus size={13} /> New Finding
         </button>
       </div>
 
       {findings.length === 0 && !showNew ? (
-        <div className="py-12 text-center text-[#9a9a95] text-sm">
+        <div className="py-12 text-center text-[#94a3b8] text-sm">
           No findings recorded for this phase yet.
         </div>
       ) : (
@@ -39,7 +39,7 @@ export function FindingsList({
             <div
               key={f.id}
               onClick={() => setSelected(f)}
-              className="flex items-start gap-3 p-3 rounded-xl border border-[#e5e5e0] hover:shadow-sm transition-shadow cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-xl border border-[#e2e8f0] hover:shadow-sm transition-shadow cursor-pointer"
             >
               <SeverityDot severity={f.severity} />
               <div className="flex-1 min-w-0">
@@ -51,9 +51,9 @@ export function FindingsList({
                   >
                     {f.status.replace("_", " ")}
                   </Badge>
-                  {f.category && <span className="text-xs text-[#9a9a95]">{f.category}</span>}
+                  {f.category && <span className="text-xs text-[#94a3b8]">{f.category}</span>}
                 </div>
-                <div className="text-sm text-[#3d3d3a] font-medium">{f.title}</div>
+                <div className="text-sm text-[#334155] font-medium">{f.title}</div>
                 {f.financial_impact && (
                   <span
                     className="text-xs font-medium mt-1 inline-block"
@@ -118,24 +118,24 @@ function NewFindingForm({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e0]">
-          <h2 className="text-lg font-semibold text-[#1a1a18]">New Finding</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0]">
+          <h2 className="text-lg font-semibold text-[#0f172a]">New Finding</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg">
             <X size={18} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Title</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Title</label>
             <input name="title" required
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="Describe the finding…" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Severity</label>
+              <label className="text-sm font-medium text-[#334155] block mb-1.5">Severity</label>
               <select name="severity" defaultValue="medium"
-                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl">
+                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl">
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -144,9 +144,9 @@ function NewFindingForm({
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Category</label>
+              <label className="text-sm font-medium text-[#334155] block mb-1.5">Category</label>
               <select name="category"
-                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl">
+                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl">
                 <option value="">Select…</option>
                 <option value="Invalid Code">Invalid Code</option>
                 <option value="Revenue Code">Revenue Code</option>
@@ -161,29 +161,29 @@ function NewFindingForm({
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Est. Financial Impact ($)</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Est. Financial Impact ($)</label>
             <input name="financial_impact" type="number" step="0.01"
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="0.00" />
           </div>
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Description</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Description</label>
             <textarea name="description" rows={2}
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="Details about the issue…" />
           </div>
           <div>
-            <label className="text-sm font-medium text-[#3d3d3a] block mb-1.5">Recommendation</label>
+            <label className="text-sm font-medium text-[#334155] block mb-1.5">Recommendation</label>
             <textarea name="recommendation" rows={2}
-              className="w-full px-3 py-2.5 text-sm border border-[#e5e5e0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#1a1a18]/10"
+              className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10"
               placeholder="Recommended action…" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#5a5a55] hover:bg-[#f5f5f0] rounded-xl">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#475569] hover:bg-[#f1f5f9] rounded-xl">
               Cancel
             </button>
             <button type="submit" disabled={isPending}
-              className="px-5 py-2 bg-[#1a1a18] text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+              className="px-5 py-2 bg-[#0f172a] text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2">
               {isPending && <Loader2 size={14} className="animate-spin" />}
               Save Finding
             </button>
@@ -209,16 +209,16 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col overflow-hidden animate-slide-in">
         <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}.animate-slide-in{animation:slideIn .2s ease-out}`}</style>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e5e0]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e8f0]">
           <div className="flex items-center gap-2">
             <SeverityDot severity={finding.severity} />
-            <span className="text-sm font-medium text-[#3d3d3a]">Finding Detail</span>
+            <span className="text-sm font-medium text-[#334155]">Finding Detail</span>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#f5f5f0] rounded-lg"><X size={18} /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg"><X size={18} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           <div>
-            <h3 className="text-base font-semibold text-[#1a1a18] mb-2">{finding.title}</h3>
+            <h3 className="text-base font-semibold text-[#0f172a] mb-2">{finding.title}</h3>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={finding.severity === "critical" ? "danger" : finding.severity === "high" ? "warning" : "default"}>
                 {finding.severity}
@@ -230,26 +230,26 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
             </div>
           </div>
           {finding.financial_impact && (
-            <div className="p-4 bg-[#fafaf8] rounded-xl border border-[#e5e5e0]">
-              <div className="text-xs font-medium text-[#7a7a75] mb-1">Estimated Financial Impact</div>
-              <div className="text-xl font-semibold text-[#1a1a18]">${finding.financial_impact.toLocaleString()}</div>
+            <div className="p-4 bg-[#f4f6f8] rounded-xl border border-[#e2e8f0]">
+              <div className="text-xs font-medium text-[#64748b] mb-1">Estimated Financial Impact</div>
+              <div className="text-xl font-semibold text-[#0f172a]">${finding.financial_impact.toLocaleString()}</div>
             </div>
           )}
           {finding.description && (
             <div>
-              <div className="text-xs font-medium text-[#7a7a75] mb-1">Description</div>
-              <div className="text-sm text-[#3d3d3a] leading-relaxed">{finding.description}</div>
+              <div className="text-xs font-medium text-[#64748b] mb-1">Description</div>
+              <div className="text-sm text-[#334155] leading-relaxed">{finding.description}</div>
             </div>
           )}
           {finding.recommendation && (
             <div>
-              <div className="text-xs font-medium text-[#7a7a75] mb-1">Recommendation</div>
-              <div className="text-sm text-[#3d3d3a] leading-relaxed">{finding.recommendation}</div>
+              <div className="text-xs font-medium text-[#64748b] mb-1">Recommendation</div>
+              <div className="text-sm text-[#334155] leading-relaxed">{finding.recommendation}</div>
             </div>
           )}
         </div>
-        <div className="px-5 py-3 border-t border-[#e5e5e0] flex items-center gap-2">
-          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[#e5e5e0] rounded-lg text-sm font-medium text-[#5a5a55] hover:bg-[#f5f5f0]">
+        <div className="px-5 py-3 border-t border-[#e2e8f0] flex items-center gap-2">
+          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[#e2e8f0] rounded-lg text-sm font-medium text-[#475569] hover:bg-[#f1f5f9]">
             <MessageSquare size={14} /> Comment
           </button>
           {finding.status !== "resolved" && (

@@ -9,11 +9,11 @@ const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low
 const PRIORITY: Record<string, string> = { critical: "CRITICAL", high: "HIGH", medium: "MEDIUM", low: "LOW", info: "INFO" };
 const num = (v: any) => { const n = parseFloat(String(v ?? "").replace(/[$,]/g, "")); return isNaN(n) ? 0 : n; };
 
-// ── Style palette (mirrors Greg's report) ──
+// ── Style palette (mirrors the expert's report) ──
 const MONEY = '"$"#,##0';
 const thin = { style: "thin", color: { rgb: "BFBFBF" } };
 const BORDER = { top: thin, bottom: thin, left: thin, right: thin };
-// Greg's exact palette
+// the expert's exact palette
 const TITLE = { fill: { patternType: "solid", fgColor: { rgb: "1F3864" } }, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 }, alignment: { vertical: "center" } };
 const SUBTITLE = { fill: { patternType: "solid", fgColor: { rgb: "2E4057" } }, font: { color: { rgb: "FFFFFF" }, sz: 10 }, alignment: { vertical: "center" } };
 const SECTION = { fill: { patternType: "solid", fgColor: { rgb: "44546A" } }, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 }, alignment: { vertical: "center" } };
@@ -116,7 +116,7 @@ export async function GET(request: Request) {
       const wb = XLSX.utils.book_new();
       const r0 = (v: number) => Math.round(v);
 
-      // ── Executive Summary (Greg layout: col-A margin, slate banners, mini-tables) ──
+      // ── Executive Summary (the reference methodology layout: col-A margin, slate banners, mini-tables) ──
       const M = 1;              // blank column A margin (content starts at col B)
       const LAST = M + 10;      // 11 content columns (B..L)
       const pct = (v: number) => (T.gross ? ((v / T.gross) * 100).toFixed(1) + "%" : "0%");
