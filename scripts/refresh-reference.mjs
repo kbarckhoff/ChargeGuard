@@ -200,12 +200,19 @@ const SOURCES = {
       };
       const csv = rawTextFromZip(buf, /\.csv$/i) || rawTextFromZip(buf, /\.txt$/i);
       const lines = csv.split(/\r?\n/);
-      const hi = lines.findIndex((l) => /hcpcs/i.test(l) && l.split(",").length > 1);
+      // The preamble is prose that can itself mention "HCPCS codes ...", so the
+      // header row is the first one with a cell that IS the HCPCS header (a short
+      // "hcpcs"/"hcpcs code(s)" cell), not merely a line containing the word.
+      const norml = (h) => h.replace(/"/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+      let hi = -1, headers = null;
+      for (let i = 0; i < Math.min(lines.length, 80); i++) {
+        const cells = splitCsv(lines[i]).map(norml);
+        if (cells.some((h) => /^hcpcs( code)?s?$/.test(h))) { hi = i; headers = cells; break; }
+      }
       const out = [];
       let chosenHdr = null;
       if (hi >= 0) {
-        const headers = splitCsv(lines[hi]).map((h) => h.replace(/"/g, "").toLowerCase().replace(/\s+/g, " ").trim());
-        const hc = headers.findIndex((h) => h.includes("hcpcs"));
+        const hc = headers.findIndex((h) => /^hcpcs( code)?s?$/.test(h));
         // Payment column: a rate/payment/fee/amount header (not a date, mod, or
         // the code column). Take the first such match.
         const pay = headers.findIndex((h) => /(payment|rate|fee|amount|price)/.test(h) && !/date|effective|hcpcs|mod/.test(h));
