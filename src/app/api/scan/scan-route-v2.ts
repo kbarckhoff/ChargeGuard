@@ -294,7 +294,12 @@ function runRules(items: any[]): RuleResult[] {
     const desc = (item.charge_description || "").toLowerCase();
     const code = (item.hcpcs_cpt_code || "").trim();
     const rev = (item.revenue_code || "").trim();
-    const rev3 = rev.substring(0, 3);
+    // Normalize to a 4-digit UB-04 revenue code first (CDMs often drop the
+    // leading zero, e.g. "270" for 0270, "352" for 0352), then take the 3-digit
+    // family prefix — otherwise the rev-code family checks silently miss.
+    const revDigits = rev.replace(/\D/g, "");
+    const rev4 = revDigits ? (revDigits.length >= 4 ? revDigits.slice(0, 4) : revDigits.padStart(4, "0")) : "";
+    const rev3 = rev4.substring(0, 3);
     const price = parseFloat(item.gross_charge) || 0;
     const mod1 = (item.modifier_1 || "").trim().toUpperCase();
     const mod2 = (item.modifier_2 || "").trim().toUpperCase();
@@ -315,7 +320,7 @@ function runRules(items: any[]): RuleResult[] {
 
     // ─── Rule S.4: Missing CPT/HCPCS ───────────────────
     if (!code && rev) {
-      const requiresHcpcs = REV_CODES_REQUIRING_HCPCS.some((r) => rev3 === r || rev.startsWith(r));
+      const requiresHcpcs = REV_CODES_REQUIRING_HCPCS.some((r) => rev3 === r || rev4.startsWith(r));
       // Supply/implant lines (rev 027x) are their own reported category so the
       // "Supply: 0% HCPCS coverage" pattern is visible separately from generic
       // missing-code lines.
@@ -812,7 +817,9 @@ export async function POST(request: Request) {
     for (const it of allItems) revByItem[it.id] = it.revenue_code || "";
     const deptFor = (category: string, chargeItemId: string | null): string | null => {
       if (isStructuralCategory(category)) return idByCode["revenue_cycle"] || idByCode["unassigned"] || null;
-      const p3 = (chargeItemId ? revByItem[chargeItemId] || "" : "").replace(/[^0-9]/g, "").slice(0, 3);
+      const d = (chargeItemId ? revByItem[chargeItemId] || "" : "").replace(/\D/g, "");
+      const r4 = d ? (d.length >= 4 ? d.slice(0, 4) : d.padStart(4, "0")) : "";
+      const p3 = r4.slice(0, 3);
       return (p3 && deptIdByPrefix[p3]) || idByCode["unassigned"] || null;
     };
 
