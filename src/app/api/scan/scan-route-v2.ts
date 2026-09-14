@@ -316,13 +316,23 @@ function runRules(items: any[]): RuleResult[] {
     // ─── Rule S.4: Missing CPT/HCPCS ───────────────────
     if (!code && rev) {
       const requiresHcpcs = REV_CODES_REQUIRING_HCPCS.some((r) => rev3 === r || rev.startsWith(r));
+      // Supply/implant lines (rev 027x) are their own reported category so the
+      // "Supply: 0% HCPCS coverage" pattern is visible separately from generic
+      // missing-code lines.
+      const isSupply = rev3 === "027";
       if (requiresHcpcs) {
         results.push({
           rule_id: "S.4", charge_item_id: item.id,
-          title: `Revenue code ${rev} requires HCPCS - none assigned - ${procNum}`,
-          description: `Charge item "${item.charge_description}" uses revenue code ${rev} which requires a CPT/HCPCS code on outpatient claims, but none is assigned.`,
-          severity: "high", category: "Missing Code",
-          recommendation: "Assign the appropriate CPT/HCPCS code for this service. Claims submitted without the required HCPCS will be denied.",
+          title: isSupply
+            ? `Supply line missing HCPCS (rev ${rev}) - ${procNum}`
+            : `Revenue code ${rev} requires HCPCS - none assigned - ${procNum}`,
+          description: isSupply
+            ? `Supply/implant line "${item.charge_description}" is under revenue code ${rev} with no HCPCS. Supplies billed without a HCPCS are non-covered/packaged, so the charge isn't separately reimbursed.`
+            : `Charge item "${item.charge_description}" uses revenue code ${rev} which requires a CPT/HCPCS code on outpatient claims, but none is assigned.`,
+          severity: "high", category: isSupply ? "Supply - Missing HCPCS" : "Missing Code",
+          recommendation: isSupply
+            ? "Assign the appropriate HCPCS (and C-code for devices) so the supply is billable, or confirm it is intentionally packaged."
+            : "Assign the appropriate CPT/HCPCS code for this service. Claims submitted without the required HCPCS will be denied.",
         });
       }
     }
