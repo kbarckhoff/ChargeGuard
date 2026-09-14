@@ -166,6 +166,20 @@ export default async function FindingsPage({
   const { data: laggingFindings } = await laggingQuery;
   const lagging = laggingFindings || [];
 
+  // Roll-up: collapse the full flag list into systemic issues by category, ranked
+  // by dollar exposure, so the page leads with "what matters" not the raw volume.
+  const byCat = new Map<string, { count: number; impact: number }>();
+  for (const f of allFindings) {
+    const c = f.category || "Uncategorized";
+    const e = byCat.get(c) || { count: 0, impact: 0 };
+    e.count += 1; e.impact += f.financial_impact || 0;
+    byCat.set(c, e);
+  }
+  const rollup = [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.impact - a.impact);
+  const systemicCount = rollup.length;
+  const totalExposure = rollup.reduce((s, r) => s + r.impact, 0);
+  const topRollup = rollup.slice(0, 10);
+
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
@@ -189,6 +203,38 @@ export default async function FindingsPage({
           </div>
 
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
+          {/* Top findings by impact: roll up the raw flags into systemic issues. */}
+          {rollup.length > 0 && (
+            <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
+                <div>
+                  <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
+                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {(count || 0).toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
+                </div>
+                {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
+              </div>
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#f1f5f9]">
+                    <th className="px-5 py-2 w-8">#</th><th className="px-3 py-2">Issue category</th>
+                    <th className="px-3 py-2 text-right">Flags</th><th className="px-3 py-2 text-right">Est. impact</th><th className="px-3 py-2 w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topRollup.map((r, i) => (
+                    <tr key={r.category} className="border-b border-[#f6f8fa] hover:bg-[#f8fafc]">
+                      <td className="px-5 py-2.5 text-[#94a3b8]">{i + 1}</td>
+                      <td className="px-3 py-2.5 font-medium text-[#0f172a]">{r.category}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[#475569]">{r.count.toLocaleString()}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#0f172a]">{r.impact ? formatImpact(r.impact) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right"><a href={`/findings?auditId=${auditId}&category=${encodeURIComponent(r.category)}`} className="text-[12px] text-[#1f6fd4] hover:underline">View</a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* Pending EHR Sync: approved in a prior review, still not in the EHR. */}
           {lagging.length > 0 && (
             <div className="bg-[#fff8ec] border border-[#f5d99a] rounded-xl p-4">
