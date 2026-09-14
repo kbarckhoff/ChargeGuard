@@ -323,57 +323,58 @@ function runBilateralRules(items: any[]): RuleResult[] {
       .map((m) => (m || "").trim().toUpperCase())
       .filter(Boolean);
 
+  const lateral = (it: any) => { const m = modsOf(it); return m.includes("50") || m.includes("RT") || m.includes("LT"); };
+
   for (const [code, group] of byCode) {
+    const priced = group.filter((it) => num(it.gross_charge) > 0);
+    if (priced.length < 2) continue; // need 2+ CDM lines to compare a ratio
+
+    // Base = the lowest-priced line for this HCPCS (the unilateral rate). Per
+    // Step 10 the base can itself carry a mod-50, so consider ALL priced lines.
+    let baseItem = priced[0];
+    for (const it of priced) if (num(it.gross_charge) < num(baseItem.gross_charge)) baseItem = it;
+    const basePrice = num(baseItem.gross_charge);
+    const expected = basePrice * 1.75;
+
+    // Section B: a mod-50 line exists but no RT/LT counterpart anywhere.
     const fifty = group.filter((it) => modsOf(it).includes("50"));
-    if (fifty.length === 0) continue;
-
-    const base = group.filter((it) => {
-      const m = modsOf(it);
-      return m.includes("RT") || m.includes("LT") || m.length === 0;
-    });
-
-    const procNum = fifty[0].procedure_number || fifty[0].id;
-
-    // Missing RT/LT counterpart entirely
     const hasRT = group.some((it) => modsOf(it).includes("RT"));
     const hasLT = group.some((it) => modsOf(it).includes("LT"));
-    if (!hasRT && !hasLT) {
+    if (fifty.length > 0 && !hasRT && !hasLT) {
       out.push({
         rule_id: "10.B", charge_item_id: fifty[0].id,
-        title: `Mod-50 line for ${code} has no RT/LT counterpart - ${procNum}`,
-        description: `Code ${code} has a bilateral (modifier 50) line but no RT or LT unilateral line anywhere in the CDM, so its price cannot be validated against the 1.75x rule.`,
+        title: `Mod-50 line for ${code} has no RT/LT counterpart - ${fifty[0].procedure_number || fifty[0].id}`,
+        description: `Code ${code} has a bilateral (modifier 50) line but no RT or LT unilateral line in the CDM, so its price cannot be validated against the 1.75x rule.`,
         severity: "medium", category: "Bilateral Pricing",
         recommendation: "Add the unilateral RT/LT line, or confirm this is a legitimately bilateral-only procedure (e.g., orbits, mastoids).",
       });
-      continue;
     }
 
-    const basePrices = base.map((it) => num(it.gross_charge)).filter((p) => p > 0);
-    if (basePrices.length === 0) continue;
-    const basePrice = Math.min(...basePrices);
-    const expected = basePrice * 1.75;
-
-    for (const it of fifty) {
+    // Section A: every laterality-coded line above the base should sit at 1.75x,
+    // not 2.0x (and not below target). Restrict to 50/RT/LT lines so ordinary
+    // multi-line codes aren't flagged as bilateral.
+    for (const it of priced) {
+      if (it === baseItem || !lateral(it)) continue;
       const p = num(it.gross_charge);
-      if (p <= 0) continue;
       const ratio = p / basePrice;
+      const procNum = it.procedure_number || it.id;
       if (ratio > 1.9) {
         out.push({
           rule_id: "10", charge_item_id: it.id,
-          title: `Bilateral priced ${ratio.toFixed(2)}x unilateral (should be 1.75x) - ${procNum}`,
-          description: `Code ${code} bilateral (Mod-50) line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the unilateral $${basePrice.toFixed(2)}. OPPS bilateral methodology pays 1.75x, not 2.0x.`,
+          title: `Bilateral priced ${ratio.toFixed(2)}x base (should be 1.75x) - ${procNum}`,
+          description: `Code ${code}: this line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the base $${basePrice.toFixed(2)}. OPPS bilateral methodology pays 1.75x, not 2.0x.`,
           severity: "medium", category: "Bilateral Pricing",
           financial_impact: p - expected,
-          recommendation: `Reprice the Mod-50 line to $${expected.toFixed(2)} (1.75x unilateral).`,
+          recommendation: `Reprice to $${expected.toFixed(2)} (1.75x base).`,
         });
-      } else if (ratio < 1.75 && ratio >= 1.0) {
+      } else if (ratio > 1.0 && ratio < 1.75) {
         out.push({
           rule_id: "10", charge_item_id: it.id,
-          title: `Bilateral priced ${ratio.toFixed(2)}x unilateral (below 1.75x) - ${procNum}`,
-          description: `Code ${code} bilateral (Mod-50) line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the unilateral $${basePrice.toFixed(2)}, below the 1.75x bilateral target. Lost repricing opportunity.`,
+          title: `Bilateral priced ${ratio.toFixed(2)}x base (below 1.75x) - ${procNum}`,
+          description: `Code ${code}: this line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the base $${basePrice.toFixed(2)}, below the 1.75x bilateral target. Lost repricing opportunity.`,
           severity: "low", category: "Bilateral Pricing",
           financial_impact: expected - p,
-          recommendation: `Consider repricing the Mod-50 line up to $${expected.toFixed(2)} (1.75x unilateral).`,
+          recommendation: `Consider repricing up to $${expected.toFixed(2)} (1.75x base).`,
         });
       }
     }
