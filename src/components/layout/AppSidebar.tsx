@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList } from "lucide-react";
 
 // Global menu: the hub (Dashboard), Findings & Analysis (results across reviews),
-// the CMS reference data (References), and Settings.
+// the CDM Change Log (accepted changes across runs), the CMS reference data
+// (References), and Settings.
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
+  { label: "Change Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
