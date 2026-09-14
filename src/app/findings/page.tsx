@@ -118,7 +118,8 @@ export default async function FindingsPage({
       .from("findings")
       .select("severity, status, financial_impact, category, title")
       .eq("audit_id", auditId)
-      .eq("ehr_lagging", false);
+      .eq("ehr_lagging", false)
+      .order("id", { ascending: true }); // stable sort so range paging can't repeat rows
     if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
     const { data, error } = await statsQuery.range(offset, offset + 999);
     if (error || !data || data.length === 0) break;
@@ -209,7 +210,7 @@ export default async function FindingsPage({
               <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
                 <div>
                   <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {(count || 0).toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
+                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {allFindings.length.toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
                 </div>
                 {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
               </div>

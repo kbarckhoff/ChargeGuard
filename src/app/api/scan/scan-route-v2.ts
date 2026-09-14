@@ -636,6 +636,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This quarter is completed (locked). Reopen it to run a scan." }, { status: 409 });
     }
 
+    // Concurrency guard: two overlapping scans (e.g. an auto-scan racing a manual
+    // one, or a double-click) each delete-then-insert and end up doubling the
+    // findings. Refuse to start if another scan began in the last 5 minutes.
+    {
+      const { data: aRow } = await supabaseAdmin.from("audits").select("metadata").eq("id", auditId).single();
+      const meta = ((aRow?.metadata as any) || {}) as Record<string, any>;
+      const startedAt = meta.scan_started_at ? Date.parse(meta.scan_started_at) : 0;
+      if (startedAt && Date.now() - startedAt < 5 * 60 * 1000) {
+        return NextResponse.json({ error: "A scan is already running for this review. Please wait for it to finish." }, { status: 409 });
+      }
+      await supabaseAdmin.from("audits").update({ metadata: { ...meta, scan_started_at: new Date().toISOString() } }).eq("id", auditId);
+    }
+
     // Fetch ALL charge items (paginated)
     let allItems: any[] = [];
     let offset = 0;
@@ -910,6 +923,14 @@ export async function POST(request: Request) {
       .from("audits")
       .update({ total_findings: count || 0 })
       .eq("id", auditId);
+
+    // Release the scan guard.
+    try {
+      const { data: aRow2 } = await supabaseAdmin.from("audits").select("metadata").eq("id", auditId).single();
+      const meta2 = ((aRow2?.metadata as any) || {}) as Record<string, any>;
+      delete meta2.scan_started_at;
+      await supabaseAdmin.from("audits").update({ metadata: meta2 }).eq("id", auditId);
+    } catch { /* the guard auto-expires after 5 min regardless */ }
 
     // Summary by rule
     const summary: Record<string, { count: number; severity: string }> = {};
