@@ -20,6 +20,7 @@ interface FindingRow {
   applied_old?: string | null;
   applied_new?: string | null;
   resolution_note?: string | null;
+  is_carried?: boolean | null;
   charge_items: {
     procedure_number: string;
     charge_description: string;
@@ -156,7 +157,10 @@ export function FindingsTable({
                     ) : "—"}
                   </td>
                   <td className="px-3 py-2.5">
-                    <Badge variant={statusVariant(f.status)}>{statusLabel(f.status)}</Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={statusVariant(f.status)}>{statusLabel(f.status)}</Badge>
+                      {f.is_carried && <span title={f.resolution_note || "Carried from a prior review"} className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">CARRIED</span>}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-[#475569]">
                     {f.financial_impact ? `$${f.financial_impact.toLocaleString()}` : "—"}

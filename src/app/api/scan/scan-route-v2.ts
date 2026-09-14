@@ -789,22 +789,72 @@ export async function POST(request: Request) {
       return (p3 && deptIdByPrefix[p3]) || idByCode["unassigned"] || null;
     };
 
+    // Carry-forward: a finding rejected-with-reason in a prior run becomes a
+    // standing exception (keyed to the CDM line + category). Auto-carry it here
+    // unless the charge changed materially (> ~1%), in which case re-surface it
+    // as open with a note so a stale acceptance can't hide a new problem.
+    const procByItem: Record<string, string> = {};
+    const hcpcsByItem: Record<string, string> = {};
+    const chargeByItem: Record<string, number | null> = {};
+    for (const it of allItems) {
+      procByItem[it.id] = (it.procedure_number || "").toString().trim();
+      hcpcsByItem[it.id] = (it.hcpcs_cpt_code || "").toString().trim();
+      chargeByItem[it.id] = it.gross_charge ?? null;
+    }
+    const { data: exRows } = await supabaseAdmin
+      .from("finding_exceptions")
+      .select("id, line_key, category, reason, snapshot_charge")
+      .eq("org_id", userData.org_id)
+      .eq("status", "active");
+    const exByKey: Record<string, { id: string; reason: string | null; snapshot_charge: number | null }> = {};
+    for (const e of exRows || []) exByKey[`${(e as any).line_key}||${(e as any).category}`] = e as any;
+    const seenExceptionIds = new Set<string>();
+
+    const carryFor = (r: RuleResult) => {
+      const lineKey = (r.charge_item_id ? (procByItem[r.charge_item_id] || hcpcsByItem[r.charge_item_id]) : "") || "";
+      if (!lineKey || !r.category) return null;
+      const ex = exByKey[`${lineKey}||${r.category}`];
+      if (!ex) return null;
+      seenExceptionIds.add(ex.id);
+      const nowCharge = r.charge_item_id ? chargeByItem[r.charge_item_id] : null;
+      const changed = ex.snapshot_charge != null && nowCharge != null &&
+        Math.abs(nowCharge - ex.snapshot_charge) / Math.max(Math.abs(ex.snapshot_charge), 1) > 0.01;
+      const reason = ex.reason ? `"${ex.reason}"` : "no reason recorded";
+      if (changed) {
+        return {
+          status: "open", is_carried: false,
+          note: null as string | null,
+          descAppend: ` [Previously rejected (${reason}), but the charge changed from $${Number(ex.snapshot_charge).toFixed(2)} to $${Number(nowCharge).toFixed(2)} — please re-review.]`,
+        };
+      }
+      return {
+        status: "rejected", is_carried: true,
+        note: ex.reason ? `Carried from a prior review — ${ex.reason}` : "Carried from a prior review (rejected).",
+        descAppend: "",
+      };
+    };
+
     // Insert findings in batches
-    const findings = ruleResults.map((r) => ({
-      audit_id: auditId,
-      phase_id: ruleToPhase(r.rule_id),
-      org_id: userData.org_id,
-      charge_item_id: r.charge_item_id,
-      title: r.title,
-      description: r.description,
-      severity: r.severity,
-      status: "open",
-      category: r.category,
-      financial_impact: r.financial_impact || null,
-      recommendation: r.recommendation,
-      owner_department_id: deptFor(r.category, r.charge_item_id),
-      created_by: user.id,
-    }));
+    const findings = ruleResults.map((r) => {
+      const carry = carryFor(r);
+      return {
+        audit_id: auditId,
+        phase_id: ruleToPhase(r.rule_id),
+        org_id: userData.org_id,
+        charge_item_id: r.charge_item_id,
+        title: r.title,
+        description: (r.description || "") + (carry?.descAppend || ""),
+        severity: r.severity,
+        status: carry?.status || "open",
+        category: r.category,
+        financial_impact: r.financial_impact || null,
+        recommendation: r.recommendation,
+        owner_department_id: deptFor(r.category, r.charge_item_id),
+        is_carried: carry?.is_carried || false,
+        resolution_note: carry?.note || null,
+        created_by: user.id,
+      };
+    });
 
     const BATCH_SIZE = 500;
     let inserted = 0;
@@ -816,6 +866,14 @@ export async function POST(request: Request) {
       } else {
         inserted += batch.length;
       }
+    }
+
+    // Note which standing exceptions fired again this run.
+    if (seenExceptionIds.size) {
+      await supabaseAdmin
+        .from("finding_exceptions")
+        .update({ last_seen_audit_id: auditId, updated_at: new Date().toISOString() })
+        .in("id", [...seenExceptionIds]);
     }
 
     // Update audit finding count

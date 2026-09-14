@@ -46,6 +46,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Carry-forward ledger: a rejection (with reason) becomes a persistent
+    // exception keyed to the CDM line + category, so the next run can auto-carry
+    // it. Reopening/accepting clears the exception.
+    try {
+      const { data: f } = await supabaseAdmin
+        .from("findings")
+        .select("org_id, audit_id, category, financial_impact, charge_items(procedure_number, hcpcs_cpt_code, gross_charge)")
+        .eq("id", findingId)
+        .single();
+      const ci: any = (f as any)?.charge_items || {};
+      const lineKey: string = (ci.procedure_number || ci.hcpcs_cpt_code || "").toString().trim();
+      const category: string = ((f as any)?.category || "").toString().trim();
+      if (f && lineKey && category) {
+        if (status === "rejected") {
+          await supabaseAdmin.from("finding_exceptions").upsert({
+            org_id: (f as any).org_id,
+            line_key: lineKey,
+            category,
+            procedure_number: ci.procedure_number || null,
+            hcpcs: ci.hcpcs_cpt_code || null,
+            reason: typeof note === "string" ? note : null,
+            status: "active",
+            snapshot_charge: ci.gross_charge ?? null,
+            snapshot_impact: (f as any).financial_impact ?? null,
+            first_rejected_audit_id: (f as any).audit_id,
+            last_seen_audit_id: (f as any).audit_id,
+            rejected_by: user.id,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "org_id,line_key,category" });
+        } else if (status === "open" || status === "accepted" || status === "resolved") {
+          // No longer a standing exception — stop carrying it forward.
+          await supabaseAdmin.from("finding_exceptions")
+            .update({ status: "cleared", updated_at: new Date().toISOString() })
+            .eq("org_id", (f as any).org_id).eq("line_key", lineKey).eq("category", category);
+        }
+      }
+    } catch (ledgerErr) {
+      console.error("exception ledger error:", ledgerErr);
+      // Non-fatal: the finding update already succeeded.
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
