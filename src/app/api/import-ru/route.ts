@@ -48,6 +48,7 @@ export async function POST(request: Request) {
         org_id: userData.org_id,
         charge_code: String(pick(r, "chargecode", "charge", "code") ?? "").trim() || null,
         hcpcs: String(pick(r, "hcpcs") ?? "").trim() || null,
+        modifier: String(pick(r, "modifier", "mod") ?? "").trim() || null,
         department: String(pick(r, "department", "dept") ?? "").trim() || null,
         units: num(pick(r, "units")),
         gross: num(pick(r, "grosscharges", "gross")),

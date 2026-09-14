@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
-import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules } from "@/lib/cdm-reference-rules";
+import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
@@ -692,7 +692,7 @@ export async function POST(request: Request) {
     const usageByCode = new Map<string, any>();
     const formularyByCode = new Map<string, any>();
     for (let off = 0; ; off += 1000) {
-      const { data } = await supabaseAdmin.from("charge_usage").select("charge_code, units, gross").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await supabaseAdmin.from("charge_usage").select("charge_code, units, gross, modifier").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
       for (const u of data) if (u.charge_code) usageByCode.set(String(u.charge_code), u);
       if (data.length < 1000) break;
@@ -756,6 +756,7 @@ export async function POST(request: Request) {
       ...runPriceTransparencyRules(allItems),
       ...runMultiplierRules(allItems),
       ...runFormularyRules(allItems, formularyByCode, usageByCode),
+      ...runModifierRules(allItems, usageByCode),
       ...runBenchmarkRules(allItems, auditState),
       ...runClaimsRules(allItems, claimLines),
       ...runPeerCompetitorRules(allItems, peerRows),

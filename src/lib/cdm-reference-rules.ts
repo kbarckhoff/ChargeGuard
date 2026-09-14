@@ -484,6 +484,43 @@ export function runMultiplierRules(items: any[]): RuleResult[] {
   return out;
 }
 
+// Codes handled via the separate hardcoded modifier-build list (CDM Review
+// Dictionary: 93 Radiology-Modifier + 21 Other-Modifier codes). Excluded from the
+// scripted Missing-Modifier flag per the methodology (Step 13).
+const MODIFIER_HARDCODE_EXCLUDE = new Set<string>([
+  "70030","70120","70130","70328","71100","71101","73000","73010","73020","73030","73040","73060","73070","73080","73085","73090","73092","73100","73110","73115","73120","73130","73140","73200","73201","73202","73206","73218","73219","73220","73221","73222","73223","73225","73501","73502","73503","73525","73551","73552","73560","73562","73564","73580","73590","73592","73600","73610","73615","73620","73630","73650","73660","73700","73701","73702","73706","73718","73719","73720","73721","73722","73723","73725","74470","74485","74742","75716","75741","75746","75756","75801","75805","75820","75831","75840","76510","76511","76512","76529","76641","76642","76881","76882","76883","76885","76886","77046","77048","77053","77054","77061","77065","92020","92230","92311","92313","92315","92317","92325","92326","93882","93926","93931","93971","93979","93990","95860","95866","95867","95870","95885","95886","95905",
+]);
+
+/**
+ * Missing Modifier (Step 13): the R&U shows a modifier was ACTUALLY BILLED, but
+ * the CDM line carries none. Excludes the hardcode-eligible codes above (handled
+ * via a separate modifier-build list). Needs R&U with a billed-modifier column.
+ */
+export function runModifierRules(items: any[], usageByCode: Map<string, any>): RuleResult[] {
+  const out: RuleResult[] = [];
+  for (const item of items) {
+    const cc = String(item.procedure_number ?? "").trim();
+    if (!cc) continue;
+    const u = usageByCode.get(cc);
+    const billedMod = (u?.modifier ?? "").toString().trim().toUpperCase();
+    if (!billedMod) continue; // nothing billed to compare against
+    const cdmMods = [item.modifier_1, item.modifier_2, item.modifier_3]
+      .map((m) => (m || "").toString().trim()).filter(Boolean);
+    if (cdmMods.length > 0) continue; // CDM already carries a modifier
+    const hcpcsRaw = (item.hcpcs_cpt_code || "").toString().trim().toUpperCase();
+    if (MODIFIER_HARDCODE_EXCLUDE.has(hcpcsRaw) || MODIFIER_HARDCODE_EXCLUDE.has(normalizeHcpcs(item.hcpcs_cpt_code))) continue;
+    out.push({
+      rule_id: "13", charge_item_id: item.id,
+      title: `CDM line missing modifier ${billedMod} billed in R&U - ${cc}`,
+      description: `"${item.charge_description}" was billed with modifier ${billedMod} in the utilization data, but the CDM line has no modifier. The CDM should carry the modifier so claims build and price correctly.`,
+      severity: "high", category: "Missing Modifier",
+      financial_impact: u ? num(u.gross) : undefined,
+      recommendation: `Add modifier ${billedMod} to the CDM line, or confirm it is applied downstream in the billing system.`,
+    });
+  }
+  return out;
+}
+
 function normalizeNdc(v: any): string { const d = String(v ?? "").replace(/\D/g, ""); if (!d) return ""; return d.length <= 11 ? d.padStart(11, "0") : d; }
 
 // Parse a dosage/unit string ("per 0.25 mg", "10 MG", "1 ea") → amount + unit + dimension.
