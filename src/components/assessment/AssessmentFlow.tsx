@@ -578,6 +578,7 @@ function Peer({ comps, setComps, auditId, peerCounts, onBack }: any) {
   // (debounced). No manual "run" button.
   const [scanState, setScanState] = useState<"idle" | "running" | "done">("idle");
   const [lastRun, setLastRun] = useState<string | null>(null);
+  const [scanErr, setScanErr] = useState("");
   const [newComp, setNewComp] = useState("");
   const timer = useRef<any>(null);
   // Competitors can be added here without reopening the (locked) Intake — peer
@@ -589,15 +590,20 @@ function Peer({ comps, setComps, auditId, peerCounts, onBack }: any) {
     setNewComp("");
   };
   const autoScan = () => {
-    setScanState("running");
+    setScanState("running"); setScanErr("");
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId }) });
+        const res = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId }) });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          setScanState("idle"); setScanErr(j.error || `Scan failed (${res.status})`);
+          return;
+        }
         setScanState("done"); setLastRun(new Date().toLocaleTimeString());
         // Peer files now exist → review is "Ready"; email entity users once.
         fetch("/api/notify/ready", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId }) }).catch(() => {});
-      } catch { setScanState("idle"); }
+      } catch (e: any) { setScanState("idle"); setScanErr(e?.message || "Scan failed to start"); }
     }, 1500);
   };
   return (
@@ -625,10 +631,15 @@ function Peer({ comps, setComps, auditId, peerCounts, onBack }: any) {
             : scanState === "done" ? <><Check size={15} className="text-[#12b76a]" /> <span className="text-[#374151]">Analysis updated automatically{lastRun ? ` at ${lastRun}` : ""}.</span></>
             : <span className="text-[#6b7280]">The analysis runs automatically when you add or change a peer file.</span>}
         </div>
+        {scanErr && <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-[13px] text-red-700">Scan error: {scanErr}</div>}
         <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={autoScan} disabled={scanState === "running"} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-[#e2e6ec] text-[#374151] text-sm font-semibold hover:bg-[#f6f7f9] disabled:opacity-50">
+            {scanState === "running" ? <><Loader2 size={15} className="animate-spin" /> Running…</> : <><Zap size={15} /> Run analysis now</>}
+          </button>
           <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8]">View peer analysis <ArrowRight size={15} /></a>
           <a href={`/findings?auditId=${auditId}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-[#e2e6ec] text-[#374151] text-sm font-semibold hover:bg-[#f6f7f9]">View findings</a>
         </div>
+        <p className="text-xs text-[#9aa2af] mt-2">Backup: the analysis runs automatically when peer files change, but you can re-run it here anytime.</p>
       </div>
       <div className="flex justify-between mt-2">
         <button onClick={onBack} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">← Back to Review</button>

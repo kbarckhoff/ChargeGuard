@@ -606,6 +606,7 @@ function runRules(items: any[]): RuleResult[] {
 // ─── API Route ───────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  let guardAuditId: string | null = null;
   try {
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -632,6 +633,7 @@ export async function POST(request: Request) {
     if (!auditId) {
       return NextResponse.json({ error: "Missing auditId" }, { status: 400 });
     }
+    guardAuditId = auditId;
     if (await isAuditLocked(supabaseAdmin, auditId)) {
       return NextResponse.json({ error: "This quarter is completed (locked). Reopen it to run a scan." }, { status: 409 });
     }
@@ -950,6 +952,16 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error("Scan error:", err?.message || err);
+    // Always release the scan guard on failure so a broken run can't block retries.
+    try {
+      if (guardAuditId) {
+        const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+        const { data: aRow } = await db.from("audits").select("metadata").eq("id", guardAuditId).single();
+        const m = ((aRow?.metadata as any) || {}) as Record<string, any>;
+        delete m.scan_started_at;
+        await db.from("audits").update({ metadata: m }).eq("id", guardAuditId);
+      }
+    } catch { /* flag auto-expires after 5 min anyway */ }
     return NextResponse.json({ error: "Scan failed", detail: err?.message }, { status: 500 });
   }
 }
