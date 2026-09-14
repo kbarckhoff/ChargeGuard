@@ -502,6 +502,22 @@ function parseDosage(s: any): { amt: number; unit: string; dim: string } {
   return { amt: isNaN(amt) ? 0 : amt, unit, dim: unitDim(str || unit) };
 }
 
+// Within-dimension unit conversion (Formula Library Step 7). Mass factors are
+// "mg per 1 unit" (MG=1, G/GM=1000, MCG=0.001); volume factors are "mL per 1
+// unit" (ML/CC=1, L=1000). Converting BEFORE computing units-per-vial is the
+// step Step 7 flags as most likely to produce wrong answers if skipped.
+const MASS_PER_UNIT: Record<string, number> = { mg: 1, milligram: 1, milligrams: 1, g: 1000, gm: 1000, gram: 1000, grams: 1000, mcg: 0.001, microgram: 0.001, micrograms: 0.001, ug: 0.001 };
+const VOL_PER_UNIT: Record<string, number> = { ml: 1, milliliter: 1, milliliters: 1, cc: 1, l: 1000, liter: 1000, liters: 1000 };
+function unitScale(unitRaw: any): { dim: string; factor: number } | null {
+  const u = String(unitRaw ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  if (!u) return null;
+  if (u in MASS_PER_UNIT) return { dim: "mass", factor: MASS_PER_UNIT[u] };
+  if (u in VOL_PER_UNIT) return { dim: "volume", factor: VOL_PER_UNIT[u] };
+  if (u === "iu") return { dim: "iu", factor: 1 };
+  if (/^(ea|each|unit|units|u|vial|vials|dose|doses|tab|tablet|tablets|cap|capsule|capsules)$/.test(u)) return { dim: "count", factor: 1 };
+  return null;
+}
+
 /**
  * Formulary rules (need an imported formulary + R&U):
  *  - Inactive Formulary: drug is INACTIVE in the formulary but still has billing
@@ -541,34 +557,63 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
       });
     }
 
-    // ── Billing-unit / UOM (Step 7): needs ASP limit + HCPCS dosage + formulary pkg ──
+    // ── Billing-unit / UOM (Formula Library Step 7) ──
+    // Split the HCPCS billing unit into value+unit, convert the formulary package
+    // to the SAME unit before dividing, then flag only where the CDM is priced
+    // per vial (units/vial > 1) at >=10x ASP. Overbilling is realized R&U dollars,
+    // not gross exposure. Incompatible/blank units route to the UOM Mismatch flag.
     const ref = getReference(item.hcpcs_cpt_code);
     const asp = ref ? refNum(ref.asp) : 0;
     const price = num(item.gross_charge);
     if (asp > 0 && price > 0 && ref?.dosage) {
       const dose = parseDosage(ref.dosage);
-      const pkgDim = unitDim(String(fm.pkg_unit || ""));
-      if (dose.dim && pkgDim && dose.dim !== pkgDim) {
+      const buScale = unitScale(dose.unit);
+      const pkgAmt = num(fm.pkg_amt);
+      const pkgScale = unitScale(fm.pkg_unit);
+      const ratio = price / asp;
+      const billed = u ? num(u.units) : 0;
+      const grossRU = u ? num(u.gross) : 0;
+
+      if (!(dose.amt > 0) || !buScale || !(pkgAmt > 0) || !pkgScale) {
+        // MISSING DATA (e.g. "Per Dose" viscosupplements, or blank package) — can't
+        // validate the billing unit; route to UOM Mismatch (Section B).
+        out.push({
+          rule_id: "UOM", charge_item_id: item.id,
+          title: `Pharmacy billing unit needs pharmacy input - ${code}`,
+          description: `"${item.charge_description}" can't be unit-validated: HCPCS billing unit "${ref.dosage}" or the formulary package (${fm.pkg_amt ?? "—"} ${fm.pkg_unit ?? "—"}) is blank or non-numeric. Confirm whether the drug is correctly billed on this basis.`,
+          severity: "medium", category: "Pharmacy UOM Mismatch",
+          financial_impact: gross || undefined,
+          recommendation: "Have pharmacy confirm the billing unit and package size so the per-unit price can be validated.",
+        });
+      } else if (buScale.dim !== pkgScale.dim) {
+        // INCOMPATIBLE dimensions (mass vs volume, mass vs count, count vs IU) —
+        // needs the drug's concentration; route to UOM Mismatch (Section A).
         out.push({
           rule_id: "UOM", charge_item_id: item.id,
           title: `Pharmacy UOM mismatch - ${code} (${dose.unit} vs ${fm.pkg_unit})`,
-          description: `"${item.charge_description}" bills per ${ref.dosage} (${dose.dim}) but the formulary package is in ${fm.pkg_unit} (${pkgDim}). These units are dimensionally incompatible, so per-unit pricing can't be validated without drug-specific concentration data.`,
+          description: `"${item.charge_description}" bills per ${ref.dosage} (${buScale.dim}) but the formulary package is in ${fm.pkg_unit} (${pkgScale.dim}). These units are dimensionally incompatible, so per-unit pricing can't be validated without the drug's concentration.`,
           severity: "high", category: "Pharmacy UOM Mismatch",
           financial_impact: gross || undefined,
           recommendation: "Have pharmacy supply the concentration / units-per-vial so the billing-unit price can be validated.",
         });
       } else {
-        const ratio = price / asp;
-        if (ratio >= 10) {
-          const unitsPerVial = dose.amt > 0 && num(fm.pkg_amt) > 0 ? num(fm.pkg_amt) / dose.amt : 0;
-          const correctPerUnit = unitsPerVial > 0 ? price / unitsPerVial : 0;
+        // Same dimension: convert both to a common base, then units/vial.
+        const converted = buScale.factor !== pkgScale.factor;
+        const buBase = dose.amt * buScale.factor;
+        const pkgBase = pkgAmt * pkgScale.factor;
+        const unitsPerVial = buBase > 0 ? pkgBase / buBase : 0;
+        const correctPerUnit = unitsPerVial > 0 ? price / unitsPerVial : 0;
+        // Only a billing-unit error when the CDM is priced per vial (units/vial > 1).
+        // units/vial ~= 1 at high ratio is a pricing issue, handled by the markup rule.
+        if (ratio >= 10 && unitsPerVial > 1) {
+          const estOver = billed > 0 ? Math.max(grossRU - billed * correctPerUnit, 0) : undefined;
           out.push({
             rule_id: "PBU", charge_item_id: item.id,
             title: `Pharmacy billing-unit price ${ratio.toFixed(0)}x ASP - ${code}`,
-            description: `"${item.charge_description}" is priced $${price.toFixed(2)} vs an ASP limit of $${asp.toFixed(2)} per ${ref.dosage} (${ratio.toFixed(0)}x). The CDM price looks set per package/vial while Medicare reimburses per billing unit${unitsPerVial > 0 ? ` (~${Math.round(unitsPerVial)} units/vial → correct ≈ $${correctPerUnit.toFixed(2)}/unit)` : ""}.`,
+            description: `"${item.charge_description}" is priced $${price.toFixed(2)} vs an ASP limit of $${asp.toFixed(2)} per ${ref.dosage} (${ratio.toFixed(0)}x). The package is ${pkgAmt} ${fm.pkg_unit}${converted ? ` (unit-converted)` : ""} = ~${Math.round(unitsPerVial)} billing units/vial, so the correct price is ≈ $${correctPerUnit.toFixed(4)}/unit. The CDM looks priced per vial while Medicare reimburses per billing unit.${billed > 0 ? ` R&U ${Math.round(billed).toLocaleString()} units → est. overbilling $${(estOver || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.` : " Import R&U to quantify overbilling."}`,
             severity: ratio > 50 ? "critical" : "high", category: "Pharmacy Billing Unit",
-            financial_impact: gross || undefined,
-            recommendation: `Confirm whether this is a per-vial or per-unit charge code; reprice to the per-billing-unit basis${unitsPerVial > 0 ? ` (~$${correctPerUnit.toFixed(2)}/unit)` : ""}.`,
+            financial_impact: estOver,
+            recommendation: `Reprice to the per-billing-unit basis (~$${correctPerUnit.toFixed(4)}/unit).`,
           });
         }
       }
