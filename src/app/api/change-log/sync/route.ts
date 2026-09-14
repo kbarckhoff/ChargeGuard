@@ -50,19 +50,26 @@ export async function POST(request: Request) {
     const byKey: Record<string, any> = {};
     for (const r of rows) byKey[key(r)] = r;
 
-    const { data: changes } = await db.from("cdm_change_log").select("*").eq("org_id", audit.org_id).in("status", ["exported", "pending"]);
+    // "Awaiting EHR sync" = exported or previously flagged approved-but-missing.
+    const { data: changes } = await db.from("cdm_change_log").select("*").eq("org_id", audit.org_id).in("status", ["exported", "approved_missing"]);
     const list = changes || [];
 
     const implementedIds: string[] = [];
     const missing: any[] = [];
     for (const c of list as any[]) {
-      if (c.status === "exported" && reflected(c, byKey[c.line_key])) implementedIds.push(c.id);
-      else if (c.status === "exported") missing.push(c);
+      if (reflected(c, byKey[c.line_key])) implementedIds.push(c.id);   // Case A: EHR now has it -> Closed & Synced
+      else missing.push(c);                                             // Case B: EHR still lagging
     }
 
     if (action === "reconcile") {
+      const now = new Date().toISOString();
       if (implementedIds.length) {
-        await db.from("cdm_change_log").update({ status: "implemented", implemented_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in("id", implementedIds);
+        await db.from("cdm_change_log").update({ status: "implemented", implemented_at: now, updated_at: now }).in("id", implementedIds);
+      }
+      // Flag still-missing exported entries as "approved but missing from EHR".
+      const toFlag = missing.filter((m) => m.status === "exported").map((m) => m.id);
+      if (toFlag.length) {
+        await db.from("cdm_change_log").update({ status: "approved_missing", updated_at: now }).in("id", toFlag);
       }
       return NextResponse.json({ ok: true, implemented: implementedIds.length, missing: missing.length });
     }

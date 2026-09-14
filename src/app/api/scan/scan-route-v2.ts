@@ -8,6 +8,7 @@ import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
 import { ruleIdsForFacility, type FacilityType } from "@/lib/rule-catalog";
 import { loadDeptMaps, isStructuralCategory } from "@/lib/departments";
+import { changeFieldForCategory, AWAITING_SYNC_STATUSES } from "@/lib/change-log";
 
 export const maxDuration = 60;
 
@@ -810,6 +811,25 @@ export async function POST(request: Request) {
     for (const e of exRows || []) exByKey[`${(e as any).line_key}||${(e as any).category}`] = e as any;
     const seenExceptionIds = new Set<string>();
 
+    // Lagging EHR: a finding re-found on this fresh upload that matches a change
+    // already accepted + exported in a prior run (and not yet in the EHR) is
+    // shown read-only under "Pending EHR Sync" instead of asked to Accept again.
+    const { data: clRows } = await supabaseAdmin
+      .from("cdm_change_log")
+      .select("line_key, field, updated_at")
+      .eq("org_id", userData.org_id)
+      .in("status", AWAITING_SYNC_STATUSES as unknown as string[]);
+    const laggingByKey: Record<string, { updated_at: string | null }> = {};
+    for (const c of clRows || []) laggingByKey[`${(c as any).line_key}||${(c as any).field}`] = { updated_at: (c as any).updated_at };
+    const laggingFor = (r: RuleResult) => {
+      const lineKey = (r.charge_item_id ? (procByItem[r.charge_item_id] || hcpcsByItem[r.charge_item_id]) : "") || "";
+      if (!lineKey || !r.category) return null;
+      const hit = laggingByKey[`${lineKey}||${changeFieldForCategory(r.category)}`];
+      if (!hit) return null;
+      const when = hit.updated_at ? new Date(hit.updated_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "a prior review";
+      return { note: `Approved ${when}; awaiting EHR implementation.` };
+    };
+
     const carryFor = (r: RuleResult) => {
       const lineKey = (r.charge_item_id ? (procByItem[r.charge_item_id] || hcpcsByItem[r.charge_item_id]) : "") || "";
       if (!lineKey || !r.category) return null;
@@ -834,9 +854,12 @@ export async function POST(request: Request) {
       };
     };
 
-    // Insert findings in batches
+    // Insert findings in batches. Precedence: a re-found approved change (lagging
+    // EHR) takes over as read-only; else a prior rejection carries forward; else
+    // it's a new open finding.
     const findings = ruleResults.map((r) => {
-      const carry = carryFor(r);
+      const lagging = laggingFor(r);
+      const carry = lagging ? null : carryFor(r);
       return {
         audit_id: auditId,
         phase_id: ruleToPhase(r.rule_id),
@@ -845,13 +868,14 @@ export async function POST(request: Request) {
         title: r.title,
         description: (r.description || "") + (carry?.descAppend || ""),
         severity: r.severity,
-        status: carry?.status || "open",
+        status: lagging ? "accepted" : (carry?.status || "open"),
         category: r.category,
         financial_impact: r.financial_impact || null,
         recommendation: r.recommendation,
         owner_department_id: deptFor(r.category, r.charge_item_id),
         is_carried: carry?.is_carried || false,
-        resolution_note: carry?.note || null,
+        ehr_lagging: !!lagging,
+        resolution_note: lagging ? lagging.note : (carry?.note || null),
         created_by: user.id,
       };
     });

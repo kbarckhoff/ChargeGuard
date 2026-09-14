@@ -85,6 +85,7 @@ export default async function FindingsPage({
     .from("findings")
     .select("*, charge_items(procedure_number, charge_description, hcpcs_cpt_code, revenue_code, gross_charge)", { count: "exact" })
     .eq("audit_id", auditId)
+    .eq("ehr_lagging", false)
     .order("severity", { ascending: true })
     .order("created_at", { ascending: false });
   if (!canSeeAll) query = query.in("owner_department_id", scopeIds);
@@ -116,7 +117,8 @@ export default async function FindingsPage({
     let statsQuery = supabaseAdmin
       .from("findings")
       .select("severity, status, financial_impact, category, title")
-      .eq("audit_id", auditId);
+      .eq("audit_id", auditId)
+      .eq("ehr_lagging", false);
     if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
     const { data, error } = await statsQuery.range(offset, offset + 999);
     if (error || !data || data.length === 0) break;
@@ -152,6 +154,18 @@ export default async function FindingsPage({
   // Get unique categories
   const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
 
+  // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
+  // Shown read-only so the reviewer isn't asked to Accept the same fix again.
+  let laggingQuery = supabaseAdmin
+    .from("findings")
+    .select("id, title, category, resolution_note, financial_impact, charge_items(procedure_number, hcpcs_cpt_code)")
+    .eq("audit_id", auditId)
+    .eq("ehr_lagging", true)
+    .order("category");
+  if (!canSeeAll) laggingQuery = laggingQuery.in("owner_department_id", scopeIds);
+  const { data: laggingFindings } = await laggingQuery;
+  const lagging = laggingFindings || [];
+
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
@@ -175,6 +189,31 @@ export default async function FindingsPage({
           </div>
 
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
+          {/* Pending EHR Sync: approved in a prior review, still not in the EHR. */}
+          {lagging.length > 0 && (
+            <div className="bg-[#fff8ec] border border-[#f5d99a] rounded-xl p-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-[#8a5a1a]" />
+                  <h3 className="text-[13.5px] font-semibold text-[#8a5a1a]">Pending EHR Sync · {lagging.length}</h3>
+                </div>
+                <a href={`/api/change-log/export?auditId=${auditId}`} className="text-[12px] font-semibold text-[#1f6fd4] hover:underline">Re-export fix file</a>
+              </div>
+              <p className="text-[12px] text-[#8a5a1a]/90 mb-3">You already reviewed and approved these fixes; they haven't been applied in the EHR yet, so they need no action here.</p>
+              <div className="space-y-1.5">
+                {lagging.slice(0, 50).map((f: any) => (
+                  <div key={f.id} className="flex items-center justify-between gap-3 bg-white/70 rounded-lg px-3 py-2 border border-[#f0e2c2]">
+                    <div className="min-w-0">
+                      <div className="text-[13px] text-[#0f172a] truncate">{f.title}</div>
+                      <div className="text-[11px] text-[#94a3b8]">{f.charge_items ? `${f.charge_items.procedure_number || f.charge_items.hcpcs_cpt_code || "—"} · ` : ""}{f.category}{f.resolution_note ? ` · ${f.resolution_note}` : ""}</div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded shrink-0">AWAITING EHR</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
             {Object.entries(SEVERITY_CONFIG).map(([key, cfg]) => (

@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     // Accepted changes for this org that aren't already implemented/void.
     const { data: changes } = await db.from("cdm_change_log")
       .select("id, line_key, action_type, field, old_value, new_value, rationale, status, procedure_number, hcpcs, description")
-      .eq("org_id", audit.org_id).in("status", ["pending", "exported"]);
+      .eq("org_id", audit.org_id).in("status", ["pending", "exported", "approved_missing"]);
     const changeList = changes || [];
 
     const byKey: Record<string, any> = {};

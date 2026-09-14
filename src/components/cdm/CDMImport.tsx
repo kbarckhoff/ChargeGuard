@@ -62,6 +62,8 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState("");
+  const [syncPrompt, setSyncPrompt] = useState<{ missing: number } | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -104,8 +106,25 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
       if (!res.ok) { setMsg("Failed: " + (j.error || res.status)); setBusy(false); return; }
       inserted += j.inserted || 0; setMsg(`Importing… ${inserted.toLocaleString()} rows`);
     }
-    setBusy(false); setRows(null); setMsg(`Imported ${inserted.toLocaleString()} charge lines.`);
+    setRows(null); setMsg(`Imported ${inserted.toLocaleString()} charge lines.`);
+
+    // Smart-sync: reconcile this fresh upload against changes we recommended in
+    // prior reviews. Auto-mark the ones the hospital implemented; if any approved
+    // changes are still missing from this EHR extract, offer to re-apply them.
+    try {
+      const r = await fetch("/api/change-log/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId, action: "reconcile" }) });
+      const j = await r.json();
+      if (r.ok && (j.missing || 0) > 0) { setSyncPrompt({ missing: j.missing }); setBusy(false); return; }
+    } catch { /* non-fatal */ }
+
+    setBusy(false);
     router.refresh();
+  };
+
+  const reapplyMissing = async () => {
+    setSyncBusy(true);
+    try { await fetch("/api/change-log/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId, action: "reapply" }) }); } catch { /* ignore */ }
+    setSyncBusy(false); setSyncPrompt(null); router.refresh();
   };
 
   return (
@@ -148,6 +167,23 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
               <button onClick={() => setRows(null)} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Cancel</button>
               <button onClick={runImport} disabled={busy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-50 flex items-center gap-2">
                 {busy && <Loader2 size={14} className="animate-spin" />} Import {rows.length.toLocaleString()} rows
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {syncPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6">
+            <h3 className="text-sm font-bold text-[#111827] mb-1.5">Approved changes still missing</h3>
+            <p className="text-[13px] text-[#4b5563] mb-4">
+              This new CDM upload doesn't include <span className="font-semibold">{syncPrompt.missing}</span> change{syncPrompt.missing === 1 ? "" : "s"} you approved in a prior review. Would you like to re-apply {syncPrompt.missing === 1 ? "it" : "them"} to this review so they're recommended again?
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => { setSyncPrompt(null); router.refresh(); }} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Skip</button>
+              <button onClick={reapplyMissing} disabled={syncBusy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#1f6fd4] text-white hover:bg-[#1a5fb8] disabled:opacity-50 flex items-center gap-2">
+                {syncBusy && <Loader2 size={14} className="animate-spin" />} Re-apply {syncPrompt.missing}
               </button>
             </div>
           </div>

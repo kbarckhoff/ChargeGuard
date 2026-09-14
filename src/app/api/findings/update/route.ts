@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { changeFieldForCategory, changeActionForCategory } from "@/lib/change-log";
 
 export async function POST(request: Request) {
   try {
@@ -60,15 +61,8 @@ export async function POST(request: Request) {
         // ── Change log: accepting a finding stages a PENDING change (does not
         // touch the baseline). Reopening/rejecting voids a still-pending change.
         if (status === "accepted") {
-          const cat = category.toLowerCase();
-          const action_type = /retired|inactive|deactivat|self-admin/.test(cat) ? "deactivate"
-            : /missing code|new .*code|recommended code|add-on|missing primary/.test(cat) ? "add" : "modify";
-          const field = /pric|markup|clfs|billing unit|multiplier|leakage/.test(cat) ? "price"
-            : /description/.test(cat) ? "description"
-            : /revenue code/.test(cat) ? "revenue_code"
-            : /modifier/.test(cat) ? "modifier"
-            : /retired|missing code|coding|hcpcs|crosswalk|device/.test(cat) ? "hcpcs"
-            : "review";
+          const action_type = changeActionForCategory(category);
+          const field = changeFieldForCategory(category);
           const old_value = field === "price" ? (ci.gross_charge != null ? String(ci.gross_charge) : null)
             : field === "description" ? (ci.charge_description || null)
             : field === "revenue_code" ? (ci.revenue_code || null)

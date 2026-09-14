@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, RefreshCw, Loader2, Check, X, Pencil } from "lucide-react";
+import { Download, Check, X, Pencil } from "lucide-react";
 
 type Entry = {
   id: string; change_number: number | null; audit_id: string | null;
@@ -23,7 +23,6 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("active");
   const [reviewId, setReviewId] = useState(latestAuditId || "");
-  const [syncMsg, setSyncMsg] = useState("");
   const [busy, setBusy] = useState<string>("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
@@ -35,8 +34,6 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
 
   const voidEntry = async (id: string) => { setBusy(id); await post("/api/change-log/update", { id, status: "void" }); setBusy(""); router.refresh(); };
   const saveEdit = async (id: string) => { setBusy(id); await post("/api/change-log/update", { id, new_value: editVal, effective_date: editDate }); setBusy(""); setEditId(null); router.refresh(); };
-  const reconcile = async () => { if (!reviewId) return; setBusy("sync"); const r = await post("/api/change-log/sync", { auditId: reviewId, action: "reconcile" }); setBusy(""); setSyncMsg(`${r.implemented ?? 0} now implemented · ${r.missing ?? 0} still missing from this upload`); router.refresh(); };
-  const reapply = async () => { if (!reviewId) return; setBusy("sync"); const r = await post("/api/change-log/sync", { auditId: reviewId, action: "reapply" }); setBusy(""); setSyncMsg(`${r.reapplied ?? 0} approved changes re-staged as pending on this review`); router.refresh(); };
 
   return (
     <div className="space-y-4">
@@ -50,13 +47,6 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
         <a href={reviewId ? `/api/change-log/export?auditId=${reviewId}` : "#"} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white ${reviewId ? "bg-[#1f6fd4] hover:bg-[#1a5fb8]" : "bg-[#cbd5e1] pointer-events-none"}`}>
           <Download size={14} /> Generate Updated CDM
         </a>
-        <button onClick={reconcile} disabled={!reviewId || busy === "sync"} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium bg-white border border-[#e2e8f0] text-[#334155] hover:bg-[#f6f7f9] disabled:opacity-50">
-          {busy === "sync" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Check EHR sync
-        </button>
-        <button onClick={reapply} disabled={!reviewId || busy === "sync"} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium bg-white border border-[#e2e8f0] text-[#334155] hover:bg-[#f6f7f9] disabled:opacity-50">
-          Re-apply missing
-        </button>
-        {syncMsg && <span className="text-[12px] text-[#475569]">{syncMsg}</span>}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[#64748b]">Show</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-[13px] border border-[#e2e8f0] rounded-lg px-2 py-1.5">
