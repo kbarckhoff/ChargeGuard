@@ -8,6 +8,11 @@
 // (CPT-MPFS / CLFS-ASP lookups).
 
 import referenceData from "./cms-reference-data.json";
+// Part B ASP payment limit + HCPCS billing-unit (dosage) per J-code, from the CMS
+// ASP pricing file. The main reference/DB carries SI/APC/MPFS but often lacks the
+// billing-unit descriptor, without which the pharmacy billing-unit and UOM rules
+// cannot run. This overlay backfills asp + dosage by normalized HCPCS.
+import aspDosageData from "./asp-dosage.json";
 
 export interface CmsReference {
   short_desc?: string;
@@ -24,6 +29,7 @@ export interface CmsReference {
 }
 
 const REF: Record<string, CmsReference> = referenceData as Record<string, CmsReference>;
+const ASP_DOSAGE: Record<string, { asp?: string; dosage?: string }> = aspDosageData as Record<string, { asp?: string; dosage?: string }>;
 
 // Live overlay loaded from the cms_reference table when available. When set, it
 // takes precedence over the bundled JSON so the automatic quarterly refresh
@@ -86,7 +92,17 @@ export function normalizeHcpcs(raw: string | null | undefined): string {
 export function getReference(rawHcpcs: string | null | undefined): CmsReference | null {
   const key = normalizeHcpcs(rawHcpcs);
   if (!key) return null;
-  return (LIVE ?? REF)[key] ?? null;
+  const base = (LIVE ?? REF)[key] ?? null;
+  const od = ASP_DOSAGE[key];
+  if (!od) return base;
+  // Backfill asp + dosage from the ASP file when the primary reference is missing
+  // them (the DB/bundled reference carries SI/MPFS but usually not the billing unit).
+  if (!base) return { ...od };
+  return {
+    ...base,
+    asp: (base.asp != null && String(base.asp).trim() !== "") ? base.asp : od.asp,
+    dosage: (base.dosage != null && String(base.dosage).trim() !== "") ? base.dosage : od.dosage,
+  };
 }
 
 /** Parse a possibly-blank numeric reference field to a number (0 if blank/NaN). */

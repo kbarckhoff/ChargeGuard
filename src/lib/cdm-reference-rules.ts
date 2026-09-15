@@ -60,14 +60,20 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
     // a hospital outpatient department under Part B. Checked before the HCPCS
     // guard because many Rev 637 lines carry no HCPCS.
     if (rev === "637" || rev === "0637") {
-      out.push({
-        rule_id: "637", charge_item_id: item.id,
-        title: `Self-administered drug (Rev 637) - ${procNum}`,
-        description: `"${item.charge_description}" is billed under Revenue Code 637 (self-administered drugs). Drugs that are "usually self-administered" are not covered under Part B when billed by a hospital outpatient department, creating compliance exposure.`,
-        severity: "high", category: "Self-Admin Drugs (Rev 637)",
-        financial_impact: price || undefined,
-        recommendation: "Confirm with clinical staff whether this drug is administered in the facility or dispensed for home use. If home use, remove it from Medicare/Medicaid billing. Verify a written self-administered drug policy exists.",
-      });
+      // Only flag ACTIVE lines (billed in the R&U period) — the report screens
+      // the ~700 Rev-637 lines down to the ~392 with 2025 activity.
+      const u637 = usageByCode?.get(String(item.procedure_number ?? "").trim());
+      const billed637 = u637 ? num(u637.units) : 0;
+      if (billed637 > 0 || !usageByCode) {
+        out.push({
+          rule_id: "637", charge_item_id: item.id,
+          title: `Self-administered drug (Rev 637) - ${procNum}`,
+          description: `"${item.charge_description}" is billed under Revenue Code 637 (self-administered drugs). Drugs that are "usually self-administered" are not covered under Part B when billed by a hospital outpatient department, creating compliance exposure.`,
+          severity: "high", category: "Self-Admin Drugs (Rev 637)",
+          financial_impact: (u637 ? num(u637.gross) : price) || undefined,
+          recommendation: "Confirm with clinical staff whether this drug is administered in the facility or dispensed for home use. If home use, remove it from Medicare/Medicaid billing. Verify a written self-administered drug policy exists.",
+        });
+      }
     }
 
     const code = (item.hcpcs_cpt_code || "").trim();
@@ -84,7 +90,9 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         title: `Retired HCPCS ${code} still active in CDM - ${procNum}`,
         description: `"${item.charge_description}" uses HCPCS ${code}, which is not present in the current-year CPT/HCPCS list (retired). Claims with deleted codes are denied.`,
         severity: "high", category: "Retired HCPCS",
-        financial_impact: price || undefined,
+        // Compliance flag (claims deny), not a recoverable dollar opportunity —
+        // the line gross is review scope, so no financial_impact.
+        financial_impact: undefined,
         recommendation: "Replace with the current valid code per the CMS transmittal / AMA CPT annual update, or deactivate the line.",
       });
     }
@@ -96,7 +104,8 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         title: `Bundled code (SI=B) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries OPPS Status Indicator B — Medicare bundles its payment into the related procedure's APC and never pays it separately on outpatient claims.`,
         severity: "medium", category: "Bundled (SI=B)",
-        financial_impact: price || undefined,
+        // Gross in scope, not opportunity (payment is bundled into the APC).
+        financial_impact: undefined,
         recommendation: "Confirm this line is not billed expecting separate payment. Keep for charge capture/cost tracking only; its reimbursement is included in the primary procedure's APC.",
       });
     }
@@ -108,7 +117,9 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         title: `Conditionally packaged (SI=${si}) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries SI=${si}: ${Q_PACKAGING[si]}. Separate payment depends on what else is billed on the same claim/date.`,
         severity: "medium", category: "Conditional Packaging (SI=Q1-Q4)",
-        financial_impact: price || undefined,
+        // Scope, not opportunity: payment depends on claim-level combinations and
+        // cannot be scored as a dollar figure without claim data.
+        financial_impact: undefined,
         recommendation: "Validate claim-level billing combinations so this line is paid when eligible and not double-counted when packaged.",
       });
     }
@@ -120,7 +131,9 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         title: `Pass-through / C-APC code (SI=${si}) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries SI=${si}: ${PASS_THROUGH_SI[si]}.`,
         severity: "high", category: "Pass-Through & New Technology",
-        financial_impact: price || undefined,
+        // Scope (gross of pass-through lines); the real dollar signal is the ASP
+        // markup delta flagged separately below (rule 15.ASP).
+        financial_impact: undefined,
         recommendation: si === "K1"
           ? "Confirm NOPAIN Act status and that the line is not bundled into a co-billed C-APC (J1) procedure. Verify dose-to-unit multiplier."
           : "Confirm separately-payable status is current (pass-throughs expire) and that pricing tracks ASP acquisition cost.",
@@ -173,16 +186,26 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         }
       }
     } else if (si === "A") {
-      // SI=A codes are paid under a non-OPPS fee schedule (MPFS/CLFS), not OPPS.
+      // SI=A lines are paid under a non-OPPS fee schedule (MPFS/CLFS/DMEPOS), not
+      // OPPS. The report inventories every SI=A line: the actionable subset is
+      // priced BELOW the fee schedule (a revenue gap); lines at/above are logged
+      // for review at $0. This mirrors the report's 203-line SI=A screen.
       const rate = Math.max(refNum(ref.mc_fee), refNum(ref.clfs));
-      if (rate > 0 && price > 0 && price < rate) {
+      if (price > 0) {
+        const belowFs = rate > 0 && price < rate;
         out.push({
           rule_id: "SIA", charge_item_id: item.id,
-          title: `SI=A code priced below non-OPPS rate - ${code} - ${procNum}`,
-          description: `"${item.charge_description}" (${code}, SI=A) is paid under a non-OPPS fee schedule (MPFS/CLFS), and is priced $${price.toFixed(2)} vs the fee schedule $${rate.toFixed(2)}.`,
-          severity: "medium", category: "SI=A Non-OPPS Fee Schedule",
-          financial_impact: rate - price,
-          recommendation: `Raise the charge to at least the non-OPPS fee-schedule amount ($${rate.toFixed(2)}).`,
+          title: belowFs
+            ? `SI=A code priced below non-OPPS rate - ${code} - ${procNum}`
+            : `SI=A non-OPPS fee-schedule line - ${code} - ${procNum}`,
+          description: belowFs
+            ? `"${item.charge_description}" (${code}, SI=A) is paid under a non-OPPS fee schedule (MPFS/CLFS), and is priced $${price.toFixed(2)} vs the fee schedule $${rate.toFixed(2)} — a revenue gap.`
+            : `"${item.charge_description}" (${code}, SI=A) is paid under a non-OPPS fee schedule (MPFS/CLFS/DMEPOS), not OPPS APC.${rate > 0 ? ` Priced $${price.toFixed(2)} vs fee schedule $${rate.toFixed(2)} (at/above schedule — commercial/self-pay pricing).` : " No MPFS/CLFS rate on file; confirm the correct fee-schedule basis."}`,
+          severity: belowFs ? "medium" : "info", category: "SI=A Non-OPPS Fee Schedule",
+          financial_impact: belowFs ? rate - price : undefined,
+          recommendation: belowFs
+            ? `Raise the charge to at least the non-OPPS fee-schedule amount ($${rate.toFixed(2)}).`
+            : `Confirm SI=A pricing basis; Medicare pays the fee schedule, the CDM price drives commercial/self-pay.`,
         });
       }
     } else {
@@ -279,7 +302,7 @@ export function runDeviceCrosswalkRules(items: any[]): RuleResult[] {
             title: `Device procedure ${pd.cpt} missing required C-code (${missing.join(pd.logic === "OR" ? "/" : "+")}) - ${procNum}`,
             description: `"${item.charge_description}" (${pd.cpt}, ${pd.family}) is a device-dependent procedure. CMS I/OCE hard-rejects 13X claims unless the device C-code(s) ${pd.ccodes.join(join)} appear on the claim. ${missing.join(", ")} ${missing.length > 1 ? "are" : "is"} not present in the CDM.`,
             severity: "critical", category: "Device-Procedure Crosswalk",
-            financial_impact: price || undefined,
+            financial_impact: undefined, // claim-rejection risk (scope), not a dollar opportunity
             recommendation: `Add device C-code(s) ${missing.join(", ")} (Rev Code 278) so procedure ${pd.cpt} passes I/OCE editing.`,
           });
         }
@@ -295,7 +318,7 @@ export function runDeviceCrosswalkRules(items: any[]): RuleResult[] {
         title: `Rev 278 device line missing C-code${cat ? ` (${cat.category})` : ""} - ${procNum}`,
         description: `"${item.charge_description}" is an implantable-device charge (Rev Code 278) with no HCPCS/C-code mapped. Unmapped device charges can't tie to the device-dependent procedure and risk I/OCE rejection and lost cost-report (CCR) capture.${ctip}`,
         severity: "high", category: "Device-Procedure Crosswalk",
-        financial_impact: price || undefined,
+        financial_impact: undefined, // claim-rejection risk (scope), not a dollar opportunity
         recommendation: `Map the appropriate HCPCS C-code to this device line${cat && cat.cptFamily.length ? `, and confirm a primary procedure CPT (${cat.cptFamily.join(", ")}) is co-billed` : ""}.`,
       });
     }
@@ -726,17 +749,24 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
         const pkgBase = pkgAmt * pkgScale.factor;
         const unitsPerVial = buBase > 0 ? pkgBase / buBase : 0;
         const correctPerUnit = unitsPerVial > 0 ? price / unitsPerVial : 0;
-        // Only a billing-unit error when the CDM is priced per vial (units/vial > 1).
-        // units/vial ~= 1 at high ratio is a pricing issue, handled by the markup rule.
-        if (ratio >= 10 && unitsPerVial > 1) {
-          const estOver = billed > 0 ? Math.max(grossRU - billed * correctPerUnit, 0) : undefined;
+        // Flag every line priced >=10x the ASP limit (matches the report's
+        // "Price >10x ASP" screen). Real overbilling dollars are booked only when
+        // the CDM is priced per vial (units/vial > 1); a units/vial ~= 1 line at
+        // high ratio is a per-unit markup question, so it flags at $0 impact.
+        if (ratio >= 10) {
+          const perVial = unitsPerVial > 1;
+          const estOver = perVial && billed > 0 ? Math.max(grossRU - billed * correctPerUnit, 0) : (perVial ? undefined : 0);
           out.push({
             rule_id: "PBU", charge_item_id: item.id,
-            title: `Pharmacy billing-unit price ${ratio.toFixed(0)}x ASP - ${code}`,
-            description: `"${item.charge_description}" is priced $${price.toFixed(2)} vs an ASP limit of $${asp.toFixed(2)} per ${ref.dosage} (${ratio.toFixed(0)}x). The package is ${pkgAmt} ${fm.pkg_unit}${converted ? ` (unit-converted)` : ""} = ~${Math.round(unitsPerVial)} billing units/vial, so the correct price is ≈ $${correctPerUnit.toFixed(4)}/unit. The CDM looks priced per vial while Medicare reimburses per billing unit.${billed > 0 ? ` R&U ${Math.round(billed).toLocaleString()} units → est. overbilling $${(estOver || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.` : " Import R&U to quantify overbilling."}`,
+            title: `Pharmacy price ${ratio.toFixed(0)}x ASP - ${code}`,
+            description: perVial
+              ? `"${item.charge_description}" is priced $${price.toFixed(2)} vs an ASP limit of $${asp.toFixed(2)} per ${ref.dosage} (${ratio.toFixed(0)}x). The package is ${pkgAmt} ${fm.pkg_unit}${converted ? ` (unit-converted)` : ""} = ~${Math.round(unitsPerVial)} billing units/vial, so the correct price is ≈ $${correctPerUnit.toFixed(4)}/unit. The CDM looks priced per vial while Medicare reimburses per billing unit.${billed > 0 ? ` R&U ${Math.round(billed).toLocaleString()} units → est. overbilling $${(estOver || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.` : " Import R&U to quantify overbilling."}`
+              : `"${item.charge_description}" is priced $${price.toFixed(2)} = ${ratio.toFixed(0)}x the ASP limit of $${asp.toFixed(2)} per ${ref.dosage}. It bills per single unit (no per-vial error), but the markup over ASP is high — confirm the price is defensible.`,
             severity: ratio > 50 ? "critical" : "high", category: "Pharmacy Billing Unit",
             financial_impact: estOver,
-            recommendation: `Reprice to the per-billing-unit basis (~$${correctPerUnit.toFixed(4)}/unit).`,
+            recommendation: perVial
+              ? `Reprice to the per-billing-unit basis (~$${correctPerUnit.toFixed(4)}/unit).`
+              : `Review the price of ${code} against the ASP acquisition cost + markup policy.`,
           });
         }
       }
