@@ -45,16 +45,6 @@ function num(v: any): number {
   return isNaN(n) ? 0 : n;
 }
 
-// Annual R&U units for a charge line (by charge master code), used to
-// volume-weight the repricing opportunity the way the impact analysis does.
-// Falls back to 1 (per-unit gap) when R&U is not loaded.
-function usageUnits(usageByCode: Map<string, any> | undefined, item: any): number {
-  if (!usageByCode) return 1;
-  const cc = String(item.procedure_number ?? "").replace(/\.0+$/, "").trim();
-  const u = usageByCode.get(cc);
-  const n = u ? parseFloat(u.units) : 0;
-  return n > 0 ? n : 1;
-}
 
 export function runReferenceRules(items: any[], usageByCode?: Map<string, any>): RuleResult[] {
   const out: RuleResult[] = [];
@@ -202,18 +192,33 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
       // carry an MPFS value. OPPS/APC-only lines are out of scope for this band,
       // so we key on mc_fee alone (not APC payment) to match his process.
       const rate = refNum(ref.mc_fee);
-      if (rate > 0 && price > 0) {
+      // Professional-component (modifier 26) and technical-component (TC) lines
+      // are priced against only a slice of the global fee schedule, so comparing
+      // their price to the GLOBAL MC Fee Schedule wrongly reads them as
+      // "underpriced." The reference has only the global fee, so exclude 26/TC
+      // lines from the markup band (matches the report, which prices these off the
+      // component fee and therefore does not flag them).
+      const cdmMods = [item.modifier_1, item.modifier_2, item.modifier_3]
+        .map((m) => (m || "").toString().trim().toUpperCase());
+      const isComponentLine = cdmMods.includes("26") || cdmMods.includes("TC");
+      if (rate > 0 && price > 0 && !isComponentLine) {
         const markup = price / rate;
-        if (markup < 2.5) {
+        // Repricing opportunity is volume-weighted (report methodology): a line
+        // that was never billed carries $0 opportunity, so only flag below-band
+        // lines that actually have R&U units. This keeps the total from being
+        // inflated by thousands of never-billed lines defaulting to 1 unit.
+        const cc = String(item.procedure_number ?? "").replace(/\.0+$/, "").trim();
+        const uRow = usageByCode?.get(cc);
+        const rawUnits = uRow ? (parseFloat(uRow.units) || 0) : 0;
+        if (markup < 2.5 && rawUnits > 0) {
           const floor = 2.5 * rate;
-          const units = usageUnits(usageByCode, item);
           out.push({
             rule_id: "U", charge_item_id: item.id,
             title: `Underpriced vs MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x (target 2.5-3.0x) - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x, so repricing to the 2.5x floor ($${floor.toFixed(2)})${units > 1 ? ` across ${units.toLocaleString()} R&U units` : ""} is a revenue opportunity.`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x, so repricing to the 2.5x floor ($${floor.toFixed(2)}) across ${rawUnits.toLocaleString()} R&U units is a revenue opportunity.`,
             severity: markup < 1.0 ? "high" : "medium",
             category: "Medicare Markup (Underpriced)",
-            financial_impact: (floor - price) * units,
+            financial_impact: (floor - price) * rawUnits,
             recommendation: `Reprice toward the 2.5x floor ($${floor.toFixed(2)}) per the facility's markup policy.`,
           });
         } else if (markup > 5.0) {
@@ -323,7 +328,13 @@ function runBilateralRules(items: any[]): RuleResult[] {
       .map((m) => (m || "").trim().toUpperCase())
       .filter(Boolean);
 
-  const lateral = (it: any) => { const m = modsOf(it); return m.includes("50") || m.includes("RT") || m.includes("LT"); };
+  // Laterality is often carried in the DESCRIPTION, not a modifier column (this
+  // CDM has few populated modifier fields), so detect both. Word-boundary tokens
+  // keep "RT"/"LT"/"RIGHT"/"LEFT"/"BILAT(ERAL)" from matching inside other words.
+  const isBilat = (it: any) => modsOf(it).includes("50") || /\bBILAT(ERAL)?\b/i.test(it.charge_description || "");
+  const isRT = (it: any) => modsOf(it).includes("RT") || /\b(RIGHT|RT)\b/i.test(it.charge_description || "");
+  const isLT = (it: any) => modsOf(it).includes("LT") || /\b(LEFT|LT)\b/i.test(it.charge_description || "");
+  const lateral = (it: any) => isBilat(it) || isRT(it) || isLT(it);
 
   for (const [code, group] of byCode) {
     const priced = group.filter((it) => num(it.gross_charge) > 0);
@@ -336,10 +347,10 @@ function runBilateralRules(items: any[]): RuleResult[] {
     const basePrice = num(baseItem.gross_charge);
     const expected = basePrice * 1.75;
 
-    // Section B: a mod-50 line exists but no RT/LT counterpart anywhere.
-    const fifty = group.filter((it) => modsOf(it).includes("50"));
-    const hasRT = group.some((it) => modsOf(it).includes("RT"));
-    const hasLT = group.some((it) => modsOf(it).includes("LT"));
+    // Section B: a bilateral line exists but no RT/LT counterpart anywhere.
+    const fifty = group.filter((it) => isBilat(it));
+    const hasRT = group.some((it) => isRT(it));
+    const hasLT = group.some((it) => isLT(it));
     if (fifty.length > 0 && !hasRT && !hasLT) {
       out.push({
         rule_id: "10.B", charge_item_id: fifty[0].id,
