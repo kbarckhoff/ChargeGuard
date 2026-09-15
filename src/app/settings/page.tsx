@@ -1,16 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/shared";
-import { FacilityTypeSetting } from "@/components/settings/FacilityTypeSetting";
 import { TeamManager } from "@/components/settings/TeamManager";
-import type { FacilityType } from "@/lib/rule-catalog";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("users").select("*, organizations(*)").eq("id", user!.id).single();
   const org = profile?.organizations as any;
-  const facilityType: FacilityType = (org?.settings?.facility_type as FacilityType) || "opps_outpatient";
 
   // Team data (service-role read, scoped to this org).
   const orgId = profile?.org_id as string | undefined;
@@ -68,8 +65,9 @@ export default async function SettingsPage() {
                 <span className="text-sm text-[#64748b]">Slug</span>
                 <span className="text-sm text-[#334155] font-mono">{org?.slug}</span>
               </div>
-              <div className="pt-3 border-t border-[#eef1f5]">
-                <FacilityTypeSetting initial={facilityType} />
+              <div className="flex items-center justify-between pt-3 border-t border-[#eef1f5]">
+                <span className="text-sm text-[#64748b]">Facility type</span>
+                <span className="text-sm font-medium text-[#0f172a]">Short-Term Acute Care</span>
               </div>
             </div>
           </div>

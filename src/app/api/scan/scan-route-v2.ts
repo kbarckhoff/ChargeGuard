@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
-import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules } from "@/lib/cdm-reference-rules";
+import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
-import { ruleIdsForFacility, type FacilityType } from "@/lib/rule-catalog";
 import { loadDeptMaps, isStructuralCategory } from "@/lib/departments";
 import { changeFieldForCategory, AWAITING_SYNC_STATUSES } from "@/lib/change-log";
 
@@ -733,20 +732,24 @@ export async function POST(request: Request) {
     let auditState: string | null = null;
     // Rules the client deactivated on the Intake page (empty = all active).
     const disabledRules = new Set<string>();
-    // Facility type scopes which rules run (inpatient/SNF drop OPPS-only rules).
-    let facilityType: FacilityType = "opps_outpatient";
+    // Review year drives effective-date awareness: a code not yet effective in the
+    // review year should not be flagged. Low-volume threshold drives RVU analysis.
+    let reviewYear: number = new Date().getFullYear();
+    let lowVolumeThreshold = 10;
     try {
       const { data: auditRow } = await supabaseAdmin.from("audits").select("*").eq("id", auditId).single();
       const raw = (auditRow?.state || auditRow?.hospital_state || auditRow?.state_code || "") as string;
       if (raw) auditState = String(raw).trim().toUpperCase().slice(0, 2);
       const dr = auditRow?.disabled_rules;
       if (Array.isArray(dr)) for (const r of dr) disabledRules.add(String(r));
-      const ft = String(auditRow?.facility_type || "").trim();
-      if (["opps_outpatient", "short_term_acute", "inpatient", "snf"].includes(ft)) facilityType = ft as FacilityType;
+      const md = (auditRow?.metadata || {}) as any;
+      const periodYear = String(md.review_period || "").match(/\b(20\d{2})\b/);
+      if (periodYear) reviewYear = parseInt(periodYear[1], 10);
+      else if (auditRow?.start_date) reviewYear = new Date(auditRow.start_date).getFullYear();
+      const lvt = Number(md.low_volume_threshold);
+      if (Number.isFinite(lvt) && lvt >= 0) lowVolumeThreshold = lvt;
     } catch { /* national fallback */ }
-    // Only the non-OPPS settings drop rules; outpatient/acute run the full set.
-    const facilityAllowed = (facilityType === "inpatient" || facilityType === "snf")
-      ? ruleIdsForFacility(facilityType) : null;
+    // Short-term acute care runs the full rule set (no facility-based scoping).
 
     // Load the live CMS reference set from the DB (falls back to bundled JSON),
     // so the automatic quarterly refresh takes effect for every scan.
@@ -762,14 +765,35 @@ export async function POST(request: Request) {
       ...runMultiplierRules(allItems),
       ...runFormularyRules(allItems, formularyByCode, usageByCode),
       ...runModifierRules(allItems, usageByCode),
+      ...runInternalPricingRules(allItems),
+      ...runRvuRules(allItems, usageByCode, lowVolumeThreshold),
       ...runBenchmarkRules(allItems, auditState),
       ...runClaimsRules(allItems, claimLines),
       ...runPeerCompetitorRules(allItems, peerRows),
     ];
-    // Drop findings the client deactivated, and any rule not in scope for the
-    // facility type (inpatient/SNF exclude OPPS-only rules).
+    // Effective-date awareness: skip findings for CDM lines whose code/line is not
+    // yet effective in the review year (e.g. a 2026-effective code in a 2025 review).
+    // The effective date, when present, comes through the CDM import in raw_data.
+    const effYearOf = (item: any): number | null => {
+      const rd = (item?.raw_data || {}) as Record<string, any>;
+      for (const k of Object.keys(rd)) {
+        if (/eff|effective|start/i.test(k)) {
+          const m = String(rd[k] ?? "").match(/\b(20\d{2})\b/);
+          if (m) return parseInt(m[1], 10);
+        }
+      }
+      return null;
+    };
+    const notYetEffective = new Set<string>();
+    for (const it of allItems) {
+      const y = effYearOf(it);
+      if (y != null && y > reviewYear) notYetEffective.add(it.id);
+    }
+
+    // Drop findings the client deactivated and any line not yet effective this year.
     const ruleResults = ruleResultsAll.filter(
-      (r) => !disabledRules.has(r.rule_id) && (!facilityAllowed || facilityAllowed.has(r.rule_id))
+      (r) => !disabledRules.has(r.rule_id)
+        && !(r.charge_item_id && notYetEffective.has(r.charge_item_id))
     );
 
     // Get phases for mapping
@@ -795,6 +819,8 @@ export async function POST(request: Request) {
         "C25": 2, "C59": 2, "CNIC": 2, "CUNIT": 2,
         // Named-competitor peer pricing
         "PC": 6,
+        // RVU / low-volume analysis
+        "RVU": 6,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;
@@ -837,12 +863,33 @@ export async function POST(request: Request) {
     }
     const { data: exRows } = await supabaseAdmin
       .from("finding_exceptions")
-      .select("id, line_key, category, reason, snapshot_charge")
-      .eq("org_id", userData.org_id)
-      .eq("status", "active");
-    const exByKey: Record<string, { id: string; reason: string | null; snapshot_charge: number | null }> = {};
-    for (const e of exRows || []) exByKey[`${(e as any).line_key}||${(e as any).category}`] = e as any;
+      .select("id, line_key, category, reason, snapshot_charge, disposition, status, updated_at")
+      .eq("org_id", userData.org_id);
+    // Active exceptions (Denied / N/A) are carried forward; the disposition map
+    // (any status, most recent) drives tiering of every finding on this run.
+    const exByKey: Record<string, { id: string; reason: string | null; snapshot_charge: number | null; disposition: string | null }> = {};
+    const dispByKey: Record<string, { disposition: string | null; updated_at: string | null }> = {};
+    for (const e of exRows || []) {
+      const key = `${(e as any).line_key}||${(e as any).category}`;
+      if ((e as any).status === "active") exByKey[key] = e as any;
+      const prev = dispByKey[key];
+      const ts = (e as any).updated_at || null;
+      if (!prev || (ts && (!prev.updated_at || ts > prev.updated_at))) {
+        dispByKey[key] = { disposition: (e as any).disposition || null, updated_at: ts };
+      }
+    }
     const seenExceptionIds = new Set<string>();
+
+    // Tier: 1 new · 2 previously accepted · 3 previously denied · 4 previously N/A.
+    const tierFor = (r: RuleResult): number => {
+      const lineKey = (r.charge_item_id ? (procByItem[r.charge_item_id] || hcpcsByItem[r.charge_item_id]) : "") || "";
+      if (!lineKey || !r.category) return 1;
+      const d = dispByKey[`${lineKey}||${r.category}`]?.disposition;
+      if (d === "accepted") return 2;
+      if (d === "rejected") return 3;
+      if (d === "na") return 4;
+      return 1;
+    };
 
     // Lagging EHR: a finding re-found on this fresh upload that matches a change
     // already accepted + exported in a prior run (and not yet in the EHR) is
@@ -869,20 +916,22 @@ export async function POST(request: Request) {
       const ex = exByKey[`${lineKey}||${r.category}`];
       if (!ex) return null;
       seenExceptionIds.add(ex.id);
+      const disp = ex.disposition === "na" ? "na" : "rejected";
       const nowCharge = r.charge_item_id ? chargeByItem[r.charge_item_id] : null;
-      const changed = ex.snapshot_charge != null && nowCharge != null &&
+      const changed = disp === "rejected" && ex.snapshot_charge != null && nowCharge != null &&
         Math.abs(nowCharge - ex.snapshot_charge) / Math.max(Math.abs(ex.snapshot_charge), 1) > 0.01;
       const reason = ex.reason ? `"${ex.reason}"` : "no reason recorded";
       if (changed) {
         return {
           status: "open", is_carried: false,
           note: null as string | null,
-          descAppend: ` [Previously rejected (${reason}), but the charge changed from $${Number(ex.snapshot_charge).toFixed(2)} to $${Number(nowCharge).toFixed(2)} — please re-review.]`,
+          descAppend: ` [Previously denied (${reason}), but the charge changed from $${Number(ex.snapshot_charge).toFixed(2)} to $${Number(nowCharge).toFixed(2)} — please re-review.]`,
         };
       }
+      const label = disp === "na" ? "N/A" : "denied";
       return {
-        status: "rejected", is_carried: true,
-        note: ex.reason ? `Carried from a prior review — ${ex.reason}` : "Carried from a prior review (rejected).",
+        status: disp, is_carried: true,
+        note: ex.reason ? `Carried from a prior review — ${ex.reason}` : `Carried from a prior review (${label}).`,
         descAppend: "",
       };
     };
@@ -908,6 +957,7 @@ export async function POST(request: Request) {
         owner_department_id: deptFor(r.category, r.charge_item_id),
         is_carried: carry?.is_carried || false,
         ehr_lagging: !!lagging,
+        tier: tierFor(r),
         resolution_note: lagging ? lagging.note : (carry?.note || null),
         created_by: user.id,
       };

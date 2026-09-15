@@ -145,22 +145,30 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
               <button onClick={() => setRows(null)} className="p-2 rounded-lg hover:bg-[#f6f7f9] text-[#9aa2af]"><X size={18} /></button>
             </div>
             <div className="p-6">
-              <p className="text-xs text-[#6b7280] mb-4">We auto-matched your file's columns. Review each field and adjust if needed. <span className="text-[#b45309] font-medium">* required</span></p>
-              <div className="space-y-2.5">
-                {TARGETS.map((t) => (
-                  <div key={t.key} className="flex items-center gap-3">
-                    <div className="w-44 text-[13px] font-medium text-[#374151] flex items-center gap-1.5">
-                      {mapping[t.key] ? <Check size={14} className="text-[#12b76a]" /> : <span className="w-3.5" />}
-                      {t.label}{t.req && <span className="text-[#b45309]">*</span>}
-                    </div>
-                    <span className="text-[#9aa2af] text-xs">←</span>
-                    <select value={mapping[t.key] || ""} onChange={(e) => setMapping({ ...mapping, [t.key]: e.target.value })}
-                      className={`flex-1 h-9 border rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#2563eb] ${t.req && !mapping[t.key] ? "border-[#f4b6b6] bg-[#fdeceb]" : "border-[#e2e6ec]"}`}>
-                      <option value="">— Not mapped —</option>
-                      {headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                ))}
+              <p className="text-xs text-[#6b7280] mb-4">We auto-matched your file&apos;s columns. Review each field and adjust if needed. <span className="text-[#b45309] font-medium">* required</span></p>
+              <div className="rounded-xl border border-[#edf0f4] overflow-hidden">
+                <div className="grid grid-cols-[180px_1fr_150px] items-center gap-3 px-4 py-2 bg-[#f8fafc] border-b border-[#edf0f4] text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                  <div>ChargeGuard field</div><div>Your column</div><div>Sample value</div>
+                </div>
+                <div className="divide-y divide-[#f1f5f9]">
+                  {TARGETS.map((t) => {
+                    const sample = mapping[t.key] && rows?.[0] ? String((rows[0] as any)[mapping[t.key]] ?? "") : "";
+                    return (
+                      <div key={t.key} className="grid grid-cols-[180px_1fr_150px] items-center gap-3 px-4 py-2.5">
+                        <div className="text-[13px] font-medium text-[#374151] flex items-center gap-1.5">
+                          {mapping[t.key] ? <Check size={14} className="text-[#12b76a] shrink-0" /> : <span className="w-3.5 shrink-0" />}
+                          <span>{t.label}{t.req && <span className="text-[#b45309]">*</span>}</span>
+                        </div>
+                        <select value={mapping[t.key] || ""} onChange={(e) => setMapping({ ...mapping, [t.key]: e.target.value })}
+                          className={`w-full h-9 border rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#2563eb] ${t.req && !mapping[t.key] ? "border-[#f4b6b6] bg-[#fdeceb]" : "border-[#e2e6ec]"}`}>
+                          <option value="">— Not mapped —</option>
+                          {headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                        <div className="text-[12px] text-[#94a3b8] truncate" title={sample}>{sample || "—"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#edf0f4] sticky bottom-0 bg-white rounded-b-2xl">

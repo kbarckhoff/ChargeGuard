@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   ClipboardList, Upload, FileSearch, Users, BarChart3, Check,
-  FileSpreadsheet, Database, Pill, ReceiptText, Download, DollarSign, FileText,
+  FileSpreadsheet, Database, Pill, Download, DollarSign, FileText,
   AlertTriangle, ListChecks, Zap, Lock, Plus, X, Loader2, Trash2, LogOut, Building2, ArrowRight,
 } from "lucide-react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -48,14 +48,27 @@ async function streamCsvFile(file: File, opts: StreamOpts, onProgress: (codes: n
 import { CDMImport } from "@/components/cdm/CDMImport";
 import { RUImport } from "@/components/cdm/RUImport";
 import { FormularyImport } from "@/components/cdm/FormularyImport";
-import { ClaimsImport } from "@/components/cdm/ClaimsImport";
 import { ScanButton } from "@/components/audit/ScanButton";
 import { KPICard, SeverityBar, formatImpact } from "@/components/ui/shared";
 import { RuleSettings } from "@/components/assessment/RuleSettings";
-import { FACILITY_TYPES, type FacilityType } from "@/lib/rule-catalog";
+import { type FacilityType } from "@/lib/rule-catalog";
 import { intakeFilesForFacility, type IntakeFile } from "@/lib/intake-files";
 
 const AVCOLORS = ["#3b82f6", "#12b76a", "#7c3aed", "#f59e0b", "#ef4444"];
+
+// Review period options (quarter or half). A single "Review Date" replaces the
+// old start/end dates; the trailing year drives effective-date filtering.
+const REVIEW_PERIODS: string[] = (() => {
+  const now = new Date();
+  const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+  const out: string[] = [];
+  for (const y of years) {
+    for (const q of ["Q1", "Q2", "Q3", "Q4"]) out.push(`${q} ${y}`);
+    for (const h of ["H1", "H2"]) out.push(`${h} ${y}`);
+    out.push(`FY ${y}`);
+  }
+  return out;
+})();
 
 type Stats = {
   critical: number; high: number; medium: number; low: number;
@@ -73,7 +86,7 @@ const STEPS = [
 ];
 
 export function AssessmentFlow({
-  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, facilityType,
+  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, reviewPeriod, lowVolume,
 }: {
   auditId: string;
   hospitalName: string;
@@ -86,7 +99,8 @@ export function AssessmentFlow({
   disabledRules?: string[];
   status?: string;
   intakeLocked?: boolean;
-  facilityType?: FacilityType;
+  reviewPeriod?: string;
+  lowVolume?: number | null;
 }) {
   // Once the intake steps (Intake -> Imports -> Review Imports) are finished, the
   // review is locked: profile, files, competitors, and rules become read-only.
@@ -165,9 +179,9 @@ export function AssessmentFlow({
                 <button onClick={reopenIntake} disabled={lockBusy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#2563eb] bg-white border border-[#c7d2fe] hover:bg-[#eef2ff] disabled:opacity-50">{lockBusy ? <Loader2 size={13} className="animate-spin" /> : null} Reopen to edit</button>
               </div>
             )}
-            {step === 0 && <Intake comps={comps} setComps={setComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialFacilityType={facilityType} onNext={() => setStep(nextOf(0))} />}
-            {step === 1 && <Imports auditId={auditId} chargeItems={chargeItems} counts={counts} locked={locked} facilityType={facilityType || "opps_outpatient"} onBack={() => setStep(prevOf(1))} onNext={() => setStep(nextOf(1))} />}
-            {step === 2 && <Review auditId={auditId} counts={counts} chargeItems={chargeItems} isOwner={isOwner} facilityType={facilityType || "opps_outpatient"} onBack={() => setStep(prevOf(2))} onNext={() => setStep(nextOf(2))} />}
+            {step === 0 && <Intake comps={comps} setComps={setComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} onNext={() => setStep(nextOf(0))} />}
+            {step === 1 && <Imports auditId={auditId} chargeItems={chargeItems} counts={counts} locked={locked} onBack={() => setStep(prevOf(1))} onNext={() => setStep(nextOf(1))} />}
+            {step === 2 && <Review auditId={auditId} counts={counts} chargeItems={chargeItems} isOwner={isOwner} onBack={() => setStep(prevOf(2))} onNext={() => setStep(nextOf(2))} />}
             {step === 3 && isOwner && <Peer comps={comps} setComps={setComps} auditId={auditId} peerCounts={pc} onBack={() => setStep(prevOf(3))} />}
           </div>
         </div>
@@ -205,8 +219,26 @@ function chip(text: string, tone: string) {
 }
 
 /* ---------- STEP 1: INTAKE ---------- */
-function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialFacilityType }: any) {
-  const facilityType: FacilityType = initialFacilityType || "opps_outpatient";
+function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume }: any) {
+  const facilityType: FacilityType = "short_term_acute";
+  const [reviewPeriod, setReviewPeriod] = useState<string>(initialReviewPeriod || "");
+  const [lowVolume, setLowVolume] = useState<string>(initialLowVolume != null ? String(initialLowVolume) : "10");
+  const [savingPeriod, setSavingPeriod] = useState(false);
+  const savePeriod = async (v: string) => {
+    setReviewPeriod(v); setSavingPeriod(true);
+    try {
+      await fetch("/api/audits/period", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auditId, reviewPeriod: v }),
+      });
+    } finally { setSavingPeriod(false); }
+  };
+  const saveThreshold = async (v: string) => {
+    await fetch("/api/audits/period", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ auditId, lowVolumeThreshold: v === "" ? null : Number(v) }),
+    });
+  };
   const setComp = (idx: number, key: string, val: string) =>
     setComps(comps.map((c: any, j: number) => (j === idx ? { ...c, [key]: val } : c)));
   const isLocked = (name: string) => ((peerCounts || {})[name] || 0) > 0;
@@ -218,20 +250,28 @@ function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner,
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Review name</label><input className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} defaultValue={auditName} disabled={locked} /></div>
           <div><label className={labelCls}>Entity name</label><input className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} defaultValue={hospitalName} disabled={locked} /></div>
-          <div><label className={labelCls}>Review start date</label><input type="date" className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} disabled={locked} /></div>
-          <div><label className={labelCls}>Review end date</label><input type="date" className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} disabled={locked} /></div>
+          <div>
+            <label className={labelCls}>Review date {savingPeriod && <span className="text-[#94a3b8]">· saving…</span>}</label>
+            <select className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={reviewPeriod} disabled={locked} onChange={(e) => savePeriod(e.target.value)}>
+              <option value="">Select review period…</option>
+              {REVIEW_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <p className="text-xs text-[#9aa2af] mt-1.5">Sets the review year. Codes not yet effective in this period are skipped.</p>
+          </div>
+          <div>
+            <label className={labelCls}>Low-volume threshold (RVU analysis)</label>
+            <input type="number" min={0} step={1} className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={lowVolume} disabled={locked}
+              onChange={(e) => setLowVolume(e.target.value)} onBlur={(e) => saveThreshold(e.target.value)} placeholder="10" />
+            <p className="text-xs text-[#9aa2af] mt-1.5">Annual units at or below this count flag a CPT/HCPCS line as low/no volume.</p>
+          </div>
         </div>
-      </div>
-      <div className={CARD}>
-        <h3 className="text-sm font-bold text-[#111827] mb-1">Facility type</h3>
-        <p className="text-xs text-[#9aa2af] mb-3">Set once for this entity in Settings and applied to every review. It determines which checks below apply.</p>
-        <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-[#e2e6ec] bg-[#f8fafc] text-[13px] text-[#334155]">
-          <Building2 size={14} className="text-[#94a3b8]" /> {FACILITY_TYPES.find((f) => f.value === facilityType)?.label}
-        </div>
-        <p className="text-xs text-[#9aa2af] mt-2">{FACILITY_TYPES.find((f) => f.value === facilityType)?.note} <a href="/settings" className="text-[#2563eb] hover:underline">Change in Settings</a></p>
       </div>
       <div className={CARD}>
         <h3 className="text-sm font-bold text-[#111827] mb-4">Competitors for peer analysis (up to 5)</h3>
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-[12px] text-[#92400e]">
+          <Building2 size={14} className="mt-0.5 shrink-0 text-[#d97706]" />
+          <span>Each competitor must have publicly available price-transparency data (a machine-readable file or shoppable-services list). Hospitals without published prices can't be benchmarked.</span>
+        </div>
         {comps.map((c: any, i: number) => {
           const lk = isLocked(c.n) || locked;
           return (
@@ -257,19 +297,40 @@ function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner,
 }
 
 /* ---------- STEP 2: IMPORTS ---------- */
-function Imports({ auditId, chargeItems, counts, locked, facilityType, onBack, onNext }: any) {
-  const files: IntakeFile[] = intakeFilesForFacility(facilityType || "opps_outpatient");
+function Imports({ auditId, chargeItems, counts, locked, onBack, onNext }: any) {
+  const files: IntakeFile[] = intakeFilesForFacility();
   const countOf = (f: IntakeFile) => f.countKey === "cdm" ? chargeItems : f.countKey ? (counts[f.countKey] || 0) : 0;
-  const iconOf = (key: string) => key === "cdm" ? FileSpreadsheet : key === "ru" ? Database : key === "formulary" ? Pill : key === "claims" ? ReceiptText : key === "mds" ? ClipboardList : FileText;
+  const iconOf = (key: string) => key === "cdm" ? FileSpreadsheet : key === "ru" ? Database : key === "formulary" ? Pill : FileText;
   const control = (f: IntakeFile, uploaded: boolean) => {
     switch (f.handler) {
       case "cdm": return <CDMImport auditId={auditId} label={uploaded ? "Replace file" : "Upload CDM"} />;
       case "ru": return <RUImport auditId={auditId} label={uploaded ? "Replace file" : "Import R&U"} />;
       case "formulary": return <FormularyImport auditId={auditId} label={uploaded ? "Replace file" : "Import Formulary"} />;
-      case "claims": return <ClaimsImport auditId={auditId} label={uploaded ? "Replace file" : "Import claims"} />;
       default: return <div className="text-[12px] text-[#9aa2af]">No automated import yet — provide this file to your reviewer.</div>;
     }
   };
+  const SpecDetails = ({ f }: { f: IntakeFile }) => (
+    <details className="group mt-1">
+      <summary className="cursor-pointer list-none inline-flex items-center gap-1 text-[12px] font-medium text-[#2563eb] hover:underline">
+        <FileText size={12} /> View file spec
+      </summary>
+      <div className="mt-2 rounded-lg border border-[#edf0f4] bg-[#fafbfc] p-3">
+        <table className="w-full text-[11px]">
+          <thead><tr className="text-left text-[#94a3b8]"><th className="pb-1 font-semibold">Column</th><th className="pb-1 font-semibold">Req</th><th className="pb-1 font-semibold">Notes</th></tr></thead>
+          <tbody>
+            {f.spec.map((c) => (
+              <tr key={c.name} className="align-top border-t border-[#edf0f4]">
+                <td className="py-1 pr-2 font-medium text-[#334155] whitespace-nowrap">{c.name}</td>
+                <td className="py-1 pr-2 text-[#64748b]">{c.required ? "Yes" : "—"}</td>
+                <td className="py-1 text-[#64748b]">{c.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <a href={`/api/import-spec?type=${f.key}`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:underline"><Download size={11} /> Download blank template (CSV)</a>
+      </div>
+    </details>
+  );
 
   const Tile = ({ f }: { f: IntakeFile }) => {
     const Icon = iconOf(f.key);
@@ -284,7 +345,7 @@ function Imports({ auditId, chargeItems, counts, locked, facilityType, onBack, o
             ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#e7f7ef] text-[#067647]"><Check size={12} /> Uploaded</span>
             : <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full ${f.required ? "bg-[#fef4e2] text-[#b45309]" : "bg-[#eef1f5] text-[#6b7280]"}`}>{f.required ? "Required" : "Optional"}</span>}
         </div>
-        <div><div className="font-bold text-sm text-[#111827]">{f.title}</div><div className="text-xs text-[#6b7280]">{f.desc}</div><div className="text-[11px] text-[#94a3b8] mt-1">Accepts: {f.accepts}</div></div>
+        <div><div className="font-bold text-sm text-[#111827]">{f.title}</div><div className="text-xs text-[#6b7280]">{f.desc}</div><div className="text-[11px] text-[#94a3b8] mt-1">Accepts: {f.accepts}</div><SpecDetails f={f} /></div>
         {handled && uploaded
           ? <div className="flex items-center justify-between text-[13px]">
               <span className="text-[#374151]"><span className="font-bold text-[#111827]">{count.toLocaleString()}</span> rows imported</span>
@@ -300,12 +361,11 @@ function Imports({ auditId, chargeItems, counts, locked, facilityType, onBack, o
 
   const handledFiles = files.filter((f) => f.handler != null);
   const done = handledFiles.filter((f) => countOf(f) > 0).length;
-  const facilityLabel = FACILITY_TYPES.find((x) => x.value === (facilityType || "opps_outpatient"))?.label;
   return (
     <>
-      <PageHead title="Imports" desc="Upload the client's files. The files below are the ones this facility type needs; already-uploaded files show their row counts." />
+      <PageHead title="Imports" desc="Upload the client's files. Each tile shows its column spec and a blank template; already-uploaded files show their row counts." />
       <div className="rounded-xl px-4 py-3 mb-4 bg-[#f6f7f9] border border-[#edf0f4] text-[13px] text-[#374151] flex items-center gap-2">
-        <Check size={15} className="text-[#12b76a]" /> {done} of {handledFiles.length} importable files uploaded · file list tailored to {facilityLabel}.
+        <Check size={15} className="text-[#12b76a]" /> {done} of {handledFiles.length} importable files uploaded.
       </div>
       <div className="grid grid-cols-2 gap-4 mb-4">
         {files.map((f) => <Tile key={f.key} f={f} />)}
@@ -316,9 +376,9 @@ function Imports({ auditId, chargeItems, counts, locked, facilityType, onBack, o
 }
 
 /* ---------- STEP 3: REVIEW IMPORTS ---------- */
-function Review({ auditId, counts, chargeItems, isOwner, facilityType, onBack, onNext }: any) {
+function Review({ auditId, counts, chargeItems, isOwner, onBack, onNext }: any) {
   const countOf = (f: IntakeFile) => f.countKey === "cdm" ? (chargeItems || 0) : f.countKey ? (counts[f.countKey] || 0) : 0;
-  const files = intakeFilesForFacility(facilityType || "opps_outpatient").map((f) => ({
+  const files = intakeFilesForFacility().map((f) => ({
     key: f.key, name: f.title, type: f.handler ? f.handler.toUpperCase() : "Manual", total: countOf(f), optional: !f.required, handled: f.handler != null,
   }));
   const [sel, setSel] = useState<string>(files.find((f) => f.total > 0)?.key || "cdm");

@@ -88,7 +88,8 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
       disabledRules={Array.isArray(audit.disabled_rules) ? audit.disabled_rules : []}
       status={audit.status || "in_progress"}
       intakeLocked={!!(audit.metadata as any)?.intake_locked}
-      facilityType={audit.facility_type || "opps_outpatient"}
+      reviewPeriod={(audit.metadata as any)?.review_period || ""}
+      lowVolume={(audit.metadata as any)?.low_volume_threshold ?? null}
     />
   );
 }

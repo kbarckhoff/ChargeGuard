@@ -514,8 +514,82 @@ export function runModifierRules(items: any[], usageByCode: Map<string, any>): R
       title: `CDM line missing modifier ${billedMod} billed in R&U - ${cc}`,
       description: `"${item.charge_description}" was billed with modifier ${billedMod} in the utilization data, but the CDM line has no modifier. The CDM should carry the modifier so claims build and price correctly.`,
       severity: "high", category: "Missing Modifier",
-      financial_impact: u ? num(u.gross) : undefined,
+      // Compliance / build-correctness flag, not a pricing gap. Do NOT assign a
+      // dollar impact: a missing modifier does not by itself over- or under-bill,
+      // and counting full R&U gross per line massively overstates total exposure.
+      financial_impact: undefined,
       recommendation: `Add modifier ${billedMod} to the CDM line, or confirm it is applied downstream in the billing system.`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Internal pricing consistency: the same CPT/HCPCS code priced differently across
+ * CDM lines within the hospital. Broader than rule 3.2 (which is revenue-code
+ * scoped and only fires above a 3x spread) — this looks at the code across the
+ * whole CDM and flags any material spread. One finding per code.
+ */
+export function runInternalPricingRules(items: any[]): RuleResult[] {
+  const out: RuleResult[] = [];
+  const byCode = new Map<string, any[]>();
+  for (const item of items) {
+    const code = normalizeHcpcs(item.hcpcs_cpt_code);
+    if (!code) continue;
+    (byCode.get(code) || byCode.set(code, []).get(code)!).push(item);
+  }
+  for (const [code, group] of byCode) {
+    if (group.length < 2) continue;
+    const priced = group
+      .map((g) => ({ item: g, price: num(g.gross_charge) || 0 }))
+      .filter((g) => g.price > 0);
+    if (priced.length < 2) continue;
+    const prices = priced.map((p) => p.price);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    // Ignore trivial rounding differences; flag a real spread (>5%).
+    if (minP <= 0 || maxP / minP - 1 <= 0.05) continue;
+    const distinct = new Set(prices.map((p) => p.toFixed(2))).size;
+    const top = priced.reduce((a, b) => (b.price > a.price ? b : a));
+    out.push({
+      rule_id: "3.2b", charge_item_id: top.item.id,
+      title: `Same code ${code} priced ${distinct} different ways ($${minP.toFixed(2)}–$${maxP.toFixed(2)})`,
+      description: `CPT/HCPCS ${code} appears on ${group.length} CDM lines at ${distinct} distinct prices, from $${minP.toFixed(2)} to $${maxP.toFixed(2)} (${((maxP / minP - 1) * 100).toFixed(0)}% spread). The same code should carry a consistent price across the chargemaster unless the units differ.`,
+      severity: "medium", category: "Pricing Consistency",
+      financial_impact: maxP - minP,
+      recommendation: `Align the price for ${code} across all lines, or confirm the differences reflect legitimate unit/setting variation.`,
+    });
+  }
+  return out;
+}
+
+/**
+ * RVU / volume analysis: CPT/HCPCS codes with low or no billed volume in the R&U.
+ * These are candidates to retire or review — a maintained CDM line that is never
+ * (or rarely) billed adds risk without revenue. Threshold is set at intake.
+ */
+export function runRvuRules(items: any[], usageByCode: Map<string, any>, lowVolumeThreshold: number): RuleResult[] {
+  const out: RuleResult[] = [];
+  const thr = Number.isFinite(lowVolumeThreshold) && lowVolumeThreshold >= 0 ? lowVolumeThreshold : 10;
+  for (const item of items) {
+    const code = (item.hcpcs_cpt_code || "").toString().trim();
+    if (!code) continue; // volume analysis is code-level
+    const cc = String(item.procedure_number ?? "").trim();
+    const u = cc ? usageByCode.get(cc) : undefined;
+    const units = u ? (num(u.units) ?? 0) : 0;
+    if (units > thr) continue; // adequately used
+    const noVolume = units <= 0;
+    out.push({
+      rule_id: noVolume ? "RVU.0" : "RVU.low", charge_item_id: item.id,
+      title: `${noVolume ? "No" : "Low"} volume for ${code} (${units} unit${units === 1 ? "" : "s"}) - ${cc || item.id}`,
+      description: `"${item.charge_description}" (${code}) was billed ${units} unit${units === 1 ? "" : "s"} in the utilization period${noVolume ? ", so it is carried in the CDM but never billed" : `, below the low-volume threshold of ${thr}`}. Low/no-volume lines are candidates to retire, consolidate, or confirm they are still needed.`,
+      severity: noVolume ? "low" : "info", category: "RVU / Low Volume",
+      // Volume/cleanup flag, not a pricing gap — no dollar impact so it does not
+      // inflate the estimated-opportunity total.
+      financial_impact: undefined,
+      recommendation: noVolume
+        ? `Confirm ${code} is still offered. If not, retire the line to reduce CDM maintenance risk.`
+        : `Review whether ${code} should stay active given its low volume (${units} vs threshold ${thr}).`,
     });
   }
   return out;

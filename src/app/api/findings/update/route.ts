@@ -23,7 +23,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    const validStatuses = ["open", "in_review", "accepted", "rejected", "resolved"];
+    // Open · Under Review (in_review) · Accepted · Denied (rejected) · N/A (na).
+    // "resolved" is kept for backward compatibility with older rows/flows.
+    const validStatuses = ["open", "in_review", "accepted", "rejected", "na", "resolved"];
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
@@ -99,33 +101,43 @@ export async function POST(request: Request) {
               status: "pending", source_finding_id: findingId, requested_by: user.id, approver: user.id,
             });
           }
-        } else if (status === "open" || status === "in_review" || status === "rejected") {
+        } else if (status === "open" || status === "in_review" || status === "rejected" || status === "na") {
           // Un-accepting voids a change that hasn't been exported yet.
           await supabaseAdmin.from("cdm_change_log")
             .update({ status: "void", updated_at: new Date().toISOString() })
             .eq("source_finding_id", findingId).eq("status", "pending");
         }
 
-        // ── Carry-forward exceptions: a rejection becomes a standing exception;
-        // reopening/accepting clears it.
-        if (status === "rejected") {
-          await supabaseAdmin.from("finding_exceptions").upsert({
-            org_id: (f as any).org_id,
-            line_key: lineKey,
-            category,
-            procedure_number: ci.procedure_number || null,
-            hcpcs: ci.hcpcs_cpt_code || null,
-            reason: typeof note === "string" ? note : null,
-            status: "active",
-            snapshot_charge: ci.gross_charge ?? null,
-            snapshot_impact: (f as any).financial_impact ?? null,
-            first_rejected_audit_id: (f as any).audit_id,
-            last_seen_audit_id: (f as any).audit_id,
-            rejected_by: user.id,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "org_id,line_key,category" });
-        } else if (status === "open" || status === "accepted" || status === "resolved") {
-          // No longer a standing exception — stop carrying it forward.
+        // ── Disposition memory (drives carry-forward + finding tiers on the next
+        // scan). Denied (rejected) and N/A are standing exceptions carried forward;
+        // Accepted is remembered (for tier 2) but not carried; reopening clears it.
+        const baseEx = {
+          org_id: (f as any).org_id,
+          line_key: lineKey,
+          category,
+          procedure_number: ci.procedure_number || null,
+          hcpcs: ci.hcpcs_cpt_code || null,
+          reason: typeof note === "string" ? note : null,
+          snapshot_charge: ci.gross_charge ?? null,
+          snapshot_impact: (f as any).financial_impact ?? null,
+          first_rejected_audit_id: (f as any).audit_id,
+          last_seen_audit_id: (f as any).audit_id,
+          rejected_by: user.id,
+          updated_at: new Date().toISOString(),
+        };
+        if (status === "rejected" || status === "na") {
+          await supabaseAdmin.from("finding_exceptions").upsert(
+            { ...baseEx, disposition: status === "na" ? "na" : "rejected", status: "active" },
+            { onConflict: "org_id,line_key,category" }
+          );
+        } else if (status === "accepted" || status === "resolved") {
+          // Remembered for tier 2, but not a standing (carried) exception.
+          await supabaseAdmin.from("finding_exceptions").upsert(
+            { ...baseEx, disposition: "accepted", status: "cleared" },
+            { onConflict: "org_id,line_key,category" }
+          );
+        } else if (status === "open" || status === "in_review") {
+          // Back in the queue — stop carrying it forward (keep disposition history).
           await supabaseAdmin.from("finding_exceptions")
             .update({ status: "cleared", updated_at: new Date().toISOString() })
             .eq("org_id", (f as any).org_id).eq("line_key", lineKey).eq("category", category);

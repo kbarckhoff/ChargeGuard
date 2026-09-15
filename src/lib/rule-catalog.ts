@@ -13,17 +13,19 @@
 // outpatient settings. The Intake facility-type selector filters the list, and
 // the scan only runs the rules for the selected facility type.
 
-export type FacilityType = "opps_outpatient" | "short_term_acute" | "inpatient" | "snf";
+// ChargeGuard currently supports short-term acute care only. The type is kept as
+// a single-member union so existing call sites compile unchanged, but there is no
+// facility selection in the product anymore.
+export type FacilityType = "short_term_acute";
+
+export const DEFAULT_FACILITY: FacilityType = "short_term_acute";
 
 export const FACILITY_TYPES: { value: FacilityType; label: string; note: string }[] = [
-  { value: "opps_outpatient", label: "OPPS Outpatient", note: "Hospital outpatient paid under OPPS (APC). Full rule set." },
-  { value: "short_term_acute", label: "Short-Term Acute Care", note: "Acute hospital billing both outpatient (OPPS) and inpatient (IPPS). Full rule set." },
-  { value: "inpatient", label: "Inpatient (IPPS / MS-DRG)", note: "Inpatient charge-integrity only; OPPS payment rules do not apply." },
-  { value: "snf", label: "Skilled Nursing (PDPM)", note: "Charge capture + consolidated billing; most OPPS rules do not apply." },
+  { value: "short_term_acute", label: "Short-Term Acute Care", note: "Acute hospital billing outpatient (OPPS) and inpatient (IPPS). Full rule set." },
 ];
 
-// The two outpatient settings share the full OPPS rule set.
-const OPPS: FacilityType[] = ["opps_outpatient", "short_term_acute"];
+// Full rule set applies to short-term acute care.
+const OPPS: FacilityType[] = ["short_term_acute"];
 
 export interface RuleItem {
   key: string;
@@ -69,7 +71,7 @@ export const RULE_CATALOG: RuleGroup[] = [
     group: "Pricing integrity (internal)",
     items: [
       { key: "zero_price", name: "Zero or missing price", desc: "An active line priced at $0.", ids: ["6.5"] },
-      { key: "price_var", name: "Same code, different prices", desc: "One code priced inconsistently across lines.", ids: ["3.2"] },
+      { key: "price_var", name: "Same code, different prices", desc: "One CPT/HCPCS priced inconsistently across the chargemaster.", ids: ["3.2", "3.2b"] },
       { key: "dupe", name: "Duplicate line", desc: "The same code, revenue code, and price appear on more than one line.", ids: ["1.11"] },
     ],
   },
@@ -131,6 +133,12 @@ export const RULE_CATALOG: RuleGroup[] = [
     ],
   },
   {
+    group: "RVU / volume",
+    items: [
+      { key: "low_volume", name: "Low or no volume", desc: "A CPT/HCPCS line billed at or below the low-volume threshold (retire/review candidate).", ids: ["RVU.0", "RVU.low"] },
+    ],
+  },
+  {
     group: "Compliance",
     items: [
       { key: "non_billable", name: "Non-billable / convenience item", desc: "A line that looks like a convenience or non-billable item.", ids: ["2.1"] },
@@ -140,15 +148,6 @@ export const RULE_CATALOG: RuleGroup[] = [
     group: "Price transparency (shoppable services)",
     items: [
       { key: "shoppable", name: "Shoppable service checks", desc: "Required shoppable services missing, unpriced, or inpatient/DRG gaps.", ids: ["PT.drg", "PT.missing", "PT.unpriced"], facilities: OPPS },
-    ],
-  },
-  {
-    group: "Claims (837)",
-    items: [
-      { key: "mod25", name: "Modifier-25 misuse", desc: "Modifier-25 on an E/M billed with a procedure.", ids: ["C25"], facilities: OPPS },
-      { key: "unbundle", name: "Unbundling modifier", desc: "Unbundling modifier (e.g. 59) used on claims.", ids: ["C59"], facilities: OPPS },
-      { key: "not_in_cdm", name: "Billed but not in CDM", desc: "A code billed on claims that is missing from the CDM.", ids: ["CNIC"], facilities: OPPS },
-      { key: "unit_outlier", name: "Unit outlier on claims", desc: "Units well above the median for a code.", ids: ["CUNIT"], facilities: OPPS },
     ],
   },
 ];

@@ -33,11 +33,8 @@ export async function POST(request: Request) {
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // New reviews inherit the entity's facility type (set once in Settings) so
-    // it isn't chosen every time. Falls back to OPPS outpatient if unset.
-    const { data: org } = await db.from("organizations").select("settings").eq("id", userData.org_id).single();
-    const facilityType = (org?.settings as any)?.facility_type || "opps_outpatient";
-    await db.from("audits").update({ status: "in_progress", facility_type: facilityType }).eq("id", newId);
+    // ChargeGuard supports short-term acute care only; every review uses it.
+    await db.from("audits").update({ status: "in_progress", facility_type: "short_term_acute" }).eq("id", newId);
 
     return NextResponse.json({ success: true, auditId: newId, existing: false });
   } catch (err: any) {

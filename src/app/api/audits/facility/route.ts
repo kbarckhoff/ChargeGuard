@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { auditId, facilityType } = await request.json();
-    const allowed = ["opps_outpatient", "short_term_acute", "inpatient", "snf"];
+    const allowed = ["short_term_acute"];
     if (!auditId || !allowed.includes(facilityType)) {
       return NextResponse.json({ error: "auditId and a valid facilityType are required" }, { status: 400 });
     }

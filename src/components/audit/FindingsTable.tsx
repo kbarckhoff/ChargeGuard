@@ -21,6 +21,7 @@ interface FindingRow {
   applied_new?: string | null;
   resolution_note?: string | null;
   is_carried?: boolean | null;
+  tier?: number | null;
   charge_items: {
     procedure_number: string;
     charge_description: string;
@@ -37,18 +38,26 @@ const FIELD_LABELS: Record<string, string> = {
   revenue_code: "Revenue code",
   charge_description: "Description",
 };
-// Disposition options while we present findings (no file edits yet). Findings
-// tied to non-CDM sources (e.g. formulary) can be marked Not applicable.
+// Disposition options while we present findings (no file edits yet).
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
-  in_review: "Reviewed",
+  in_review: "Under Review",
   accepted: "Accepted",
-  rejected: "Not applicable",
-  resolved: "Resolved",
+  rejected: "Denied",
+  na: "N/A",
+  resolved: "Accepted",
 };
 const statusLabel = (s: string) => STATUS_LABELS[s] || s;
 const statusVariant = (s: string): any =>
-  s === "accepted" ? "success" : s === "rejected" ? "warning" : s === "in_review" ? "purple" : s === "resolved" ? "success" : "default";
+  s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "in_review" ? "purple" : s === "na" ? "default" : "default";
+
+// Tier badge: how the finding relates to prior reviews of the same line.
+const TIER_META: Record<number, { label: string; title: string; cls: string }> = {
+  1: { label: "T1 New", title: "Brand new finding", cls: "bg-[#e0edff] text-[#1d4ed8]" },
+  2: { label: "T2 Accepted before", title: "Previously accepted, showing up again", cls: "bg-[#e7f7ef] text-[#067647]" },
+  3: { label: "T3 Denied before", title: "Previously denied, showing up again", cls: "bg-[#fde8e8] text-[#b42318]" },
+  4: { label: "T4 N/A before", title: "Previously marked N/A, showing up again", cls: "bg-[#f1f5f9] text-[#475569]" },
+};
 
 export function FindingsTable({
   findings,
@@ -117,9 +126,10 @@ export function FindingsTable({
           className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white">
           <option value="all">All Status</option>
           <option value="open">Open</option>
-          <option value="in_review">Reviewed</option>
+          <option value="in_review">Under Review</option>
           <option value="accepted">Accepted</option>
-          <option value="rejected">Not applicable</option>
+          <option value="rejected">Denied</option>
+          <option value="na">N/A</option>
         </select>
         <CategoryMultiSelect categories={categories} selected={categoryFilter} onChange={(v) => updateParams({ category: v })} />
       </div>
@@ -157,8 +167,9 @@ export function FindingsTable({
                     ) : "—"}
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <Badge variant={statusVariant(f.status)}>{statusLabel(f.status)}</Badge>
+                      {f.tier && TIER_META[f.tier] && <span title={TIER_META[f.tier].title} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${TIER_META[f.tier].cls}`}>{TIER_META[f.tier].label}</span>}
                       {f.is_carried && <span title={f.resolution_note || "Carried from a prior review"} className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">CARRIED</span>}
                     </div>
                   </td>
@@ -222,9 +233,10 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
 
   const DISPOSITIONS: { value: string; label: string }[] = [
     { value: "open", label: "Open" },
-    { value: "in_review", label: "Reviewed" },
+    { value: "in_review", label: "Under Review" },
     { value: "accepted", label: "Accepted" },
-    { value: "rejected", label: "Not applicable" },
+    { value: "rejected", label: "Denied" },
+    { value: "na", label: "N/A" },
   ];
 
   return (

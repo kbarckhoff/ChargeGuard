@@ -4,7 +4,8 @@ import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImp
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
-import { AlertTriangle, Zap } from "lucide-react";
+import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { AlertTriangle, Download } from "lucide-react";
 
 export default async function FindingsPage({
   searchParams,
@@ -12,7 +13,8 @@ export default async function FindingsPage({
   searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string }>;
 }) {
   const sp = await searchParams;
-  const tab = sp.tab === "peer" ? "peer" : "findings";
+  const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
+  const tab: FindingBucket = TABS.includes(sp.tab as FindingBucket) ? (sp.tab as FindingBucket) : "cdm";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -75,7 +77,28 @@ export default async function FindingsPage({
     );
   }
 
-  // Build query
+  // Get ALL findings (paged) first — drives the summary, the roll-up, and the
+  // per-tab bucketing (Supabase caps each response at 1000 rows).
+  const allFindings: { severity: string; status: string; financial_impact: number | null; category: string | null; title: string | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    let statsQuery = supabaseAdmin
+      .from("findings")
+      .select("severity, status, financial_impact, category, title")
+      .eq("audit_id", auditId)
+      .eq("ehr_lagging", false)
+      .order("id", { ascending: true }); // stable sort so range paging can't repeat rows
+    if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
+    const { data, error } = await statsQuery.range(offset, offset + 999);
+    if (error || !data || data.length === 0) break;
+    allFindings.push(...data);
+    if (data.length < 1000) break;
+  }
+
+  // Categories present, and the subset that falls in the active tab's bucket.
+  const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
+  const bucketCats = categoriesInBucket(categories, tab);
+
+  // Build the paginated table query, scoped to the active tab's categories.
   const page = parseInt(sp.page || "1");
   const pageSize = 50;
   const from = (page - 1) * pageSize;
@@ -89,6 +112,8 @@ export default async function FindingsPage({
     .order("severity", { ascending: true })
     .order("created_at", { ascending: false });
   if (!canSeeAll) query = query.in("owner_department_id", scopeIds);
+  // Scope the table to the current tab's bucket (peer tab has its own view).
+  if (tab !== "peer") query = query.in("category", bucketCats.length ? bucketCats : ["__none__"]);
 
   if (sp.severity && sp.severity !== "all") {
     query = query.eq("severity", sp.severity);
@@ -109,28 +134,10 @@ export default async function FindingsPage({
   const { data: findings, count } = await query.range(from, to);
   const totalPages = Math.ceil((count || 0) / pageSize);
 
-  // Get severity counts for summary — page through ALL findings (Supabase caps
-  // each response at 1000 rows, which otherwise undercounts stats and drops
-  // categories from the filter dropdown).
-  const allFindings: { severity: string; status: string; financial_impact: number | null; category: string | null; title: string | null }[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    let statsQuery = supabaseAdmin
-      .from("findings")
-      .select("severity, status, financial_impact, category, title")
-      .eq("audit_id", auditId)
-      .eq("ehr_lagging", false)
-      .order("id", { ascending: true }); // stable sort so range paging can't repeat rows
-    if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
-    const { data, error } = await statsQuery.range(offset, offset + 999);
-    if (error || !data || data.length === 0) break;
-    allFindings.push(...data);
-    if (data.length < 1000) break;
-  }
-
-  // Summary cards reflect the active category/search filter (but not the severity
-  // filter, so the severity breakdown stays meaningful). The category dropdown
-  // still lists every category (built from the full set below).
+  // Summary cards + status counts, scoped to the active bucket, active category
+  // filter, and search (not the severity filter, so the breakdown stays useful).
   const scope = allFindings.filter((f) =>
+    (tab === "peer" || bucketForCategory(f.category) === tab) &&
     (selectedCategories.length === 0 || (f.category != null && selectedCategories.includes(f.category))) &&
     (!sp.search || (f.title || "").toLowerCase().includes(sp.search.toLowerCase()))
   );
@@ -145,15 +152,13 @@ export default async function FindingsPage({
 
   const statusCounts = {
     open: scope.filter((f) => f.status === "open").length,
-    accepted: scope.filter((f) => f.status === "accepted").length,
+    in_review: scope.filter((f) => f.status === "in_review").length,
+    accepted: scope.filter((f) => f.status === "accepted" || f.status === "resolved").length,
     rejected: scope.filter((f) => f.status === "rejected").length,
-    resolved: scope.filter((f) => f.status === "resolved").length,
+    na: scope.filter((f) => f.status === "na").length,
   };
 
   const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
-
-  // Get unique categories
-  const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
 
   // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
   // Shown read-only so the reviewer isn't asked to Accept the same fix again.
@@ -171,6 +176,7 @@ export default async function FindingsPage({
   // by dollar exposure, so the page leads with "what matters" not the raw volume.
   const byCat = new Map<string, { count: number; impact: number }>();
   for (const f of allFindings) {
+    if (bucketForCategory(f.category) !== tab) continue; // roll-up follows the active tab
     const c = f.category || "Uncategorized";
     const e = byCat.get(c) || { count: 0, impact: 0 };
     e.count += 1; e.impact += f.financial_impact || 0;
@@ -197,10 +203,16 @@ export default async function FindingsPage({
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-4">
-          {/* Sub-tabs: Findings | Peer Analysis */}
-          <div className="flex gap-1 border-b border-[#e2e8f0]">
-            <a href={`/findings?auditId=${auditId}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === "findings" ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>Rule Findings</a>
-            <a href={`/findings?auditId=${auditId}&tab=peer`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === "peer" ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>Peer Review Analysis</a>
+          {/* Sub-tabs: CDM | RVU | Formulary | Peer Review — each exportable */}
+          <div className="flex items-center justify-between gap-3 border-b border-[#e2e8f0]">
+            <div className="flex gap-1">
+              {TABS.map((t) => (
+                <a key={t} href={`/findings?auditId=${auditId}&tab=${t}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</a>
+              ))}
+            </div>
+            {tab !== "peer" && (
+              <a href={`/api/findings/export?auditId=${auditId}&bucket=${tab}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-1 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Export {BUCKET_LABELS[tab]}</a>
+            )}
           </div>
 
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
@@ -292,7 +304,7 @@ export default async function FindingsPage({
             statusFilter={sp.status || "all"}
             categoryFilter={sp.category || "all"}
             search={sp.search || ""}
-            categories={categories}
+            categories={bucketCats}
           />
           </>)}
         </div>
