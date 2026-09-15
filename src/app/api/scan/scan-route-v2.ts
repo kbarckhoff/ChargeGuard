@@ -732,9 +732,9 @@ export async function POST(request: Request) {
     let auditState: string | null = null;
     // Rules the client deactivated on the Intake page (empty = all active).
     const disabledRules = new Set<string>();
-    // Review year drives effective-date awareness: a code not yet effective in the
-    // review year should not be flagged. Low-volume threshold drives RVU analysis.
-    let reviewYear: number = new Date().getFullYear();
+    // Review date drives effective-date awareness: a code not yet effective by the
+    // review date should not be flagged. Low-volume threshold drives RVU analysis.
+    let reviewDate: Date = new Date();
     let lowVolumeThreshold = 10;
     try {
       const { data: auditRow } = await supabaseAdmin.from("audits").select("*").eq("id", auditId).single();
@@ -743,9 +743,10 @@ export async function POST(request: Request) {
       const dr = auditRow?.disabled_rules;
       if (Array.isArray(dr)) for (const r of dr) disabledRules.add(String(r));
       const md = (auditRow?.metadata || {}) as any;
-      const periodYear = String(md.review_period || "").match(/\b(20\d{2})\b/);
-      if (periodYear) reviewYear = parseInt(periodYear[1], 10);
-      else if (auditRow?.start_date) reviewYear = new Date(auditRow.start_date).getFullYear();
+      // review_period holds an ISO date (e.g. "2026-03-15"); fall back to start_date.
+      const rp = String(md.review_period || "").trim();
+      const parsed = rp ? new Date(rp) : (auditRow?.start_date ? new Date(auditRow.start_date) : null);
+      if (parsed && !isNaN(parsed.getTime())) reviewDate = parsed;
       const lvt = Number(md.low_volume_threshold);
       if (Number.isFinite(lvt) && lvt >= 0) lowVolumeThreshold = lvt;
     } catch { /* national fallback */ }
@@ -772,22 +773,24 @@ export async function POST(request: Request) {
       ...runPeerCompetitorRules(allItems, peerRows),
     ];
     // Effective-date awareness: skip findings for CDM lines whose code/line is not
-    // yet effective in the review year (e.g. a 2026-effective code in a 2025 review).
-    // The effective date, when present, comes through the CDM import in raw_data.
-    const effYearOf = (item: any): number | null => {
+    // yet effective by the review date (e.g. a code effective 1/1/2026 in a 2025
+    // review). The effective date, when present, comes through the CDM in raw_data.
+    const effDateOf = (item: any): Date | null => {
       const rd = (item?.raw_data || {}) as Record<string, any>;
       for (const k of Object.keys(rd)) {
         if (/eff|effective|start/i.test(k)) {
-          const m = String(rd[k] ?? "").match(/\b(20\d{2})\b/);
-          if (m) return parseInt(m[1], 10);
+          const v = String(rd[k] ?? "").trim();
+          if (!v) continue;
+          const d = new Date(v);
+          if (!isNaN(d.getTime())) return d;
         }
       }
       return null;
     };
     const notYetEffective = new Set<string>();
     for (const it of allItems) {
-      const y = effYearOf(it);
-      if (y != null && y > reviewYear) notYetEffective.add(it.id);
+      const d = effDateOf(it);
+      if (d && d.getTime() > reviewDate.getTime()) notYetEffective.add(it.id);
     }
 
     // Drop findings the client deactivated and any line not yet effective this year.

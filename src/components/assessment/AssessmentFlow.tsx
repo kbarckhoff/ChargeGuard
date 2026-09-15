@@ -56,20 +56,6 @@ import { intakeFilesForFacility, type IntakeFile } from "@/lib/intake-files";
 
 const AVCOLORS = ["#3b82f6", "#12b76a", "#7c3aed", "#f59e0b", "#ef4444"];
 
-// Review period options (quarter or half). A single "Review Date" replaces the
-// old start/end dates; the trailing year drives effective-date filtering.
-const REVIEW_PERIODS: string[] = (() => {
-  const now = new Date();
-  const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
-  const out: string[] = [];
-  for (const y of years) {
-    for (const q of ["Q1", "Q2", "Q3", "Q4"]) out.push(`${q} ${y}`);
-    for (const h of ["H1", "H2"]) out.push(`${h} ${y}`);
-    out.push(`FY ${y}`);
-  }
-  return out;
-})();
-
 type Stats = {
   critical: number; high: number; medium: number; low: number;
   total: number; open: number; impact: number;
@@ -252,11 +238,8 @@ function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner,
           <div><label className={labelCls}>Entity name</label><input className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} defaultValue={hospitalName} disabled={locked} /></div>
           <div>
             <label className={labelCls}>Review date {savingPeriod && <span className="text-[#94a3b8]">· saving…</span>}</label>
-            <select className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={reviewPeriod} disabled={locked} onChange={(e) => savePeriod(e.target.value)}>
-              <option value="">Select review period…</option>
-              {REVIEW_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <p className="text-xs text-[#9aa2af] mt-1.5">Sets the review year. Codes not yet effective in this period are skipped.</p>
+            <input type="date" className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={reviewPeriod} disabled={locked} onChange={(e) => savePeriod(e.target.value)} />
+            <p className="text-xs text-[#9aa2af] mt-1.5">Sets the review year. Codes not yet effective by this date are skipped.</p>
           </div>
           <div>
             <label className={labelCls}>Low-volume threshold (RVU analysis)</label>
