@@ -304,9 +304,17 @@ export function runDeviceCrosswalkRules(items: any[]): RuleResult[] {
 }
 
 /**
- * Bilateral procedures (modifier 50) should price at 1.75x the unilateral
- * (RT/LT/base) rate, not 2.0x. Exclude surgical-range codes (<=69999) and
- * ProFee/Physician department rows. (Formula Library Step 10.)
+ * Bilateral / same-HCPCS price-ratio analysis (Formula Library Step 10).
+ * Method mirrors the reference report: for each HCPCS with 2+ priced CDM lines,
+ * the lowest-priced line is the unilateral BASE, and every other priced line is
+ * compared to it. A bilateral line should sit at 1.75x the base, not 2.0x.
+ * Bands (match the report's Section A):
+ *   • 1.95x – 2.05x  → priced at ~2.0x, reprice down to 1.75x (overpriced)
+ *   • 1.00x – 1.688x → below the 1.75x target (underpriced opportunity)
+ *   • 1.688x – 1.95x → treated as correct (~1.75x), not flagged
+ *   • > 2.05x        → left to the Pricing Consistency rule (extreme variance)
+ * Surgical-range codes (<=69999) are excluded. Section B flags a bilateral
+ * (mod-50 / "bilateral") line with no RT/LT counterpart in the CDM.
  */
 function runBilateralRules(items: any[]): RuleResult[] {
   const out: RuleResult[] = [];
@@ -315,8 +323,6 @@ function runBilateralRules(items: any[]): RuleResult[] {
   for (const item of items) {
     const code = (item.hcpcs_cpt_code || "").trim();
     if (!code) continue;
-    const dept = (item.department || "").toLowerCase();
-    if (dept.includes("pro fee") || dept.includes("profee") || dept.includes("physician")) continue;
     const n = parseInt(normalizeHcpcs(code), 10);
     if (!isNaN(n) && n <= 69999) continue; // exclude surgical range
     if (!byCode.has(code)) byCode.set(code, []);
@@ -327,24 +333,20 @@ function runBilateralRules(items: any[]): RuleResult[] {
     [it.modifier_1, it.modifier_2, it.modifier_3]
       .map((m) => (m || "").trim().toUpperCase())
       .filter(Boolean);
-
-  // Laterality is often carried in the DESCRIPTION, not a modifier column (this
-  // CDM has few populated modifier fields), so detect both. Word-boundary tokens
-  // keep "RT"/"LT"/"RIGHT"/"LEFT"/"BILAT(ERAL)" from matching inside other words.
+  // Bilateral / RT / LT detection from the modifier columns or the description.
   const isBilat = (it: any) => modsOf(it).includes("50") || /\bBILAT(ERAL)?\b/i.test(it.charge_description || "");
   const isRT = (it: any) => modsOf(it).includes("RT") || /\b(RIGHT|RT)\b/i.test(it.charge_description || "");
   const isLT = (it: any) => modsOf(it).includes("LT") || /\b(LEFT|LT)\b/i.test(it.charge_description || "");
-  const lateral = (it: any) => isBilat(it) || isRT(it) || isLT(it);
 
   for (const [code, group] of byCode) {
     const priced = group.filter((it) => num(it.gross_charge) > 0);
     if (priced.length < 2) continue; // need 2+ CDM lines to compare a ratio
 
-    // Base = the lowest-priced line for this HCPCS (the unilateral rate). Per
-    // Step 10 the base can itself carry a mod-50, so consider ALL priced lines.
+    // Base = the lowest-priced line for this HCPCS (the unilateral rate).
     let baseItem = priced[0];
     for (const it of priced) if (num(it.gross_charge) < num(baseItem.gross_charge)) baseItem = it;
     const basePrice = num(baseItem.gross_charge);
+    if (basePrice <= 0) continue;
     const expected = basePrice * 1.75;
 
     // Section B: a bilateral line exists but no RT/LT counterpart anywhere.
@@ -361,15 +363,13 @@ function runBilateralRules(items: any[]): RuleResult[] {
       });
     }
 
-    // Section A: every laterality-coded line above the base should sit at 1.75x,
-    // not 2.0x (and not below target). Restrict to 50/RT/LT lines so ordinary
-    // multi-line codes aren't flagged as bilateral.
+    // Section A: compare every non-base priced line to the base against 1.75x.
     for (const it of priced) {
-      if (it === baseItem || !lateral(it)) continue;
+      if (it === baseItem) continue;
       const p = num(it.gross_charge);
       const ratio = p / basePrice;
       const procNum = it.procedure_number || it.id;
-      if (ratio > 1.9) {
+      if (ratio >= 1.95 && ratio <= 2.05) {
         out.push({
           rule_id: "10", charge_item_id: it.id,
           title: `Bilateral priced ${ratio.toFixed(2)}x base (should be 1.75x) - ${procNum}`,
@@ -378,7 +378,7 @@ function runBilateralRules(items: any[]): RuleResult[] {
           financial_impact: p - expected,
           recommendation: `Reprice to $${expected.toFixed(2)} (1.75x base).`,
         });
-      } else if (ratio > 1.0 && ratio < 1.75) {
+      } else if (ratio >= 1.0 && ratio < 1.688) {
         out.push({
           rule_id: "10", charge_item_id: it.id,
           title: `Bilateral priced ${ratio.toFixed(2)}x base (below 1.75x) - ${procNum}`,
