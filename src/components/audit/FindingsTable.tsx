@@ -66,6 +66,7 @@ export function FindingsTable({
   totalPages,
   severityFilter,
   statusFilter,
+  tierFilter,
   categoryFilter,
   search,
   categories,
@@ -76,6 +77,7 @@ export function FindingsTable({
   totalPages: number;
   severityFilter: string;
   statusFilter: string;
+  tierFilter: string;
   categoryFilter: string;
   search: string;
   categories: string[];
@@ -130,6 +132,14 @@ export function FindingsTable({
           <option value="accepted">Accepted</option>
           <option value="rejected">Denied</option>
           <option value="na">N/A</option>
+        </select>
+        <select value={tierFilter} onChange={(e) => updateParams({ tier: e.target.value })}
+          className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white">
+          <option value="all">All Tiers</option>
+          <option value="1">T1 · New</option>
+          <option value="2">T2 · Accepted before</option>
+          <option value="3">T3 · Denied before</option>
+          <option value="4">T4 · N/A before</option>
         </select>
         <CategoryMultiSelect categories={categories} selected={categoryFilter} onChange={(v) => updateParams({ category: v })} />
       </div>

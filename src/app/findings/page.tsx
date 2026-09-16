@@ -11,7 +11,7 @@ import { AlertTriangle, Download } from "lucide-react";
 export default async function FindingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string }>;
+  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string }>;
 }) {
   const sp = await searchParams;
   const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
@@ -118,6 +118,11 @@ export default async function FindingsPage({
   }
   if (sp.status && sp.status !== "all") {
     query = query.eq("status", sp.status);
+  }
+  if (sp.tier && sp.tier !== "all") {
+    // A finding with no stored tier is a brand-new (T1) finding.
+    if (sp.tier === "1") query = query.or("tier.eq.1,tier.is.null");
+    else query = query.eq("tier", Number(sp.tier));
   }
   const selectedCategories = (sp.category && sp.category !== "all")
     ? sp.category.split(",").map((c) => c.trim()).filter(Boolean)
@@ -300,6 +305,7 @@ export default async function FindingsPage({
             totalPages={totalPages}
             severityFilter={sp.severity || "all"}
             statusFilter={sp.status || "all"}
+            tierFilter={sp.tier || "all"}
             categoryFilter={sp.category || "all"}
             search={sp.search || ""}
             categories={bucketCats}
