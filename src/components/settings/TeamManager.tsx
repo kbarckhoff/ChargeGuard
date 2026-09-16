@@ -33,7 +33,9 @@ export function TeamManager({ members, departments, invites }: { members: Member
       const res = await fetch("/api/team/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, department_ids: pickedDepts }) });
       const d = await res.json();
       if (!res.ok) { setInviteErr(d.error || "Could not send invite"); setSending(false); return; }
-      setInviteMsg(d.link ? { link: d.link, text: "Invite created. Email isn't configured, so share this link:" } : { text: `Invite emailed to ${email}.` });
+      setInviteMsg(d.tempPassword
+        ? { link: d.tempPassword, text: "Account created, but email couldn't be sent. Share this temporary password securely:" }
+        : { text: `Invited ${email}. They'll receive a temporary password by email and set their own on first sign-in.` });
       setEmail(""); setPickedDepts([]); setSending(false);
       router.refresh();
     } catch (e: any) { setInviteErr(e?.message || "Something went wrong"); setSending(false); }
@@ -75,7 +77,10 @@ export function TeamManager({ members, departments, invites }: { members: Member
             <div className="mb-3 p-2.5 bg-[#e7f7ef] border border-[#bbe9d1] rounded-lg text-[13px] text-[#067647]">
               {inviteMsg.text}
               {inviteMsg.link && (
-                <button onClick={() => navigator.clipboard?.writeText(inviteMsg.link!)} className="ml-2 inline-flex items-center gap-1 text-[#0f172a] underline"><Copy size={11} /> copy link</button>
+                <span className="ml-2 inline-flex items-center gap-2">
+                  <code className="px-1.5 py-0.5 rounded bg-white border border-[#bbe9d1] text-[#0f172a] font-mono">{inviteMsg.link}</code>
+                  <button onClick={() => navigator.clipboard?.writeText(inviteMsg.link!)} className="inline-flex items-center gap-1 text-[#0f172a] underline"><Copy size={11} /> copy</button>
+                </span>
               )}
             </div>
           )}

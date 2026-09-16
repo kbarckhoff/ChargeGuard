@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
@@ -24,11 +25,8 @@ export default async function FindingsPage({
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id, is_platform_owner")
-    .eq("id", user!.id)
-    .single();
+  const { orgId: __org, isPlatformOwner: __owner } = await resolveActiveOrg(supabaseAdmin, user!.id);
+  const userData = { org_id: __org, is_platform_owner: __owner };
 
   // Department gating: a user sees only findings for the departments they belong
   // to. The platform owner, or a user who belongs to every department, sees all.

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { RunsHome } from "@/components/runs/RunsHome";
 
 // Home = dashboard for a single hospital's CDM reviews. Lists every run
@@ -11,7 +12,8 @@ export default async function RunsPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const db = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile } = await db.from("users").select("org_id").eq("id", user!.id).single();
+  const { orgId: __org } = await resolveActiveOrg(db, user!.id);
+  const profile = { org_id: __org };
 
   const { data: audits } = await db
     .from("audits")

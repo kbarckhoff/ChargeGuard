@@ -1,0 +1,304 @@
+Charge Code,Formulary Status,Formulary NDC,Formulary Drug Name,Pkg Amt,Pkg Unit
+8000306,ON,00006302604,Keytruda 25 mg/mL intravenous solut,1,ml
+8000307,ON,55513099802,Rabies Ig Im/Sc,150,ml
+8000308,ON,55513071021,Prolia 60 mg/mL subcutaneous syring,150,gm
+8000309,ON,63323026959,Hepa Vaccine Adult Im,1,ml
+8000310,ON,89130444401,Iiv Adjuvant Vaccine Im,0.5,ml
+8000311,ON,00310461150,Iiv3 Vacc No Prsv 0.5 Ml Im,0.5,ml
+8000312,ON,00023392102,Botox 200 unit injection,0.25,ml
+8000313,ON,00074445604,Iiv3 Vaccine Splt 0.5 Ml Im,0.5,ml
+8000314,ON,82959011101,Laiv3 Vaccine Intranasal,0.2,ml
+8000315,ON,23155054842,Cciiv3 Vac Abx Fr 0.5 Ml Im,0.5,ml
+8000316,ON,71288016750,Iiv No Prsv Increased Ag Im,0.5,ml
+8000317,ON,13533070501,"Prolastin-C 1,000  mg (+/-)/20 mL i",1,ea
+8000318,ON,50242091801,Riv3 Vaccine No Preserv Im,0.5,ml
+8000319,ON,55513020721,Mvasi 25 mg/mL intravenous solution,1,ml
+8000320,ON,00703398601,Pcv20 Vaccine Im,0.5,ml
+8000321,ON,47335017795,Ilumya 100 mg/mL subcutaneous syrin,0.5,ml
+8000322,ON,00006542312,Td Vacc No Presv 7 Yrs+ Im,0.5,ml
+8000323,ON,70594003402,Tdap Vaccine 7 Yrs/> Im,0.5,ml
+8000324,ON,00003373413,Ppsv23 Vacc 2 Yrs+ Subq/Im,0.5,ml
+8000325,ON,63323013011,Hepb Vacc 2/4 Dose Adult Im,1,dose
+8000326,ON,83257000541,Fulphila 6 mg/0.6 mL subcutaneous s,40,mcg
+8000327,ON,25021010768,Hepb Vacc 2 Dose Adolesc Im,1,mg
+8000328,ON,00143985725,Hepb Vacc 3 Dose Ped/Adol Im,1,dose
+8000329,ON,57894050301,Hepb Vaccine 3 Dose Adult Im,20,mcg
+8000330,ON,00781315606,Hepb Vacc 4 Dose Immunsup Im,40,mcg
+8000331,ON,00078100060,Sarscov2 Vac 5Mcg/0.5Ml Im,0.5,ml
+8000332,ON,60793021720,Sarscv2 Vac 10Mcg Trs-Suc Im,0.3,ml
+8000333,ON,57894003001,Sarscv2 Vac 30Mcg Trs-Suc Im,0.3,ml
+8000334,ON,55150022505,rocuronium 10 mg/mL intravenous sol,0.25,ml
+8000335,ON,55150022505,Sarscov2 Vac 50 Mcg/0.5Ml Im,0.5,ml
+8000336,OFF,63323028426,Sarscov2 Vac 10 Mcg/0.2Ml Im,10,mcg
+8000337,ON,64764030020,Entyvio 300 mg intravenous solution,1,ml
+8000338,ON,67386013051,Vyepti 100 mg/mL intravenous soluti,0.1,ml
+8000339,ON,50242005306,"Rituxan 10 mg/mL concentrate,intrav",1,mg
+8000340,ON,00703321801,"PACLitaxel 6 mg/mL concentrate,intr",1,ml
+8000341,ON,63459010450,Truxima 10 mg/mL intravenous soluti,1,ml
+8000342,ON,00517234010,"Gad-Base Mr Contrast Nos,1Ml",1,ml
+8000343,ON,60505623105,Gadoxetate Disodium Inj,1,gm
+8000344,ON,70069006425,ROPivacaine (PF) 5 mg/mL (0.5 %) in,0.1,ml
+8000345,ON,60505612801,irinotecan 100 mg/5 mL intravenous,100,mg
+8000346,ON,44206043940,Privigen 10 % intravenous solution,1,microcurie
+8000347,ON,57894035001,Simponi ARIA 12.5 mg/mL intravenous,1,mg
+8000348,ON,00517065001,"Inj., Eravacycline, 1 Mg",1,mg
+8000349,ON,63323050616,Abatacept Injection,10,mg
+8000350,ON,00186604001,NexIUM 40 mg intravenous solution,10,mg
+8000351,ON,57894065002,Tremfya 200 mg/20 mL (10 mg/mL) int,100,mg
+8000352,ON,25021010167,ceFAZolin 1 gram solution for injec,5,mg
+8000353,ON,50242007001,"Gazyva 1,000 mg/40 mL intravenous s",10,mg
+8000354,ON,76125015002,"Inj, Acetaminophen (B Braun)",10,mg
+8000355,ON,50242013501,"Inj, Acetaminophen (Hikma)",10,mg
+8000356,OFF,63323016516,dexAMETHasone sodium phosphate 4 mg,10,mg/3mg
+8000357,ON,63020004901,Velcade 3.5 mg solution for injecti,1,mg
+8000358,ON,00407141210,Inj Epinephrine (Fresenius),0.1,mg
+8000359,ON,63833038702,"Kcentra 1,000 unit (800-1,240 unit)",0.1,mg
+8000360,ON,00944270007,Gammagard Liquid 10 % injection sol,0.1,mg
+8000361,ON,55513022201,Inj Epinephrine Nos 0.1 Mg,0.1,mg
+8000362,ON,55566410001,Inj Epinephrine (Bpi),0.1,mg
+8000363,ON,08290306546,Inj Epinephrine (Hospira),0.1,mg
+8000364,ON,00469650189,Epinephrine (Intl Med Sys),0.1,mg
+8000365,ON,00074501501,Inj Epinephrine (Adrenalin),0.1,ml
+8000366,OFF,00703424881,CARBOplatin 10 mg/mL intravenous so,1,mg
+8000367,ON,63323098321,piperacillin-tazobactam 3.375 gram,2,mg
+8000368,ON,00075062040,"Inj, Aflibercept Hd, 1 Mg",1,mg
+8000369,ON,65250013309,Exparel (PF) 1.3 % (13.3 mg/mL) sus,1,mg
+8000370,ON,00409166050,"Inj, Brolucizumab-Dbll, 1 Mg",1,mg
+8000371,ON,63323073916,Agalsidase Beta Injection,1,mg
+8000372,ON,00955102001,"Inj., Aprepitant, 1 Mg",1,mg
+8000373,ON,08290306424,heparin Lock Flush (Porcine) (PF) 1,1,ml
+8000374,ON,00023608210,Infed 50 mg/mL injection solution,1,gm
+8000375,ON,70121104905,Inj Velmanase Alfa-Tycv 1 Mg,1,mg
+8000376,ON,00074364103,Lupron Depot 3.75 mg intramuscular,1,mg
+8000377,ON,70594004301,Inj Aval Alfa-Nqpt 4Mg,4,mg
+8000378,ON,69853010201,Andexxa 200 mg intravenous solution,10,mg
+8000379,ON,70114010101,"Inj., Patisiran, 0.1 Mg",0.1,mg
+8000380,ON,42023022185,Inj Givosiran 0.5 Mg,0.5,mg
+8000381,ON,76204060060,ipratropium 0.5 mg-albuterol 3 mg (,0.5,mg
+8000382,ON,54288010310,EPINEPHrine HCl (PF) 1 mg/mL (1 mL),1,mg
+8000384,ON,63323085303,HYDROmorphone (PF) 2 mg/mL injectio,10,mg
+8000385,ON,63323085303,Glassia Injection,10,mg
+8000386,ON,00002940101,Amikacin Sulfate Injection,100,mg
+8000387,ON,63323016201,ketorolac 30 mg/mL (1 mL) injection,250,mg
+8000388,ON,00409662902,Inj Aminocaproic Acid 1 Gram,1,gm
+8000389,ON,47426020101,Cinvanti 130 mg/18 mL (7.2 mg/mL) i,30,mg
+8000390,ON,63323072303,remifentanil 1 mg intravenous solut,30,mg
+8000391,ON,00338105548,Amphotericin B,50,mg
+8000392,OFF,63323034129,Amphotericin B Liposome Inj,10,mg
+8000393,ON,00069080901,Inflectra 100 mg intravenous soluti,500,mg
+8000394,ON,50242017601,TNKase 50 mg intravenous solution,5,mg
+8000395,ON,00641612501,Ampicillin Sulbactam 1.5 Gm,1.5,gm
+8000396,ON,00409230517,midazolam (PF) 1 mg/mL injection so,1,mg
+8000397,ON,63323067389,"Inj, Rezafungin, 1 Mg",1,iu
+8000398,ON,25021081467,Hydralazine Hcl Injection,20,mg
+8000399,ON,00409909425,fentaNYL (PF) 50 mcg/mL injection s,1,mg
+8000400,OFF,00409909425,"Inj, Abilify Asimtufii, 1 Mg",1,mg
+8000401,ON,00409018201,gemcitabine 2 gram/52.6 mL (38 mg/m,500,mg
+8000402,ON,63323061603,amiodarone 50 mg/mL intravenous sol,100,mg
+8000403,ON,63323039810,azithromycin 500 mg intravenous sol,10,ml
+8000405,ON,63323034201,"Atropine Sulf, Nte, 0.01 Mg",0.01,mg
+8000406,ON,25021031910,dilTIAZem 5 mg/mL intravenous solut,0.01,mg
+8000407,ON,00641037625,diphenhydrAMINE 50 mg/mL injection,10,mg
+8000408,ON,61755000801,Baclofen Intrathecal Trial,50,mcg
+8000409,OFF,64253022235,"heparin, porcine (PF) 10 unit/mL in",20,mg
+8000410,ON,00641604425,LORazepam 2 mg/mL injection solutio,1,iu
+8000411,OFF,70720095130,Belimumab Injection,10,mg
+8000412,ON,00002751001,Inj Anifrolumab-Fnia 1Mg,1,iu
+8000413,ON,63323011720,Dicyclomine Injection,20,mg
+8000414,ON,44206025110,Inj Benztropine Mesylate,1,mg
+8000415,ON,50632001001,"Inj., Benralizumab, 1 Mg",1,ml
+8000416,OFF,58160084211,Boostrix Tdap 2.5 Lf unit-8 mcg-5 L,"100,000",units
+8000417,ON,25021013282,levoFLOXacin 500 mg/100 mL in 5 % d,"100,000",units
+8000418,ON,00069303220,"Inj, Brixadi, 7 Days Or Less",Less,than
+8000419,ON,00641602725,fentaNYL (PF) 50 mcg/mL injection s,Greater,than
+8000421,ON,00641602725,Bivalirudin (Endo) 1 Mg,1,mg
+8000422,ON,00703003104,Bivalirudin,1,mg
+8000423,ON,68084089501,HYDROcodone 5 mg-acetaminophen 325,1,mg
+8000424,ON,08290306545,BD PosiFlush Normal Saline 0.9 % in,1,gm
+8000425,ON,00409188622,levETIRAcetam 500 mg/5 mL intraveno,5,unit
+8000426,ON,00186037028,"Inj, Rimabotulinumtoxinb",100,iu
+8000427,ON,58468009003,Incobotulinumtoxin A,1,unit
+8000428,ON,00002821501,Inj Daxibotulinumtoxina-Lanm,1,unit
+8000429,ON,10019011501,Brevibloc 100 mg/10 mL (10 mg/mL) i,0.1,mg
+8000430,ON,39822100001,"tranexamic acid 1,000 mg/10 mL (100",1,mg
+8000431,ON,00009003928,SOLU-Medrol (PF) 40 mg/mL solution,1,mg
+8000432,ON,25021013283,Butorphanol Tartrate 1 Mg,1,mg
+8000433,OFF,72611074001,metoprolol tartrate 5 mg/5 mL intra,10,ml
+8000434,ON,76045000905,"C-1 Esterase, Berinert",10,units
+8000435,ON,70594004201,vancomycin 1 gram/200 mL in diluent,10,units
+8000436,ON,10019094401,Edetate Calcium Disodium Inj,1000,mg
+8000438,ON,00069024901,Calcium Glucon (Wg Critical),10,mg
+8000439,ON,00000000982,"Inj, Treosulfan, 50 Mg",50,mg
+8000440,ON,00003218713,Inj Metoprolol Tartrate 1 Mg,1,mg
+8000441,ON,57237007710,Caspofungin Acetate,5,mg
+8000442,ON,55566830301,Firmagon kit with diluent syringe 8,1,mg
+8000443,ON,63323010626,Leucovorin Calcium Injection,50,mg
+8000444,ON,00075062430,Inj Levoleucovorin Nos 0.5Mg,0.5,ea
+8000445,ON,63323001002,"Injection, Khapzory, 0.5 Mg",0.5,mg
+8000446,ON,62935022710,Eligard 22.5 mg (3 month) subcutane,10,mcg
+8000447,ON,00075062300,Lovenox 100 mg/mL subcutaneous syri,10,mcg
+8000448,ON,76329335201,sodium bicarbonate 50 mEq/50 mL (8.,10,gm
+8000449,ON,00338411450,clindamycin 900 mg/50 mL in 5 % dex,0.5,mg
+8000450,ON,00009004722,SOLU-Medrol (PF) 125 mg/2 mL soluti,1,mg
+8000451,ON,00003089331,Eliquis 2.5 mg tablet,10,ml
+8000452,ON,55513002304,Aranesp 60 mcg/0.3 mL (in polysorba,3,ml
+8000453,ON,60505257909,atorvastatin 20 mg tablet,500,mg
+8000454,ON,47426040110,"Inj Cefazolin Sodium, Hikma",500,gm
+8000455,ON,00143950810,ketamine 50 mg/mL injection solutio,500,mg
+8000456,ON,00338361224,clindamycin 600 mg/50 mL in 5 % dex,500,mg
+8000457,ON,70100042402,Cefepime Hcl For Injection,500,mg
+8000458,ON,63323028004,furosemide 10 mg/mL injection solut,1,mg
+8000459,ON,63323028004,furosemide 10 mg/mL injection solut,75mg,(50mg
+8000460,ON,62584026501,Ceftriaxone Sodium Injection,250,mg
+8000461,ON,00409139122,Sterile Cefuroxime Injection,750,mg
+8000462,ON,00054817525,"Inj, Cefiderocol, 10 Mg",10,mg
+8000463,ON,44567084501,Inj. Cefepime Hcl (Baxter),500,mg
+8000464,ON,00173068224,Betamethasone Acet&Sod Phosp,3,mg
+8000465,ON,23155029442,"Inj, Cefepime Hcl (B Braun)",500,mg
+8000466,ON,62935030640,Eligard 30 mg (4 month) subcutaneou,10,mg
+8000467,ON,00904791461,Inj Ceftazidime Per 500 Mg,500,mg
+8000468,ON,50268007415,Ceftazidime And Avibactam,.625,gm
+8000469,ON,36000000924,ciprofloxacin 400 mg/200 mL in 5 %,1,gm
+8000471,ON,23155062031,Chorionic Gonadotropin/1000U,1000,gm
+8000472,ON,00409226720,labetalol 5 mg/mL intravenous solut,1,mg
+8000473,ON,59676036001,ORTHOVISC 30 mg/2 mL intra-articula,300,mg
+8000474,ON,69618006501,Senna Plus 8.6 mg-50 mg tablet,300,mg
+8000475,ON,42023021689,"Hiv Prep, Inj, Lenacapavir",1,mg
+8000476,ON,60793070110,"Hiv Prep, Inj, Cabotegravir",1,mg
+8000477,ON,63323061401,hydrALAZINE 20 mg/mL injection solu,375,mg
+8000478,ON,00245531901,"Klor-Con M20 mEq tablet,extended re",2MG/3MG,iu
+8000479,ON,60505006507,"omeprazole 20 mg capsule,delayed re",4,mg-4
+8000480,ON,00406055262,oxyCODONE 5 mg tablet,250,mg
+8000481,ON,63323036920,ampicillin-sulbactam 3 gram solutio,200,mg
+8000482,ON,25021083082,"Hiv Prep, Ftc/Tdf 200/300Mg",200,ml
+8000483,ON,00003089431,"Hiv Prep, Ftc/Taf 200/25Mg",200,mg/25
+8000485,ON,63323010351,CISplatin 1 mg/mL intravenous solut,300,mg
+8000486,ON,00093227534,"Inj, Clevidipine, 1 Mg",1,mg
+8000487,ON,50242021503,Colistimethate Sodium Inj,150,mg
+8000488,ON,55111068507,"Collagenase, Clost Hist Inj",0.01,mg
+8000489,OFF,63323051877,Prochlorperazine Injection,10,mg
+8000491,ON,00641600810,Inj Crizanlizumab-Tmca 5Mg,5,mg
+8000492,ON,68308015215,Inj. Acthar Gel To 40 Units,40,iu
+8000493,ON,25021040201,"heparin (porcine) 5,000 unit/mL inj",up,to
+8000494,ON,60687058501,"Inj., Cosyntropin, 0.25 Mg",0.25,mg
+8000495,ON,00088222033,Lantus U-100 Insulin 100 unit/mL su,UP,to
+8000497,ON,00904719361,famotidine 20 mg tablet,1,mg
+8000498,ON,00409751716,Daptomycin (Xellia) Unrefrig,1,mg
+8000499,ON,63323016226,ketorolac 60 mg/2 mL intramuscular,1,mg
+8000500,ON,63323032101,"Inj, Daptomycin (Baxter)",1,mg
+8000501,ON,00904666661,"Injection, Dalbavancin",5,mg
+8000502,ON,00406012462,"Inj, Daptomycin (Hospira)",1,mg
+8000503,ON,76329331801,EPINEPHrine 0.1 mg/mL injection syr,1,mg
+8000504,ON,00591352530,lidocaine 5 % topical patch,1,mcg
+8000505,ON,00186198904,"Darbepoetin Alfa, Esrd Use",1,ea
+8000506,OFF,60505615604,piperacillin-tazobactam 2.25 gram i,1,mg
+8000507,ON,10019055303,Transderm-Scop 1 mg over 3 days tra,1,mg
+8000508,ON,00143951501,droPERidol 2.5 mg/mL injection solu,1000,units
+8000509,ON,00904629461,Epoetin Beta Esrd Use,1,iu
+8000510,ON,00075062280,Epoetin Beta Non Esrd,1,mcg
+8000511,ON,00406012562,HYDROcodone 10 mg-acetaminophen 325,1,mg
+8000512,ON,70700026894,Deferoxamine Mesylate Inj,500,mg
+8000513,ON,00071101441,Inj Luspatercept-Aamt 0.25Mg,0.25,mg
+8000514,ON,51079045320,Denosumab Injection,1,mg
+8000515,ON,00000000001,Argatroban Nonesrd (Auromed),1,mg
+8000516,ON,00409433201,vancomycin 500 mg intravenous solut,1,mg
+8000517,ON,00904632361,metoprolol succinate ER 50 mg table,1,mg
+8000518,ON,00075062160,Lovenox 60 mg/0.6 mL subcutaneous s,5,mg
+8000519,ON,00409127332,"Inj, Methylpred Acetate 1 Mg",1,mg
+8000520,ON,00071101341,Inj Testosterone Cypionate,1,mg
+8000521,ON,59762033302,"Inj, Testosterone, Azmiro",1,mg
+8000522,ON,00338104902,Dexametha Opth Insert 0.1 Mg,0.1,mg
+8000523,ON,00173069604,Advair Diskus 250 mcg-50 mcg/dose p,1,mg
+8000524,ON,57896091136,aspirin 81 mg chewable tablet,1,mg
+8000526,ON,68180012101,cephALEXin 250 mg capsule,500,mg
+8000527,ON,00409230802,Digoxin Injection,0.5,mg
+8000528,ON,00009075801,SOLU-Medrol 500 mg intravenous solu,PER,vial
+8000529,ON,60687055801,cyclobenzaprine 10 mg tablet,0.5,mg
+8000530,ON,00517037405,Inj Diltiazem In 0.72% Nacl,0.5,mg
+8000531,ON,69543038130,Phenytoin Sodium Injection,50,mg
+8000532,ON,63323059613,glucagon HCl 1 mg/mL solution for i,0.1,mg
+8000533,ON,43598032675,ciprofloxacin 0.3 %-dexamethasone 0,250,mg
+8000534,ON,68382013201,tamsulosin 0.4 mg capsule,50,mg
+8000536,ON,10019064164,Inj. Cetirizine Hcl 0.5Mg,0.5,mg
+8000537,ON,50016095721,Visco-3  10 mg/mL intra-articular s,5,mg
+8000539,ON,63323036019,calcium gluconate 100 mg/mL (10 %),50,ml
+8000540,ON,60687066101,Methadone Injection,10,mg
+8000541,ON,63323065102,Dimenhydrinate Injection,50,mg
+8000542,ON,00409337504,Dipyridamole Injection,10,mg
+8000543,ON,00186037228,Symbicort 80 mcg-4.5 mcg/actuation,250,mg
+8000544,ON,00904677361,Dopamine Injection,40,mg
+8000545,ON,49281021515,"Injection, Doxercalciferol",1,mcg
+8000546,ON,62584069321,Inj Doxycycline Hyclate 1 Mg,1,mg
+8000547,ON,50484001030,Ecallantide Injection,1,mg
+8000548,ON,60687039001,"Inj, Eculizumab, 2 Mg",2,mg
+8000550,OFF,76204090001,"Injection, Edaravone, 1 Mg",1,mg
+8000551,ON,00904693181,"Inj, Sutimlimab-Jome, 10 Mg",10,mg
+8000552,ON,00409337904,piperacillin-tazobactam 4.5 gram in,10,mg
+8000553,ON,00904686861,traZODone 50 mg tablet,1,mg
+8000554,ON,68084034701,"Inj, Evinacumab-Dgnb, 5Mg",5,mg
+8000555,ON,00703565301,Toposar 20 mg/mL intravenous soluti,1,mg
+8000556,ON,00009001103,"Inj, Crovalimab-Akkz, 10 Mg",10,mg
+8000557,ON,60687079501,"Inj, Famotidine, 0.25 Mg",0.25,mg
+8000558,ON,60505082901,"Elosulfase Alfa, Injection",1,mg
+8000559,ON,00409341401,metoclopramide 5 mg/mL injection so,1,mg
+8000560,ON,65219044501,etomidate 2 mg/mL intravenous solut,0.5,mg
+8000561,ON,00904637061,"Inj, Zolbetuximab-Clzb, 2 Mg",2,mg
+8000562,OFF,00487950125,Ertapenem Injection,500,mg
+8000563,OFF,00406051262,oxyCODONE-acetaminophen 5 mg-325 mg,500,mg
+8000564,ON,00078065920,Estradiol Valerate 10 Mg Inj,10,ml
+8000565,ON,46287000660,SPS (with sorbitol) 15 gram-20 gram,25,mg
+8000566,ON,62332003131,rOPINIRole 0.5 mg tablet,100,mg
+8000568,ON,00469260130,"Myrbetriq 25 mg tablet,extended rel",1,mg
+8000569,ON,63323001302,thiamine HCl (vitamin B1) 100 mg/mL,10,mg
+8000570,ON,00071041813,Nitrostat 0.4 mg sublingual tablet,1,mg
+8000571,ON,00409166022,Fecal Microbiota Jslm 1 Ml,1,ml
+8000572,ON,25021012267,Inj Filgrastim Excl Biosimil,1,mcg
+8000573,ON,51079005120,Inj Tbo Filgrastim 1 Microg,1,ea
+8000845,ON,00904644961,Inj Axatilimab-Csfr 0.1 Mg,0.1,mg
+8000907,ON,66993045630,dapagliflozin 5 mg tablet,7.5,mg
+8000945,ON,50242004164,Cathflo Activase 2 mg intra-cathete,1,i.u.
+8000967,ON,50458058010,Xarelto 10 mg tablet,500,mg
+8001036,OFF,00904718361,docusate sodium 100 mg capsule,1,mg
+8001104,ON,00904673061,Anti-Inhibitor,1,gm
+8001126,ON,51079077120,"Inj, Eculizumab-Aagh, 2 Mg",2,mg
+8001141,OFF,68084024301,Clofarabine Injection,1,mg
+8001143,ON,63323050720,Carmustine Injection,100,mg
+8001150,ON,51079098520,busPIRone 5 mg tablet,1,mg
+8001171,ON,00641606010,midazolam 5 mg/mL injection solutio,1,gm
+8001204,ON,60505011201,Inj Pegfilgrastim-Bmez 0.5Mg,0.5,mg
+8001209,ON,60687062701,LORazepam 0.5 mg tablet,500,mg
+8001220,ON,89130202001,Durolane 60 mg/3 mL intra-articular,1,mg
+8001264,ON,00075291201,Lovenox 120 mg/0.8 mL subcutaneous,1,mg
+8001314,ON,00409610202,Inj Bimatoprost Itc Imp1Mcg,1,mcg
+8001331,ON,00409610202,furosemide 10 mg/mL injection solut,1,mg
+8001364,ON,63323010826,magnesium sulfate 1 gram/100 mL in,10,mg
+8001389,ON,60687024201,"Inj Mosunetuzumab-Axgb, 1 Mg",1,mg
+8001429,ON,00069600110,"Inj, Factor X, (Human), 1Iu",1,iu
+8001441,ON,63459091217,"Inj, Tofidence, 1 Mg",1,mg
+8001487,ON,51293081001,phenazopyridine 100 mg tablet,1,mg
+8001493,OFF,00002759701,"Inj, Elahere, 1 Mg",1,mg
+8001538,ON,00904723761,Inj Human Fibrinogen Con Nos,1,mg
+8001567,ON,00005445174,Inj Ogivri 10 Mg,10,mg
+8001616,ON,00000001243,Clinimix E 4.25/5-2000ml Solution i,1,ea
+8001664,ON,89130311101,Gelsyn-3  16.8 mg/2 mL intra-articu,2.5,mg
+8001710,ON,60687034144,potassium chloride 20 mEq/15 mL ora,25,mcg
+8001741,ON,00409733801,Inj Pegfilgrast Ex Bio 0.5Mg,0.5,mg
+8001749,ON,00517100401,atropine 0.4 mg/mL intravenous solu,1,mg
+8001784,ON,00069313019,Velaglucerase Alfa,100,units
+8001856,ON,69339013815,chlorhexidine gluconate 0.12 % mout,0.1,mg
+8001873,ON,65628020605,Inj Zenocutuzumab-Zbco 1 Mg,1,mg
+8001879,ON,00143950910,ketamine 100 mg/mL injection soluti,0.25,mg
+8001896,ON,68084021401,Inj Talimogene Laherparepvec,1,million
+8001902,ON,00004080085,"Inj, Bendamustine Hcl, 1Mg",1,mg
+8001917,ON,63323037604,octreotide acetate 100 mcg/mL injec,1,mg
+8001921,ON,63323037604,Temozolomide Injection,1,mg
+8001930,ON,51079007220,"Inj., Retisert, 0.01 Mg",0.01,mg
+8001933,ON,67457051920,mitoMYcin 20 mg intravenous solutio,100,ea
+8001992,ON,51079028520,diazePAM 5 mg tablet,0.1,mg
+8002008,ON,60505622601,"Inj., Kanjinti, 10 Mg",10,mg
+8002015,ON,65162044210,Ketorolac Tromethamine Inj,15,mg
+8002093,ON,70010075401,methocarbamol 500 mg tablet,0.1,mg
+8002115,ON,00456321063,Namenda 10 mg tablet,1,mg
+8002128,ON,13533063102,Rasburicase,0.5,mg
+8002168,ON,00054001820,predniSONE 20 mg tablet,per,dose
+8002182,ON,00409956610,Inj Retacrit Non-Esrd Use,1000,iu

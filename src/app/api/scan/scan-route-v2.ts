@@ -8,6 +8,7 @@ import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
 import { loadDeptMaps, isStructuralCategory } from "@/lib/departments";
 import { changeFieldForCategory, AWAITING_SYNC_STATUSES } from "@/lib/change-log";
+import { resolveActiveOrg } from "@/lib/active-org";
 
 export const maxDuration = 60;
 
@@ -634,11 +635,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { data: userData } = await supabaseAdmin
-      .from("users")
-      .select("org_id")
-      .eq("id", user.id)
-      .single();
+    const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+    const userData = __org ? { org_id: __org } : null;
     if (!userData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

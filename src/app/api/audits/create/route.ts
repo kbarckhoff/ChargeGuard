@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { resolveActiveOrg } from "@/lib/active-org";
 
 export async function POST(request: Request) {
   try {
@@ -16,11 +17,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { data: userData } = await supabaseAdmin
-      .from("users")
-      .select("org_id")
-      .eq("id", user.id)
-      .single();
+    const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+    const userData = __org ? { org_id: __org } : null;
     if (!userData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

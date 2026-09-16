@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2 } from "lucide-react";
 
 // Global menu: the hub (Dashboard), Findings & Analysis (results across reviews),
 // the CDM Change Log (accepted changes across runs), the CMS reference data
@@ -20,6 +21,10 @@ const NAV = [
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.isPlatformOwner) setIsOwner(true); }).catch(() => {});
+  }, []);
   const logout = async () => {
     await createClient().auth.signOut();
     router.push("/auth/login");
@@ -41,6 +46,11 @@ export function AppSidebar() {
             </Link>
           );
         })}
+        {isOwner && (
+          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+            <Building2 size={17} /> Admin
+          </Link>
+        )}
       </nav>
       <button onClick={logout} className="flex items-center gap-2.5 px-5 py-4 text-[13px] text-white/80 hover:text-white border-t border-white/15">
         <LogOut size={16} /> Sign out

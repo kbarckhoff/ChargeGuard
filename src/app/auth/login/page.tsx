@@ -4,7 +4,6 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Shield, Loader2 } from "lucide-react";
-import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -24,7 +23,9 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/assessment");
+      // Password verified. Middleware sends us to the OTP step if email is
+      // configured, or straight to the dashboard if it isn't yet.
+      router.push("/dashboard");
       router.refresh();
     }
   };
@@ -83,10 +84,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-sm text-[#64748b] text-center mt-4">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-[#2563eb] font-medium hover:underline">
-              Sign up
-            </Link>
+            Access is by invitation. Ask your administrator to add you.
           </p>
         </div>
       </div>

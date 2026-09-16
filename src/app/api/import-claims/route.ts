@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { isAuditLocked } from "@/lib/audit-lock";
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
     const { data: { user } } = await sessionClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const { data: userData } = await supabaseAdmin.from("users").select("org_id").eq("id", user.id).single();
+    const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+    const userData = { org_id: __org };
     if (!userData) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const { auditId, rows, replace = true } = await request.json();

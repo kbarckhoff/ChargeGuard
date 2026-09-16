@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { Badge, EmptyState, SEVERITY_CONFIG, formatImpact } from "@/components/ui/shared";
 import { PieChart, AlertTriangle } from "lucide-react";
 import { ExportForm } from "@/components/reports/ExportForm";
@@ -19,11 +20,8 @@ export default async function ReportsPage({
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user!.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user!.id);
+  const userData = { org_id: __org };
 
   // Scope to a specific run when ?auditId is passed (from inside a run);
   // otherwise fall back to the most recent audit.

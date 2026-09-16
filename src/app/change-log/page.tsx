@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { ChangeLogClient } from "@/components/changelog/ChangeLogClient";
 
 // The CDM change log: the source of truth for accepted changes across every
@@ -9,8 +10,8 @@ export default async function ChangeLogPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const db = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile } = await db.from("users").select("org_id").eq("id", user!.id).single();
-  const orgId = profile?.org_id as string | undefined;
+  const { orgId: __org } = await resolveActiveOrg(db, user!.id);
+  const orgId = (__org ?? undefined) as string | undefined;
 
   let entries: any[] = [], reviews: { id: string; name: string }[] = [], latestAuditId: string | null = null;
   if (orgId) {

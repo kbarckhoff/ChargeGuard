@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { AssessmentFlow } from "@/components/assessment/AssessmentFlow";
 import { EmptyState } from "@/components/ui/shared";
 import { ClipboardList } from "lucide-react";
@@ -16,7 +17,8 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: profile } = await admin.from("users").select("org_id").eq("id", user!.id).single();
+  const { orgId: __org } = await resolveActiveOrg(admin, user!.id);
+  const profile = { org_id: __org };
   // Load the selected quarter run when one is chosen on the home page; otherwise
   // fall back to the most recent run.
   let audit: any = null;

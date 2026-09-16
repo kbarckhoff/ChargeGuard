@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { resolveActiveOrg } from "@/lib/active-org";
 import type { TaskStatus, FindingSeverity, FindingStatus } from "@/types";
 
 // ─── Helper: Admin Supabase client ───────────────────────────
@@ -26,11 +27,8 @@ export async function createAudit(formData: FormData) {
   if (!user) throw new Error("Not authenticated");
 
   // Get user's org using admin client
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+  const userData = __org ? { org_id: __org } : null;
   if (!userData) throw new Error("User not found");
 
   const { data, error } = await supabaseAdmin.rpc("create_audit_with_phases", {
@@ -105,11 +103,8 @@ export async function createFinding(data: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+  const userData = __org ? { org_id: __org } : null;
 
   const { error } = await supabaseAdmin.from("findings").insert({
     ...data,
@@ -165,11 +160,8 @@ export async function importChargeItems(
   if (!user) throw new Error("Not authenticated");
 
   // Get org_id using admin client (bypasses RLS)
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+  const userData = __org ? { org_id: __org } : null;
   if (!userData) throw new Error("User not found");
 
   // Transform rows using column mappings
@@ -234,11 +226,8 @@ export async function addComment(entityType: string, entityId: string, body: str
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+  const userData = __org ? { org_id: __org } : null;
 
   const { error } = await supabaseAdmin.from("comments").insert({
     org_id: userData!.org_id,
@@ -268,11 +257,8 @@ export async function createDepartmentMeeting(data: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: userData } = await supabaseAdmin
-    .from("users")
-    .select("org_id")
-    .eq("id", user.id)
-    .single();
+  const { orgId: __org } = await resolveActiveOrg(supabaseAdmin, user.id);
+  const userData = __org ? { org_id: __org } : null;
 
   const { error } = await supabaseAdmin.from("department_meetings").insert({
     ...data,
