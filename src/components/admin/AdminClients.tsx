@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Building2, Plus, Check, Loader2, Copy } from "lucide-react";
 
 type Row = { id: string; name: string; members: number };
@@ -103,7 +104,7 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
               <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center shrink-0"><Building2 size={16} className="text-[#1f6fd4]" /></div>
               <div className="min-w-0">
                 <div className="text-[14px] font-medium text-[#0f172a] truncate flex items-center gap-2">
-                  {r.name}
+                  <Link href={`/admin/${r.id}`} className="hover:underline hover:text-[#1f6fd4]">{r.name}</Link>
                   {r.id === activeOrgId && <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">ACTIVE</span>}
                 </div>
                 <div className="text-[12px] text-[#94a3b8]">{r.members} {r.members === 1 ? "user" : "users"}</div>
