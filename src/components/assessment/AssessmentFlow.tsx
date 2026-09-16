@@ -45,6 +45,35 @@ async function streamCsvFile(file: File, opts: StreamOpts, onProgress: (codes: n
   if (buffer.length) processLine(buffer);
   return { rows: [...acc.entries()].map(([hcpcs, set]) => ({ hcpcs, gross: aggregate([...set], opts.method) })) };
 }
+
+// Stream just far enough to collect a few rows that actually extract under the
+// detected columns. Needed because some MRFs list DRG/CDM rows (with a blank
+// gross) for hundreds of thousands of lines before the CPT/HCPCS rows, so the
+// first-256KB preview shows nothing even though the file is fine.
+async function collectSample(file: File, headerLineIndex: number, cfg: any, want = 10, maxLines = 800000): Promise<string[][]> {
+  const reader = (file.stream() as any).pipeThrough(new TextDecoderStream()).getReader();
+  const out: string[][] = [];
+  let buffer = "", idx = -1, lc = 0, stop = false;
+  const proc = (line: string) => {
+    idx++;
+    if (idx <= headerLineIndex || !line.trim()) return;
+    const cells = splitCsvLine(line);
+    if (extractCsvRow(cells, cfg)) out.push(cells);
+  };
+  while (!stop) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += value;
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      proc(buffer.slice(0, nl).replace(/\r$/, ""));
+      buffer = buffer.slice(nl + 1);
+      if (out.length >= want || ++lc >= maxLines) { stop = true; break; }
+    }
+  }
+  try { await reader.cancel(); } catch { /* ignore */ }
+  return out;
+}
 import { CDMImport } from "@/components/cdm/CDMImport";
 import { RUImport } from "@/components/cdm/RUImport";
 import { FormularyImport } from "@/components/cdm/FormularyImport";
@@ -475,7 +504,18 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
         const headText = await f.slice(0, 262144).text();
         const pv = previewCsv(headText);
         if (pv.hi < 0 || !pv.headers.length) { setStatus("Couldn't detect a header row. Is this a CMS price-transparency file?"); setBusy(false); return; }
-        setFile(f); setPreview(pv);
+        // The first rows of some MRFs are DRG/CDM with a blank gross; scan deeper
+        // to surface real CPT/HCPCS sample rows so the preview isn't empty.
+        let sample = pv.sample;
+        if (pv.def.codeIdx >= 0 && pv.def.grossIdx >= 0) {
+          setStatus("Scanning file for codes…");
+          try {
+            const cfg0 = { grossIdx: pv.def.grossIdx, codeCols: [{ ci: pv.def.codeIdx, ti: pv.def.typeIdx, direct: pv.def.typeIdx < 0 }] };
+            const scanned = await collectSample(f, pv.hi, cfg0);
+            if (scanned.length) sample = scanned;
+          } catch { /* keep head sample */ }
+        }
+        setFile(f); setPreview({ ...pv, sample });
         setSel({ codeIdx: pv.def.codeIdx, typeIdx: pv.def.typeIdx, grossIdx: pv.def.grossIdx, method: "median" });
         setBusy(false); setStatus(null);
       }
@@ -559,12 +599,14 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
                       <tbody>{previewRows.map((r: any, k: number) => <tr key={k} className="border-t border-[#edf0f4]"><td className="px-3 py-2 font-semibold">{r.hcpcs}</td><td className="px-3 py-2">${r.gross.toLocaleString()}</td></tr>)}</tbody>
                     </table>
                   </div>
-                ) : <div className="text-[13px] text-[#b45309] bg-[#fef4e2] rounded-lg px-3 py-2">No codes extracted with these columns. Pick the column that holds the CPT/HCPCS and a numeric gross charge.</div>}
+                ) : (sel.codeIdx >= 0 && sel.grossIdx >= 0)
+                  ? <div className="text-[13px] text-[#6b7280] bg-[#f6f7f9] rounded-lg px-3 py-2">No sample codes near the top of this file (its first rows may be DRG/CDM lines with no gross). The full file is still processed on import — click Import prices to run it.</div>
+                  : <div className="text-[13px] text-[#b45309] bg-[#fef4e2] rounded-lg px-3 py-2">Pick the column that holds the CPT/HCPCS code and a numeric gross charge.</div>}
               </div>
             </div>
             <div className="px-6 py-4 border-t border-[#edf0f4] sticky bottom-0 bg-white rounded-b-2xl flex items-center justify-between">
               <button onClick={() => setPreview(null)} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Cancel</button>
-              <button onClick={confirmImport} disabled={busy || !previewRows.length} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Import prices</button>
+              <button onClick={confirmImport} disabled={busy || sel.codeIdx < 0 || sel.grossIdx < 0} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Import prices</button>
             </div>
           </div>
         </div>
