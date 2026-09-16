@@ -101,7 +101,7 @@ const STEPS = [
 ];
 
 export function AssessmentFlow({
-  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, reviewPeriod, lowVolume,
+  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, reviewPeriod, lowVolume, initialComps,
 }: {
   auditId: string;
   hospitalName: string;
@@ -116,16 +116,24 @@ export function AssessmentFlow({
   intakeLocked?: boolean;
   reviewPeriod?: string;
   lowVolume?: number | null;
+  initialComps?: { n: string; c: string }[] | null;
 }) {
   // Once the intake steps (Intake -> Imports -> Review Imports) are finished, the
   // review is locked: profile, files, competitors, and rules become read-only.
   const locked = status === "completed" || !!intakeLocked;
   const [step, setStep] = useState(0);
-  const [comps, setComps] = useState([
-    { n: "Riverside Medical Center", c: "Miami, FL" },
-    { n: "Bayfront Health", c: "St. Petersburg, FL" },
-    { n: "Mercy Regional", c: "Orlando, FL" },
-  ]);
+  // Competitors are per-client, loaded from this audit's saved list (empty for a
+  // brand-new client). Never seed shared/sample names across clients.
+  const [comps, setComps] = useState<{ n: string; c: string }[]>(
+    initialComps && initialComps.length ? initialComps : [{ n: "", c: "" }],
+  );
+  // Persist the competitor list to this audit whenever it meaningfully changes.
+  const saveComps = (list: { n: string; c: string }[]) => {
+    fetch("/api/audits/competitors", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ auditId, competitors: list }),
+    }).catch(() => {});
+  };
   const pc = peerCounts || {};
 
   // Non-owner (client) users see 3 steps; Peer Setup is owner-only.
@@ -194,10 +202,10 @@ export function AssessmentFlow({
                 <button onClick={reopenIntake} disabled={lockBusy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#2563eb] bg-white border border-[#c7d2fe] hover:bg-[#eef2ff] disabled:opacity-50">{lockBusy ? <Loader2 size={13} className="animate-spin" /> : null} Reopen to edit</button>
               </div>
             )}
-            {step === 0 && <Intake comps={comps} setComps={setComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} onNext={() => setStep(nextOf(0))} />}
+            {step === 0 && <Intake comps={comps} setComps={setComps} saveComps={saveComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} onNext={() => setStep(nextOf(0))} />}
             {step === 1 && <Imports auditId={auditId} chargeItems={chargeItems} counts={counts} locked={locked} onBack={() => setStep(prevOf(1))} onNext={() => setStep(nextOf(1))} />}
             {step === 2 && <Review auditId={auditId} counts={counts} chargeItems={chargeItems} isOwner={isOwner} onBack={() => setStep(prevOf(2))} onNext={() => setStep(nextOf(2))} />}
-            {step === 3 && isOwner && <Peer comps={comps} setComps={setComps} auditId={auditId} peerCounts={pc} onBack={() => setStep(prevOf(3))} />}
+            {step === 3 && isOwner && <Peer comps={comps} setComps={setComps} saveComps={saveComps} auditId={auditId} peerCounts={pc} onBack={() => setStep(prevOf(3))} />}
           </div>
         </div>
       </main>
@@ -234,7 +242,7 @@ function chip(text: string, tone: string) {
 }
 
 /* ---------- STEP 1: INTAKE ---------- */
-function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume }: any) {
+function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume }: any) {
   const facilityType: FacilityType = "short_term_acute";
   const [reviewPeriod, setReviewPeriod] = useState<string>(initialReviewPeriod || "");
   const [lowVolume, setLowVolume] = useState<string>(initialLowVolume != null ? String(initialLowVolume) : "10");
@@ -289,11 +297,11 @@ function Intake({ comps, setComps, hospitalName, auditName, peerCounts, isOwner,
           return (
             <div key={i} className="flex items-center gap-3 mb-3">
               <span className="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center shrink-0" style={{ background: AVCOLORS[i % AVCOLORS.length] }}>{(c.n || "?")[0]}</span>
-              <input className={inputCls + (lk ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={c.n} disabled={lk} onChange={(e) => setComp(i, "n", e.target.value)} placeholder="Competitor hospital name" />
-              <input className={inputCls + (lk ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={c.c} disabled={lk} onChange={(e) => setComp(i, "c", e.target.value)} placeholder="City, State" />
+              <input className={inputCls + (lk ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={c.n} disabled={lk} onChange={(e) => setComp(i, "n", e.target.value)} onBlur={() => saveComps?.(comps)} placeholder="Competitor hospital name" />
+              <input className={inputCls + (lk ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={c.c} disabled={lk} onChange={(e) => setComp(i, "c", e.target.value)} onBlur={() => saveComps?.(comps)} placeholder="City, State" />
               {lk
                 ? <span title={locked ? "Review locked" : "Price file loaded"} className="p-2 text-[#9aa2af]"><Lock size={15} /></span>
-                : <button onClick={() => setComps(comps.filter((_: any, j: number) => j !== i))} className="p-2 rounded-lg hover:bg-[#f6f7f9] text-[#9aa2af]"><X size={16} /></button>}
+                : <button onClick={() => { const next = comps.filter((_: any, j: number) => j !== i); setComps(next); saveComps?.(next); }} className="p-2 rounded-lg hover:bg-[#f6f7f9] text-[#9aa2af]"><X size={16} /></button>}
             </div>
           );
         })}
@@ -658,7 +666,7 @@ function OrphanPeers({ comps, peerCounts, auditId, onChanged }: any) {
   );
 }
 
-function Peer({ comps, setComps, auditId, peerCounts, onBack }: any) {
+function Peer({ comps, setComps, saveComps, auditId, peerCounts, onBack }: any) {
   // The analysis runs automatically after peer files are added or changed
   // (debounced). No manual "run" button.
   const [scanState, setScanState] = useState<"idle" | "running" | "done">("idle");
@@ -671,7 +679,8 @@ function Peer({ comps, setComps, auditId, peerCounts, onBack }: any) {
   const addComp = () => {
     const name = newComp.trim();
     if (!name || (comps || []).some((c: any) => (c.n || "").trim().toLowerCase() === name.toLowerCase())) return;
-    setComps?.([...(comps || []), { n: name, c: "" }]);
+    const next = [...(comps || []), { n: name, c: "" }];
+    setComps?.(next); saveComps?.(next);
     setNewComp("");
   };
   const autoScan = () => {
