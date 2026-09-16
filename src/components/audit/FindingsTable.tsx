@@ -145,6 +145,7 @@ export function FindingsTable({
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Category</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Charge Item</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Status</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Tier</th>
                 <th className="px-3 py-2.5 text-right font-medium text-[#475569] text-xs">Impact</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs w-8" />
               </tr>
@@ -169,9 +170,11 @@ export function FindingsTable({
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <Badge variant={statusVariant(f.status)}>{statusLabel(f.status)}</Badge>
-                      {f.tier && TIER_META[f.tier] && <span title={TIER_META[f.tier].title} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${TIER_META[f.tier].cls}`}>{TIER_META[f.tier].label}</span>}
                       {f.is_carried && <span title={f.resolution_note || "Carried from a prior review"} className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">CARRIED</span>}
                     </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {(() => { const t = TIER_META[f.tier || 1]; return <span title={t.title} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${t.cls}`}>{t.label}</span>; })()}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-[#475569]">
                     {f.financial_impact ? `$${f.financial_impact.toLocaleString()}` : "—"}
@@ -183,7 +186,7 @@ export function FindingsTable({
               ))}
               {findings.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[#94a3b8] text-sm">
+                  <td colSpan={8} className="py-12 text-center text-[#94a3b8] text-sm">
                     No findings match the current filters.
                   </td>
                 </tr>
