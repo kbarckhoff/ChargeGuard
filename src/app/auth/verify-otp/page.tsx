@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
@@ -54,12 +54,10 @@ export default function VerifyOtpPage() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/auth/login"); router.refresh(); };
 
   return (
-    <div className="min-h-screen bg-[#1e3a8a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a6cff] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-[#2563eb] flex items-center justify-center">
-            <Shield size={20} className="text-white" />
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <img src="/logo-login.png" alt="ChargeGuard" className="w-11 h-11 object-contain" />
           <span className="text-xl font-bold text-white tracking-tight">ChargeGuard</span>
         </div>
 

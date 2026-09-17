@@ -30,10 +30,10 @@ export default function UpdatePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1e3a8a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a6cff] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <img src="/logo-mark.png" alt="ChargeGuard" className="w-10 h-10 object-contain" style={{ filter: "brightness(0) invert(1)" }} />
+          <img src="/logo-login.png" alt="ChargeGuard" className="w-11 h-11 object-contain" />
           <span className="text-xl font-bold text-white tracking-tight">ChargeGuard</span>
         </div>
 
