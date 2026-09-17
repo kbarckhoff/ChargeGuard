@@ -59,6 +59,10 @@ export async function updateSession(request: NextRequest) {
   const mustChange = (user.user_metadata as any)?.must_change_password === true;
 
   if (!otpOk) {
+    // Setting/resetting your own password is allowed before the OTP second
+    // factor: the user has already proven identity (password sign-in, or a
+    // password-recovery email link). This is what makes "forgot password" work.
+    if (path === "/auth/update-password") return supabaseResponse;
     if (path === "/auth/verify-otp") return supabaseResponse;
     return redirectTo("/auth/verify-otp");
   }

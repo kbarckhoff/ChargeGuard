@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -32,16 +32,14 @@ export default function UpdatePasswordPage() {
   return (
     <div className="min-h-screen bg-[#1e3a8a] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-[#2563eb] flex items-center justify-center">
-            <Shield size={20} className="text-white" />
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <img src="/logo-mark.png" alt="ChargeGuard" className="w-10 h-10 object-contain" style={{ filter: "brightness(0) invert(1)" }} />
           <span className="text-xl font-bold text-white tracking-tight">ChargeGuard</span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 shadow-xl">
           <h1 className="text-lg font-semibold text-[#0f172a] mb-1">Set your password</h1>
-          <p className="text-sm text-[#64748b] mb-6">Choose a new password to replace the temporary one.</p>
+          <p className="text-sm text-[#64748b] mb-6">Choose a new password for your account.</p>
 
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
 
