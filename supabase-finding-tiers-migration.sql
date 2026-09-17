@@ -13,6 +13,12 @@
 -- Idempotent: safe to re-run.
 -- ============================================================
 
+-- The 'na' (N/A) disposition is a real finding_status the UI/API offer, but the
+-- original enum only had open/in_review/accepted/rejected/resolved. Add it so the
+-- N/A disposition can persist (without this, N/A returns a 500 on save).
+-- Note: ALTER TYPE ... ADD VALUE must run outside a transaction block.
+alter type finding_status add value if not exists 'na';
+
 alter table findings add column if not exists tier smallint;
 alter table finding_exceptions add column if not exists disposition text;
 

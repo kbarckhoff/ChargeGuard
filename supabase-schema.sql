@@ -15,7 +15,7 @@ CREATE TYPE audit_status AS ENUM ('draft', 'in_progress', 'on_hold', 'completed'
 CREATE TYPE phase_status AS ENUM ('not_started', 'in_progress', 'review', 'completed');
 CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'skipped', 'blocked');
 CREATE TYPE finding_severity AS ENUM ('critical', 'high', 'medium', 'low', 'info');
-CREATE TYPE finding_status AS ENUM ('open', 'in_review', 'accepted', 'rejected', 'resolved');
+CREATE TYPE finding_status AS ENUM ('open', 'in_review', 'accepted', 'rejected', 'na', 'resolved');
 CREATE TYPE cdm_color AS ENUM ('red', 'blue', 'green', 'purple', 'none');
 CREATE TYPE claim_type AS ENUM (
   'interventional_radiology', 'pacemaker', 'cath_lab', 'angiography',

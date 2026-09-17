@@ -26,6 +26,7 @@ create table if not exists cdm_change_log (
   rationale          text,
   effective_date     date,
   status             text not null default 'pending',  -- pending | exported | implemented | void
+  source             text not null default 'tool',   -- tool | manual (manual = documentation-only)
   source_finding_id  uuid references findings(id) on delete set null,
   requested_by       uuid references users(id) on delete set null,
   approver           uuid references users(id) on delete set null,
@@ -37,7 +38,8 @@ create table if not exists cdm_change_log (
 create index if not exists idx_cdm_change_log_org on cdm_change_log(org_id);
 create index if not exists idx_cdm_change_log_status on cdm_change_log(org_id, status);
 create index if not exists idx_cdm_change_log_audit on cdm_change_log(audit_id);
--- One live (non-void) change per line+field, so re-accepting updates rather than duplicates.
+-- One live (non-void) change per line+field for TOOL entries, so re-accepting
+-- updates rather than duplicates. Manual (documentation) entries are exempt.
 create unique index if not exists uq_cdm_change_log_live
   on cdm_change_log(org_id, line_key, field)
-  where status <> 'void';
+  where status <> 'void' and source = 'tool';
