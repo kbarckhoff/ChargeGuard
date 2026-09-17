@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { resolveActiveOrg } from "@/lib/active-org";
 import { Badge } from "@/components/ui/shared";
 import { TeamManager } from "@/components/settings/TeamManager";
 
@@ -7,24 +8,28 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("users").select("*, organizations(*)").eq("id", user!.id).single();
-  const org = profile?.organizations as any;
 
-  // Team data (service-role read, scoped to this org).
-  const orgId = profile?.org_id as string | undefined;
-  let members: any[] = [], departments: any[] = [], invites: any[] = [];
+  const db = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+  // Team is scoped to the client currently being viewed (active org), so that
+  // inviting/managing people acts on that client.
+  const { orgId } = await resolveActiveOrg(db, user!.id);
+  const { data: org } = orgId ? await db.from("organizations").select("*").eq("id", orgId).single() : { data: null as any };
+
+  // Members = users whose home org is this client, plus anyone granted access
+  // via org_members (shown as "shared access").
+  let members: any[] = [];
   if (orgId) {
-    const db = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
-    const [{ data: deps }, { data: us }, { data: uds }, { data: invs }] = await Promise.all([
-      db.from("departments").select("id, name").eq("org_id", orgId).eq("is_active", true).order("sort_order"),
+    const [{ data: homeUsers }, { data: shares }] = await Promise.all([
       db.from("users").select("id, full_name, email, is_active, is_platform_owner").eq("org_id", orgId),
-      db.from("user_departments").select("user_id, department_id").eq("org_id", orgId),
-      db.from("invitations").select("id, email, department_ids").eq("org_id", orgId).eq("status", "pending"),
+      db.from("org_members").select("user_id").eq("org_id", orgId),
     ]);
-    departments = deps || [];
-    const byUser: Record<string, string[]> = {};
-    for (const ud of uds || []) (byUser[(ud as any).user_id] ||= []).push((ud as any).department_id);
-    members = (us || []).map((u: any) => ({ ...u, department_ids: byUser[u.id] || [] }));
-    invites = invs || [];
+    const homeIds = new Set((homeUsers || []).map((u: any) => u.id));
+    members = (homeUsers || []).map((u: any) => ({ ...u, via: "home" }));
+    const sharedIds = (shares || []).map((s: any) => s.user_id).filter((id: string) => !homeIds.has(id));
+    if (sharedIds.length) {
+      const { data: sharedUsers } = await db.from("users").select("id, full_name, email, is_active, is_platform_owner").in("id", sharedIds);
+      for (const u of sharedUsers || []) members.push({ ...(u as any), via: "shared" });
+    }
   }
 
   return (
@@ -59,7 +64,7 @@ export default async function SettingsPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#64748b]">Name</span>
-                <span className="text-sm font-medium text-[#0f172a]">{(profile?.organizations as any)?.name}</span>
+                <span className="text-sm font-medium text-[#0f172a]">{org?.name}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#64748b]">Slug</span>
@@ -73,7 +78,7 @@ export default async function SettingsPage() {
           </div>
 
           {/* Team */}
-          <TeamManager members={members} departments={departments} invites={invites} />
+          <TeamManager members={members} />
         </div>
       </div>
     </>

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { sendEmail, sesConfigured } from "@/lib/email";
 import { genTempPassword } from "@/lib/otp";
+import { resolveActiveOrg } from "@/lib/active-org";
 
 export const runtime = "nodejs";
 
@@ -36,15 +37,39 @@ export async function POST(request: Request) {
     const { data: me } = await db.from("users").select("org_id, is_platform_owner, full_name").eq("id", user.id).single();
     if (!me?.org_id) return NextResponse.json({ error: "No organization" }, { status: 404 });
 
-    const { email, department_ids, org_id } = await request.json();
+    const { email, org_id } = await request.json();
     if (!email || !/.+@.+\..+/.test(email)) return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
-    const targetOrg = (me.is_platform_owner && org_id) ? org_id : me.org_id;
-    const deptIds: string[] = Array.isArray(department_ids) ? department_ids : [];
+    // Add to the client the inviter is currently working in (platform owners may
+    // target another org explicitly).
+    const { orgId: activeOrg } = await resolveActiveOrg(db, user.id);
+    const targetOrg = (me.is_platform_owner && org_id) ? org_id : (activeOrg || me.org_id);
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // Already a member of this org?
-    const { data: existing } = await db.from("users").select("id").eq("org_id", targetOrg).ilike("email", cleanEmail).maybeSingle();
-    if (existing) return NextResponse.json({ error: "That person is already a member of this organization." }, { status: 409 });
+    const origin = new URL(request.url).origin;
+    const loginUrl = `${origin}/auth/login`;
+    const { data: org } = await db.from("organizations").select("name").eq("id", targetOrg).single();
+    const orgLabel = org?.name ? ` — ${org.name}` : "";
+
+    // If this email already has an account, don't error — just grant access to
+    // this client (org_members) and email them that they've been added.
+    const { data: existingUser } = await db.from("users").select("id, org_id").ilike("email", cleanEmail).maybeSingle();
+    if (existingUser) {
+      const alreadyHome = existingUser.org_id === targetOrg;
+      const { data: existingMember } = await db.from("org_members").select("org_id").eq("user_id", existingUser.id).eq("org_id", targetOrg).maybeSingle();
+      if (alreadyHome || existingMember) {
+        return NextResponse.json({ error: "That person already has access to this client." }, { status: 409 });
+      }
+      await db.from("org_members").upsert({ user_id: existingUser.id, org_id: targetOrg }, { onConflict: "user_id,org_id" });
+
+      const subject = `You've been added to ChargeGuard${orgLabel}`;
+      const text =
+        `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on ChargeGuard.\n\n` +
+        `You can now access it with your existing account. Sign in here: ${loginUrl}\n\n` +
+        `Use the client switcher in the top of the left menu to move between the clients you have access to.`;
+      let emailed = false;
+      try { emailed = (await sendEmail([cleanEmail], subject, text)).ok; } catch { emailed = false; }
+      return NextResponse.json({ ok: true, added: true, emailed });
+    }
 
     const fullName = nameFromEmail(cleanEmail);
     const tempPassword = genTempPassword();
@@ -72,16 +97,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: uErr.message }, { status: 500 });
     }
 
-    // Department memberships (permission scope).
-    if (deptIds.length) {
-      await db.from("user_departments").insert(deptIds.map((d) => ({ user_id: uid, department_id: d, org_id: targetOrg })));
-    }
+    // Record the client membership (their home org).
+    await db.from("org_members").upsert({ user_id: uid, org_id: targetOrg }, { onConflict: "user_id,org_id" });
 
     // Email the temporary password + where to sign in.
-    const origin = new URL(request.url).origin;
-    const loginUrl = `${origin}/auth/login`;
-    const { data: org } = await db.from("organizations").select("name").eq("id", targetOrg).single();
-    const subject = `Your ChargeGuard account${org?.name ? ` — ${org.name}` : ""}`;
+    const subject = `Your ChargeGuard account${orgLabel}`;
     const text =
       `${me.full_name || "A teammate"} added you to ChargeGuard.\n\n` +
       `Sign in here: ${loginUrl}\n` +

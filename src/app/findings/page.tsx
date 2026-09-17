@@ -28,16 +28,8 @@ export default async function FindingsPage({
   const { orgId: __org, isPlatformOwner: __owner } = await resolveActiveOrg(supabaseAdmin, user!.id);
   const userData = { org_id: __org, is_platform_owner: __owner };
 
-  // Department gating: a user sees only findings for the departments they belong
-  // to. The platform owner, or a user who belongs to every department, sees all.
-  const [{ data: myDepts }, { count: orgDeptCount }] = await Promise.all([
-    supabaseAdmin.from("user_departments").select("department_id").eq("user_id", user!.id),
-    supabaseAdmin.from("departments").select("id", { count: "exact", head: true }).eq("org_id", userData!.org_id).eq("is_active", true),
-  ]);
-  const myDeptIds = (myDepts || []).map((d) => (d as any).department_id as string);
-  const canSeeAll = !!userData?.is_platform_owner || (orgDeptCount != null && orgDeptCount > 0 && myDeptIds.length >= orgDeptCount);
-  // When scoped, filter to the user's departments (empty set -> match nothing).
-  const scopeIds = myDeptIds.length ? myDeptIds : ["00000000-0000-0000-0000-000000000000"];
+  // Everyone in a client sees all of that client's findings (department-level
+  // gating was removed).
 
   // Scope to a specific run when ?auditId is passed (from inside a run);
   // otherwise fall back to the most recent audit.
@@ -85,7 +77,6 @@ export default async function FindingsPage({
       .eq("audit_id", auditId)
       .eq("ehr_lagging", false)
       .order("id", { ascending: true }); // stable sort so range paging can't repeat rows
-    if (!canSeeAll) statsQuery = statsQuery.in("owner_department_id", scopeIds);
     const { data, error } = await statsQuery.range(offset, offset + 999);
     if (error || !data || data.length === 0) break;
     allFindings.push(...data);
@@ -109,7 +100,6 @@ export default async function FindingsPage({
     .eq("ehr_lagging", false)
     .order("severity", { ascending: true })
     .order("created_at", { ascending: false });
-  if (!canSeeAll) query = query.in("owner_department_id", scopeIds);
   // Scope the table to the current tab's bucket (peer tab has its own view).
   if (tab !== "peer") query = query.in("category", bucketCats.length ? bucketCats : ["__none__"]);
 
@@ -171,7 +161,6 @@ export default async function FindingsPage({
     .eq("audit_id", auditId)
     .eq("ehr_lagging", true)
     .order("category");
-  if (!canSeeAll) laggingQuery = laggingQuery.in("owner_department_id", scopeIds);
   const { data: laggingFindings } = await laggingQuery;
   const lagging = laggingFindings || [];
 
