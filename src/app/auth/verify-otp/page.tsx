@@ -22,7 +22,7 @@ export default function VerifyOtpPage() {
     (async () => {
       const res = await fetch("/api/auth/otp/send", { method: "POST" });
       const d = await res.json().catch(() => ({}));
-      if (d.skipped) { router.push("/dashboard"); router.refresh(); return; }
+      if (d.skipped) { router.push("/runs"); router.refresh(); return; }
       if (!res.ok) setError(d.error || "Could not send a code.");
       else setInfo("We emailed you a 6-digit code. It expires in 10 minutes.");
     })();
@@ -38,7 +38,7 @@ export default function VerifyOtpPage() {
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) { setError(d.error || "Incorrect code."); setLoading(false); return; }
-    router.push(d.mustChange ? "/auth/update-password" : "/dashboard");
+    router.push(d.mustChange ? "/auth/update-password" : "/runs");
     router.refresh();
   };
 

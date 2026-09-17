@@ -15,38 +15,26 @@ export default async function RunsPage() {
   const { orgId: __org } = await resolveActiveOrg(db, user!.id);
   const profile = { org_id: __org };
 
-  const { data: audits } = await db
-    .from("audits")
-    .select("id, name, hospital_name, created_at, status, period_year, period_quarter")
-    .eq("org_id", profile?.org_id)
-    .order("period_year", { ascending: false, nullsFirst: false })
-    .order("period_quarter", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+  // Fetch the run list and every run's KPIs in parallel. run_stats() returns
+  // all counts + impact sums for the org in a single query (see the perf-indexes
+  // migration), replacing the old ~100 sequential per-run queries.
+  const [{ data: audits }, { data: statRows }] = await Promise.all([
+    db
+      .from("audits")
+      .select("id, name, hospital_name, created_at, status, period_year, period_quarter")
+      .eq("org_id", profile?.org_id)
+      .order("period_year", { ascending: false, nullsFirst: false })
+      .order("period_quarter", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    db.rpc("run_stats", { p_org: profile?.org_id }),
+  ]);
 
-  const headCount = async (table: string, auditId: string, extra?: (q: any) => any) => {
-    let q = db.from(table).select("id", { count: "exact", head: true }).eq("audit_id", auditId);
-    if (extra) q = extra(q);
-    return (await q).count || 0;
-  };
-  // Sum of estimated financial impact on findings of a given status (paginated).
-  const impactByStatus = async (auditId: string, status: string) => {
-    let sum = 0;
-    for (let off = 0; ; off += 1000) {
-      const { data } = await db.from("findings").select("financial_impact").eq("audit_id", auditId).eq("status", status).not("financial_impact", "is", null).range(off, off + 999);
-      if (!data || data.length === 0) break;
-      for (const r of data) sum += Number(r.financial_impact) || 0;
-      if (data.length < 1000) break;
-    }
-    return sum;
-  };
-  const lastScanned = async (auditId: string) => {
-    const { data } = await db.from("findings").select("created_at").eq("audit_id", auditId).order("created_at", { ascending: false }).limit(1);
-    return data?.[0]?.created_at || null;
-  };
+  const statById: Record<string, any> = {};
+  for (const s of (statRows as any[]) || []) statById[s.audit_id] = s;
 
-  const runs = [] as any[];
-  for (const a of audits || []) {
-    runs.push({
+  const runs = (audits || []).map((a: any) => {
+    const s = statById[a.id] || {};
+    return {
       id: a.id,
       name: a.name,
       hospital_name: a.hospital_name || "Hospital",
@@ -54,16 +42,16 @@ export default async function RunsPage() {
       status: a.status,
       period_year: a.period_year,
       period_quarter: a.period_quarter,
-      chargeItems: await headCount("charge_items", a.id),
-      openFindings: await headCount("findings", a.id, (q) => q.eq("status", "open")),
-      resolvedFindings: await headCount("findings", a.id, (q) => q.eq("status", "resolved")),
-      criticalOpen: await headCount("findings", a.id, (q) => q.eq("status", "open").eq("severity", "critical")),
-      impact: await impactByStatus(a.id, "open"),
-      captured: await impactByStatus(a.id, "resolved"),
-      peerCount: await headCount("peer_prices", a.id),
-      lastScanned: await lastScanned(a.id),
-    });
-  }
+      chargeItems: Number(s.charge_items) || 0,
+      openFindings: Number(s.open_findings) || 0,
+      resolvedFindings: Number(s.resolved_findings) || 0,
+      criticalOpen: Number(s.critical_open) || 0,
+      impact: Number(s.open_impact) || 0,
+      captured: Number(s.captured_impact) || 0,
+      peerCount: Number(s.peer_count) || 0,
+      lastScanned: s.last_scanned || null,
+    };
+  });
 
   // KPIs for this hospital's reviews.
   const kpis = {

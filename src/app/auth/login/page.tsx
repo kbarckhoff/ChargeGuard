@@ -26,8 +26,8 @@ export default function LoginPage() {
       setLoading(false);
     } else {
       // Password verified. Middleware sends us to the OTP step if email is
-      // configured, or straight to the dashboard if it isn't yet.
-      router.push("/dashboard");
+      // configured, or straight to the app if it isn't yet.
+      router.push("/runs");
       router.refresh();
     }
   };

@@ -79,7 +79,7 @@ export async function updateSession(request: NextRequest) {
     path === "/auth/verify-otp" ||
     path === "/auth/update-password"
   ) {
-    return redirectTo("/dashboard");
+    return redirectTo("/runs");
   }
 
   return supabaseResponse;

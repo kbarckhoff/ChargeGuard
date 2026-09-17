@@ -25,7 +25,7 @@ export default function UpdatePasswordPage() {
       data: { must_change_password: false },
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    router.push("/dashboard");
+    router.push("/runs");
     router.refresh();
   };
 
