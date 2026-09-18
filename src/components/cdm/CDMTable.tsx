@@ -144,7 +144,7 @@ export function CDMTable({
                       className="px-3 py-2 font-mono text-xs"
                       style={
                         item.cdm_color === "red" ? { color: "#dc2626", fontWeight: 600 } :
-                        item.cdm_color === "blue" ? { color: "#2563eb", fontWeight: 600 } :
+                        item.cdm_color === "blue" ? { color: "#1e293b", fontWeight: 600 } :
                         { color: "#334155" }
                       }
                     >

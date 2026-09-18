@@ -60,7 +60,7 @@ export default async function ClaimReviewsPage() {
                 <span className="text-sm text-[#94a3b8]">/ {target} minimum</span>
               </div>
             </div>
-            <ProgressBar value={reviewed} max={target} color="#2563eb" height={8} showLabel />
+            <ProgressBar value={reviewed} max={target} color="#1e293b" height={8} showLabel />
           </div>
 
           {/* Claim Type Cards */}
@@ -76,7 +76,7 @@ export default async function ClaimReviewsPage() {
                   {ct.claim_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
                 </div>
                 <div className="text-xs text-[#94a3b8] mb-2">{ct.description}</div>
-                <ProgressBar value={ct.reviewed} max={ct.minimum_claims} color={ct.done ? "#16a34a" : "#2563eb"} height={4} />
+                <ProgressBar value={ct.reviewed} max={ct.minimum_claims} color={ct.done ? "#16a34a" : "#1e293b"} height={4} />
                 <div className="text-xs text-[#94a3b8] mt-2">Docs: {ct.supporting_docs}</div>
               </div>
             ))}

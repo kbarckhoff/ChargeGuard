@@ -7,8 +7,8 @@
   --foreground: #0f172a;   /* slate-900 primary text */
   --navy: #1e3a8a;         /* nav / header / dark surfaces */
   --navy-hover: #163a5f;
-  --accent: #2563eb;       /* orange accent (buttons, links, highlights) */
-  --accent-hover: #1d4ed8;
+  --accent: #1e293b;       /* orange accent (buttons, links, highlights) */
+  --accent-hover: #0f172a;
   --border: #e2e8f0;       /* slate-200 */
   --muted: #64748b;        /* slate-500 */
 }

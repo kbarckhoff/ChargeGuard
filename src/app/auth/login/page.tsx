@@ -71,7 +71,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 focus:border-[#2563eb]/40"
+                    className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40 focus:border-[#1e293b]/40"
                     placeholder="you@company.com"
                     required
                   />
@@ -79,7 +79,7 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-sm font-medium text-[#334155]">Password</label>
-                    <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="text-xs font-medium text-[#2563eb] hover:underline">
+                    <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="text-xs font-medium text-[#1e293b] hover:underline">
                       Forgot password?
                     </button>
                   </div>
@@ -87,7 +87,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 focus:border-[#2563eb]/40"
+                    className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40 focus:border-[#1e293b]/40"
                     placeholder="••••••••"
                     required
                   />
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 bg-[#2563eb] text-white rounded-xl text-sm font-semibold hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                  className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl text-sm font-semibold hover:bg-[#0f172a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                 >
                   {loading && <Loader2 size={16} className="animate-spin" />}
                   Sign In
@@ -129,7 +129,7 @@ export default function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40 focus:border-[#2563eb]/40"
+                      className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40 focus:border-[#1e293b]/40"
                       placeholder="you@company.com"
                       required
                     />
@@ -137,7 +137,7 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 bg-[#2563eb] text-white rounded-xl text-sm font-semibold hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl text-sm font-semibold hover:bg-[#0f172a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                   >
                     {loading && <Loader2 size={16} className="animate-spin" />}
                     Send reset link
@@ -148,7 +148,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setMode("signin"); setError(""); setResetSent(false); }}
-                className="w-full text-sm text-[#2563eb] hover:underline text-center mt-4"
+                className="w-full text-sm text-[#1e293b] hover:underline text-center mt-4"
               >
                 ← Back to sign in
               </button>

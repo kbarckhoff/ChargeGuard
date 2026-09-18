@@ -49,7 +49,7 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setOpen((v) => !v); setMsg(null); }} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8]">
+        <button onClick={() => { setOpen((v) => !v); setMsg(null); }} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a]">
           <Plus size={15} /> New hospital
         </button>
       </div>
@@ -73,23 +73,23 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
             <div>
               <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Hospital name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Northlake Regional Medical Center"
-                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
+                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
             </div>
             <div>
               <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Administrator name (optional)</label>
               <input value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Jane Smith"
-                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
+                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
             </div>
             <div className="sm:col-span-2">
               <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Administrator email</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@hospital.org"
-                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
+                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
               <p className="text-[12px] text-[#94a3b8] mt-1">They'll be emailed a temporary password and sign-in link, and set their own password on first login.</p>
             </div>
           </div>
           <div className="mt-4">
             <button disabled={busy || !name || !email} onClick={create}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8] disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a] disabled:opacity-50">
               {busy && <Loader2 size={14} className="animate-spin" />} Create hospital & invite admin
             </button>
           </div>
@@ -101,10 +101,10 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
         {rows.map((r) => (
           <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center shrink-0"><Building2 size={16} className="text-[#1f6fd4]" /></div>
+              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center shrink-0"><Building2 size={16} className="text-[#1e293b]" /></div>
               <div className="min-w-0">
                 <div className="text-[14px] font-medium text-[#0f172a] truncate flex items-center gap-2">
-                  <Link href={`/admin/${r.id}`} className="hover:underline hover:text-[#1f6fd4]">{r.name}</Link>
+                  <Link href={`/admin/${r.id}`} className="hover:underline hover:text-[#1e293b]">{r.name}</Link>
                   {r.id === activeOrgId && <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">ACTIVE</span>}
                 </div>
                 <div className="text-[12px] text-[#94a3b8]">{r.members} {r.members === 1 ? "user" : "users"}</div>
@@ -114,7 +114,7 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
               <span className="inline-flex items-center gap-1 text-[12px] text-[#067647] font-medium"><Check size={14} /> Working here</span>
             ) : (
               <button onClick={() => switchTo(r.id)} disabled={switching === r.id}
-                className="text-[12px] text-[#1f6fd4] font-medium hover:underline inline-flex items-center gap-1">
+                className="text-[12px] text-[#1e293b] font-medium hover:underline inline-flex items-center gap-1">
                 {switching === r.id ? <Loader2 size={12} className="animate-spin" /> : null} Switch to this hospital
               </button>
             )}

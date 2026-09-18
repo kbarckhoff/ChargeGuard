@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
-import { sendEmail, sesConfigured } from "@/lib/email";
+import { sendEmail, sesConfigured, renderEmail } from "@/lib/email";
 import { genTempPassword } from "@/lib/otp";
 import { resolveActiveOrg } from "@/lib/active-org";
 
@@ -65,9 +65,18 @@ export async function POST(request: Request) {
       const text =
         `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on ChargeGuard.\n\n` +
         `You can now access it with your existing account. Sign in here: ${loginUrl}\n\n` +
-        `Use the client switcher in the top of the left menu to move between the clients you have access to.`;
+        `Use the client switcher at the top of the left menu to move between the clients you have access to.`;
+      const html = renderEmail({
+        origin,
+        title: "You've been added to a client",
+        paragraphs: [
+          `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on ChargeGuard.`,
+          "You can now access it with your existing account. Use the client switcher at the top of the left menu to move between the clients you have access to.",
+        ],
+        button: { text: "Sign in to ChargeGuard", url: loginUrl },
+      });
       let emailed = false;
-      try { emailed = (await sendEmail([cleanEmail], subject, text)).ok; } catch { emailed = false; }
+      try { emailed = (await sendEmail([cleanEmail], subject, text, html)).ok; } catch { emailed = false; }
       return NextResponse.json({ ok: true, added: true, emailed });
     }
 
@@ -108,9 +117,20 @@ export async function POST(request: Request) {
       `Email: ${cleanEmail}\n` +
       `Temporary password: ${tempPassword}\n\n` +
       `On your first sign-in you'll set a new password and enter a one-time code we email you.`;
+    const html = renderEmail({
+      origin,
+      title: "Your ChargeGuard account is ready",
+      paragraphs: [
+        `${me.full_name || "A teammate"} set up a ChargeGuard account for you${org?.name ? ` at ${org.name}` : ""}.`,
+        `Sign in with your email (${cleanEmail}) and the temporary password below.`,
+      ],
+      code: tempPassword,
+      button: { text: "Sign in to ChargeGuard", url: loginUrl },
+      footnote: "On your first sign-in you'll set a new password and enter a one-time code we email you.",
+    });
 
     let emailed = false;
-    try { emailed = (await sendEmail([cleanEmail], subject, text)).ok; } catch { emailed = false; }
+    try { emailed = (await sendEmail([cleanEmail], subject, text, html)).ok; } catch { emailed = false; }
 
     // If email isn't configured/failed, hand the temp password back so the admin
     // can share it securely. Never return it when the email went out.

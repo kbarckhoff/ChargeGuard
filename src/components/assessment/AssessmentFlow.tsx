@@ -168,7 +168,7 @@ export function AssessmentFlow({
         {/* header */}
         <div className="bg-white border-b border-[#e6e9f2] px-8 py-4">
           <h1 className="text-[18px] font-bold tracking-tight text-[#0f172a]">{auditName}</h1>
-          <p className="text-[12px] text-[#64748b] mt-0.5 flex items-center gap-1.5"><Building2 size={13} className="text-[#2563eb]" /> {hospitalName}</p>
+          <p className="text-[12px] text-[#64748b] mt-0.5 flex items-center gap-1.5"><Building2 size={13} className="text-[#1e293b]" /> {hospitalName}</p>
         </div>
 
         {/* Horizontal stepper (green check = complete, red = not filled out) */}
@@ -181,10 +181,10 @@ export function AssessmentFlow({
               return (
                 <Fragment key={s.key}>
                   <button onClick={() => setStep(si)} className="flex items-center gap-2 shrink-0">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${active ? "border-[#2563eb] bg-white" : complete ? "bg-[#12b76a] border-[#12b76a] text-white" : "bg-white border-[#ef4444]"}`}>
-                      {complete ? <Check size={13} /> : active ? <span className="w-2 h-2 rounded-full bg-[#2563eb]" /> : <X size={12} className="text-[#ef4444]" />}
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${active ? "border-[#1e293b] bg-white" : complete ? "bg-[#12b76a] border-[#12b76a] text-white" : "bg-white border-[#ef4444]"}`}>
+                      {complete ? <Check size={13} /> : active ? <span className="w-2 h-2 rounded-full bg-[#1e293b]" /> : <X size={12} className="text-[#ef4444]" />}
                     </span>
-                    <span className={`text-[13px] ${active ? "font-bold text-[#2563eb]" : "font-medium text-[#475569]"}`}>{s.label}</span>
+                    <span className={`text-[13px] ${active ? "font-bold text-[#1e293b]" : "font-medium text-[#475569]"}`}>{s.label}</span>
                   </button>
                   {pos < visible.length - 1 && <span className="flex-1 h-px bg-[#e2e6ec] min-w-[16px]" />}
                 </Fragment>
@@ -199,7 +199,7 @@ export function AssessmentFlow({
             {locked && (
               <div className="mb-4 rounded-xl border border-[#fde3c2] bg-[#fff8ef] px-4 py-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[13px] text-[#8a5a1a]"><Lock size={15} className="text-[#b45309]" /> Intake is complete, so this review is locked. The profile, files, competitors, and rules can&apos;t be changed. Peer Setup stays open.</div>
-                <button onClick={reopenIntake} disabled={lockBusy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#2563eb] bg-white border border-[#c7d2fe] hover:bg-[#eef2ff] disabled:opacity-50">{lockBusy ? <Loader2 size={13} className="animate-spin" /> : null} Reopen to edit</button>
+                <button onClick={reopenIntake} disabled={lockBusy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#1e293b] bg-white border border-[#c7d2fe] hover:bg-[#eef2ff] disabled:opacity-50">{lockBusy ? <Loader2 size={13} className="animate-spin" /> : null} Reopen to edit</button>
               </div>
             )}
             {step === 0 && <Intake comps={comps} setComps={setComps} saveComps={saveComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} onNext={() => setStep(nextOf(0))} />}
@@ -227,16 +227,16 @@ function Footer({ onBack, backTxt, onNext, nextTxt }: { onBack?: () => void; bac
   return (
     <div className="flex justify-between mt-2">
       {onBack ? <button onClick={onBack} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">← {backTxt}</button> : <span />}
-      {onNext && <button onClick={onNext} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm">{nextTxt} →</button>}
+      {onNext && <button onClick={onNext} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm">{nextTxt} →</button>}
     </div>
   );
 }
-const inputCls = "w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/15";
+const inputCls = "w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/15";
 const labelCls = "block text-xs font-semibold text-[#374151] mb-1.5";
 function chip(text: string, tone: string) {
   const map: Record<string, string> = {
     green: "bg-[#e7f7ef] text-[#067647]", amber: "bg-[#fef4e2] text-[#b45309]",
-    red: "bg-[#fdeceb] text-[#b42318]", gray: "bg-[#eef1f5] text-[#6b7280]", blue: "bg-[#eaf1fe] text-[#1d4ed8]",
+    red: "bg-[#fdeceb] text-[#b42318]", gray: "bg-[#eef1f5] text-[#6b7280]", blue: "bg-[#eaf1fe] text-[#0f172a]",
   };
   return <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full ${map[tone]}`}>{text}</span>;
 }
@@ -331,7 +331,7 @@ function Imports({ auditId, chargeItems, counts, locked, onBack, onNext }: any) 
   };
   const SpecDetails = ({ f }: { f: IntakeFile }) => (
     <details className="group mt-1">
-      <summary className="cursor-pointer list-none inline-flex items-center gap-1 text-[12px] font-medium text-[#2563eb] hover:underline">
+      <summary className="cursor-pointer list-none inline-flex items-center gap-1 text-[12px] font-medium text-[#1e293b] hover:underline">
         <FileText size={12} /> View file spec
       </summary>
       <div className="mt-2 rounded-lg border border-[#edf0f4] bg-[#fafbfc] p-3">
@@ -347,7 +347,7 @@ function Imports({ auditId, chargeItems, counts, locked, onBack, onNext }: any) 
             ))}
           </tbody>
         </table>
-        <a href={`/api/import-spec?type=${f.key}`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:underline"><Download size={11} /> Download blank template (CSV)</a>
+        <a href={`/api/import-spec?type=${f.key}`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#1e293b] hover:underline"><Download size={11} /> Download blank template (CSV)</a>
       </div>
     </details>
   );
@@ -369,7 +369,7 @@ function Imports({ auditId, chargeItems, counts, locked, onBack, onNext }: any) 
         {handled && uploaded
           ? <div className="flex items-center justify-between text-[13px]">
               <span className="text-[#374151]"><span className="font-bold text-[#111827]">{count.toLocaleString()}</span> rows imported</span>
-              <a href={`/api/export-import?type=${f.countKey}&auditId=${auditId}`} className="inline-flex items-center gap-1 text-[#2563eb] font-medium hover:underline"><Download size={13} /> Download</a>
+              <a href={`/api/export-import?type=${f.countKey}&auditId=${auditId}`} className="inline-flex items-center gap-1 text-[#1e293b] font-medium hover:underline"><Download size={13} /> Download</a>
             </div>
           : <div className="text-[13px] text-[#9aa2af]">No file yet</div>}
         {locked
@@ -481,7 +481,7 @@ function Review({ auditId, counts, chargeItems, isOwner, onBack, onNext }: any) 
       ) : (
         <div className="flex justify-between mt-2">
           <button onClick={onBack} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">← Back to Imports</button>
-          <button onClick={submitForReview} disabled={submitting} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm disabled:opacity-50">{submitting ? "Submitting…" : "Submit for review →"}</button>
+          <button onClick={submitForReview} disabled={submitting} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm disabled:opacity-50">{submitting ? "Submitting…" : "Submit for review →"}</button>
         </div>
       )}
     </>
@@ -555,7 +555,7 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
   const cfg = { grossIdx: sel.grossIdx, codeCols: [{ ci: sel.codeIdx, ti: sel.typeIdx, direct: sel.typeIdx < 0 }] };
   const previewRows: any[] = preview ? preview.sample.map((r: string[]) => extractCsvRow(r, cfg)).filter(Boolean).slice(0, 5) : [];
   const colOpts = (v: number, onChange: (n: number) => void, allowNone = false) => (
-    <select value={v} onChange={(e) => onChange(Number(e.target.value))} className="w-full h-9 border border-[#e2e6ec] rounded-lg px-2 text-[13px] focus:outline-none focus:border-[#2563eb]">
+    <select value={v} onChange={(e) => onChange(Number(e.target.value))} className="w-full h-9 border border-[#e2e6ec] rounded-lg px-2 text-[13px] focus:outline-none focus:border-[#1e293b]">
       {allowNone && <option value={-1}>— none —</option>}
       {preview?.headers.map((h: string, idx: number) => <option key={idx} value={idx}>{h || `(column ${idx + 1})`}</option>)}
     </select>
@@ -572,7 +572,7 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
         {status && <span className={`text-[12px] ${loaded ? "text-[#067647]" : "text-[#6b7280]"} max-w-[200px] truncate`}>{status}</span>}
         {loaded ? (
           <>
-            <a href={`/api/export-import?type=peer&auditId=${auditId}&competitor=${encodeURIComponent(name)}`} className="inline-flex items-center gap-1 text-xs text-[#2563eb] font-medium hover:underline"><Download size={13} /> Download</a>
+            <a href={`/api/export-import?type=peer&auditId=${auditId}&competitor=${encodeURIComponent(name)}`} className="inline-flex items-center gap-1 text-xs text-[#1e293b] font-medium hover:underline"><Download size={13} /> Download</a>
             <button onClick={() => ref.current?.click()} className="text-xs text-[#6b7280] hover:underline">Replace</button>
           </>
         ) : (
@@ -594,7 +594,7 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
                 <div><label className="block text-xs font-semibold text-[#374151] mb-1.5">Code type column (optional)</label>{colOpts(sel.typeIdx, (n) => setSel({ ...sel, typeIdx: n }), true)}</div>
                 <div><label className="block text-xs font-semibold text-[#374151] mb-1.5">Gross charge column</label>{colOpts(sel.grossIdx, (n) => setSel({ ...sel, grossIdx: n }))}</div>
                 <div><label className="block text-xs font-semibold text-[#374151] mb-1.5">When a code has multiple prices, use</label>
-                  <select value={sel.method} onChange={(e) => setSel({ ...sel, method: e.target.value })} className="w-full h-9 border border-[#e2e6ec] rounded-lg px-2 text-[13px] focus:outline-none focus:border-[#2563eb]">
+                  <select value={sel.method} onChange={(e) => setSel({ ...sel, method: e.target.value })} className="w-full h-9 border border-[#e2e6ec] rounded-lg px-2 text-[13px] focus:outline-none focus:border-[#1e293b]">
                     <option value="median">Median price</option><option value="average">Average price</option><option value="max">Highest price</option>
                   </select>
                 </div>
@@ -614,7 +614,7 @@ function PeerRow({ i, name, auditId, initialCount = 0, onChanged }: { i: number;
             </div>
             <div className="px-6 py-4 border-t border-[#edf0f4] sticky bottom-0 bg-white rounded-b-2xl flex items-center justify-between">
               <button onClick={() => setPreview(null)} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Cancel</button>
-              <button onClick={confirmImport} disabled={busy || sel.codeIdx < 0 || sel.grossIdx < 0} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Import prices</button>
+              <button onClick={confirmImport} disabled={busy || sel.codeIdx < 0 || sel.grossIdx < 0} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Import prices</button>
             </div>
           </div>
         </div>
@@ -714,14 +714,14 @@ function Peer({ comps, setComps, saveComps, auditId, peerCounts, onBack }: any) 
         <OrphanPeers comps={comps} peerCounts={peerCounts} auditId={auditId} onChanged={autoScan} />
         {/* Add a competitor here without reopening the locked Intake. */}
         <div className="mt-3 flex items-center gap-2">
-          <input value={newComp} onChange={(e) => setNewComp(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addComp()} placeholder="Add a competitor hospital name" className="flex-1 h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/15" />
+          <input value={newComp} onChange={(e) => setNewComp(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addComp()} placeholder="Add a competitor hospital name" className="flex-1 h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/15" />
           <button onClick={addComp} disabled={!newComp.trim()} className="flex items-center gap-1.5 px-4 h-10 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9] disabled:opacity-50"><Plus size={15} /> Add competitor</button>
         </div>
         <p className="text-xs text-[#9aa2af] mt-3">You can add competitors here even after intake is locked.</p>
       </div>
       <div className={CARD}>
         <div className="flex items-center gap-2 text-[13px]">
-          {scanState === "running" ? <><Loader2 size={15} className="animate-spin text-[#2563eb]" /> <span className="text-[#374151]">Running analysis…</span></>
+          {scanState === "running" ? <><Loader2 size={15} className="animate-spin text-[#1e293b]" /> <span className="text-[#374151]">Running analysis…</span></>
             : scanState === "done" ? <><Check size={15} className="text-[#12b76a]" /> <span className="text-[#374151]">Analysis updated automatically{lastRun ? ` at ${lastRun}` : ""}.</span></>
             : <span className="text-[#6b7280]">The analysis runs automatically when you add or change a peer file.</span>}
         </div>
@@ -730,7 +730,7 @@ function Peer({ comps, setComps, saveComps, auditId, peerCounts, onBack }: any) 
           <button onClick={autoScan} disabled={scanState === "running"} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-[#e2e6ec] text-[#374151] text-sm font-semibold hover:bg-[#f6f7f9] disabled:opacity-50">
             {scanState === "running" ? <><Loader2 size={15} className="animate-spin" /> Running…</> : <><Zap size={15} /> Run analysis now</>}
           </button>
-          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8]">View peer analysis <ArrowRight size={15} /></a>
+          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1e293b] text-white text-sm font-semibold hover:bg-[#0f172a]">View peer analysis <ArrowRight size={15} /></a>
           <a href={`/findings?auditId=${auditId}`} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-[#e2e6ec] text-[#374151] text-sm font-semibold hover:bg-[#f6f7f9]">View findings</a>
         </div>
         <p className="text-xs text-[#9aa2af] mt-2">Backup: the analysis runs automatically when peer files change, but you can re-run it here anytime.</p>
@@ -748,7 +748,7 @@ function Analysis({ auditId, chargeItems, stats, onBack }: any) {
   return (
     <>
       <PageHead title="Analysis & Findings" desc="Complete results, peer analysis, and project management."
-        right={<Link href={`/reports?auditId=${auditId}`} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm flex items-center gap-2"><Download size={15} /> Export report</Link>} />
+        right={<Link href={`/reports?auditId=${auditId}`} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm flex items-center gap-2"><Download size={15} /> Export report</Link>} />
       <div className="grid grid-cols-4 gap-4 mb-4">
         <KPICard highlight icon={DollarSign} label="Est. impact" value={formatImpact(stats.impact)} subtext="identified opportunity" />
         <KPICard color="blue" icon={FileSpreadsheet} label="Charge lines" value={chargeItems.toLocaleString()} />
@@ -767,7 +767,7 @@ function Analysis({ auditId, chargeItems, stats, onBack }: any) {
       {tab === "findings" && (
         <div className={CARD + " text-center"}>
           <p className="text-sm text-[#6b7280] mb-4">The full findings list, filterable by severity, category, and status, with inline assignee and status.</p>
-          <Link href={`/findings?auditId=${auditId}`} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8]">Open findings ({stats.total.toLocaleString()}) →</Link>
+          <Link href={`/findings?auditId=${auditId}`} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a]">Open findings ({stats.total.toLocaleString()}) →</Link>
         </div>
       )}
       {tab === "peer" && <PeerAnalysisTab auditId={auditId} />}
@@ -801,7 +801,7 @@ function PriceRange({ min, max, median, your }: { min: number; max: number; medi
       <div className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2 rounded bg-[#e2e6ec]" />
       <div className="absolute top-1/2 h-1 -translate-y-1/2 rounded bg-[#cbd5e1]" style={{ left: at(min), right: `calc(100% - ${at(max)})` }} />
       <div className="absolute top-1/2 w-px h-3 -translate-y-1/2 bg-[#64748b]" style={{ left: at(median) }} title={`Median $${median.toLocaleString()}`} />
-      <div className="absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white" style={{ left: at(your), background: your < median ? "#2563eb" : "#ef4444" }} title={`Your charge $${your.toLocaleString()}`} />
+      <div className="absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white" style={{ left: at(your), background: your < median ? "#1e293b" : "#ef4444" }} title={`Your charge $${your.toLocaleString()}`} />
     </div>
   );
 }
@@ -856,7 +856,7 @@ export function PeerAnalysisTab({ auditId }: { auditId: string }) {
   return (
     <>
       <div className="grid grid-cols-4 gap-3 mb-2">
-        {stat("Below market", s.below, "#2563eb")}
+        {stat("Below market", s.below, "#1e293b")}
         {stat("Above market", s.above, "#ef4444")}
         {stat("At market", s.at, "#12b76a")}
         {stat("Codes compared", s.total, "#111827")}
@@ -885,11 +885,11 @@ export function PeerAnalysisTab({ auditId }: { auditId: string }) {
       <div className="bg-white rounded-2xl border border-[#edf0f4] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
         <div className="px-4 py-3 border-b border-[#edf0f4] flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter code or description…" className="h-8 w-56 border border-[#e2e6ec] rounded-lg px-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter code or description…" className="h-8 w-56 border border-[#e2e6ec] rounded-lg px-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
             <label className="flex items-center gap-1.5 text-[12px] text-[#374151]"><input type="checkbox" checked={belowOnly} onChange={(e) => setBelowOnly(e.target.checked)} /> Below market only</label>
             <label className="flex items-center gap-1.5 text-[12px] text-[#374151]"><input type="checkbox" checked={trustedOnly} onChange={(e) => setTrustedOnly(e.target.checked)} /> High-confidence only</label>
           </div>
-          <a href={`/api/peer-compare?auditId=${auditId}&format=xlsx`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#2563eb] hover:underline whitespace-nowrap"><Download size={13} /> Download full (Excel)</a>
+          <a href={`/api/peer-compare?auditId=${auditId}&format=xlsx`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#1e293b] hover:underline whitespace-nowrap"><Download size={13} /> Download full (Excel)</a>
           {loading && <Loader2 size={13} className="animate-spin text-[#94a3b8]" />}
         </div>
         <div className="overflow-x-auto">
@@ -903,7 +903,7 @@ export function PeerAnalysisTab({ auditId }: { auditId: string }) {
             <tr key={i} className="border-b border-[#edf0f4] last:border-0">
               <td className="px-3 py-3 font-semibold">{r.code}</td>
               <td className="px-3 py-3 text-[#374151] max-w-[200px] truncate" title={r.desc}>{r.desc}</td>
-              <td className={`px-3 py-3 font-semibold ${r.belowMarket ? "text-[#2563eb]" : "text-[#111827]"}`}>${r.your.toLocaleString()}</td>
+              <td className={`px-3 py-3 font-semibold ${r.belowMarket ? "text-[#1e293b]" : "text-[#111827]"}`}>${r.your.toLocaleString()}</td>
               {comps.map((c) => <td key={c} className="px-3 py-3 text-[#6b7280] whitespace-nowrap">{r.comps?.[c] != null ? `$${r.comps[c].toLocaleString()}` : "—"}</td>)}
               <td className="px-3 py-3 text-[#374151]">${(r.median ?? r.peer).toLocaleString()}</td>
               <td className="px-3 py-3"><PriceRange min={r.min} max={r.max} median={r.median ?? r.peer} your={r.your} /></td>

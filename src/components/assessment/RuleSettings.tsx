@@ -57,11 +57,11 @@ export function RuleSettings({ auditId, initialDisabled, locked, facilityType }:
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-[12px] text-[#6b7280]">{saving ? <span className="inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> saving</span> : saved ? <span className="inline-flex items-center gap-1 text-[#067647]"><Check size={12} /> saved</span> : ""}</span>
-          <span className="text-[12px] font-semibold text-[#2563eb] bg-[#eef2ff] px-2.5 py-1 rounded-full">{active}/{total} on</span>
+          <span className="text-[12px] font-semibold text-[#1e293b] bg-[#eef2ff] px-2.5 py-1 rounded-full">{active}/{total} on</span>
         </div>
       </div>
       <div className="flex gap-2 mb-4">
-        <button onClick={() => setAll(true)} className="text-[12px] font-medium text-[#2563eb] hover:underline">Enable all</button>
+        <button onClick={() => setAll(true)} className="text-[12px] font-medium text-[#1e293b] hover:underline">Enable all</button>
         <span className="text-[#d1d5db]">·</span>
         <button onClick={() => setAll(false)} className="text-[12px] font-medium text-[#6b7280] hover:underline">Disable all</button>
       </div>
@@ -79,7 +79,7 @@ export function RuleSettings({ auditId, initialDisabled, locked, facilityType }:
                       <div className={`text-[13px] font-medium ${on ? "text-[#111827]" : "text-[#9aa2af]"}`}>{it.name}</div>
                       <div className="text-[11.5px] text-[#9aa2af] leading-snug mt-0.5">{it.desc}</div>
                     </div>
-                    <button onClick={() => toggle(it.ids)} disabled={locked} aria-label={`Toggle ${it.name}`} className={`relative w-9 h-5 rounded-full shrink-0 mt-0.5 transition-colors ${on ? "bg-[#2563eb]" : "bg-[#d1d5db]"} ${locked ? "opacity-50 cursor-not-allowed" : ""}`}>
+                    <button onClick={() => toggle(it.ids)} disabled={locked} aria-label={`Toggle ${it.name}`} className={`relative w-9 h-5 rounded-full shrink-0 mt-0.5 transition-colors ${on ? "bg-[#1e293b]" : "bg-[#d1d5db]"} ${locked ? "opacity-50 cursor-not-allowed" : ""}`}>
                       <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
                     </button>
                   </div>

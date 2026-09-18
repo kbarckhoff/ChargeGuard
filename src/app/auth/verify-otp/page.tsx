@@ -75,21 +75,21 @@ export default function VerifyOtpPage() {
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="w-full px-3 py-2.5 text-center tracking-[0.5em] text-lg font-semibold border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+              className="w-full px-3 py-2.5 text-center tracking-[0.5em] text-lg font-semibold border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40"
               placeholder="000000"
               required
             />
             <button
               type="submit"
               disabled={loading || code.length < 6}
-              className="w-full py-2.5 bg-[#2563eb] text-white rounded-xl text-sm font-semibold hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl text-sm font-semibold hover:bg-[#0f172a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={16} className="animate-spin" />} Verify
             </button>
           </form>
 
           <div className="flex items-center justify-between mt-4 text-sm">
-            <button onClick={resend} disabled={resending} className="text-[#2563eb] font-medium hover:underline disabled:opacity-50">
+            <button onClick={resend} disabled={resending} className="text-[#1e293b] font-medium hover:underline disabled:opacity-50">
               {resending ? "Sending…" : "Resend code"}
             </button>
             <button onClick={signOut} className="text-[#64748b] hover:underline">Back to sign in</button>

@@ -53,7 +53,7 @@ const statusVariant = (s: string): any =>
 
 // Tier badge: how the finding relates to prior reviews of the same line.
 const TIER_META: Record<number, { label: string; title: string; cls: string }> = {
-  1: { label: "T1 New", title: "Brand new finding", cls: "bg-[#e0edff] text-[#1d4ed8]" },
+  1: { label: "T1 New", title: "Brand new finding", cls: "bg-[#e0edff] text-[#0f172a]" },
   2: { label: "T2 Accepted before", title: "Previously accepted, showing up again", cls: "bg-[#e7f7ef] text-[#067647]" },
   3: { label: "T3 Denied before", title: "Previously denied, showing up again", cls: "bg-[#fde8e8] text-[#b42318]" },
   4: { label: "T4 N/A before", title: "Previously marked N/A, showing up again", cls: "bg-[#f1f5f9] text-[#475569]" },
@@ -342,7 +342,7 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
             <div>
               <div className="text-xs font-medium text-[#64748b] mb-1.5">Applied to CDM</div>
               <div className="text-sm text-[#334155] p-3 bg-[#eef2ff] border border-[#c7d2fe] rounded-xl">
-                <b>{FIELD_LABELS[finding.applied_field] || finding.applied_field}</b>: <span className="font-mono">{finding.applied_old || "—"}</span> → <span className="font-mono text-[#2563eb] font-semibold">{finding.applied_new}</span>
+                <b>{FIELD_LABELS[finding.applied_field] || finding.applied_field}</b>: <span className="font-mono">{finding.applied_old || "—"}</span> → <span className="font-mono text-[#1e293b] font-semibold">{finding.applied_new}</span>
                 {finding.resolution_note && <div className="text-xs text-[#64748b] mt-1.5">Note: {finding.resolution_note}</div>}
               </div>
             </div>
@@ -356,7 +356,7 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
             <div className="flex flex-wrap gap-1.5">
               {DISPOSITIONS.map((d) => (
                 <button key={d.value} onClick={() => updateStatus(d.value)} disabled={updating}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-50 ${currentStatus === d.value ? "bg-[#2563eb] text-white border-[#2563eb]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f1f5f9]"}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-50 ${currentStatus === d.value ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f1f5f9]"}`}>
                   {d.label}
                 </button>
               ))}
@@ -365,7 +365,7 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
           </div>
           <div>
             <label className="block text-xs font-medium text-[#64748b] mb-1">Reviewer note (saved with the disposition)</label>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="e.g. Formulary item — route to pharmacy, not a CDM change." className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="e.g. Formulary item — route to pharmacy, not a CDM change." className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
           </div>
         </div>
       </div>
@@ -393,7 +393,7 @@ function CategoryMultiSelect({ categories, selected, onChange }: { categories: s
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute z-20 mt-1 w-64 max-h-72 overflow-y-auto bg-white border border-[#e2e8f0] rounded-lg shadow-lg py-1">
-            <button onClick={() => { onChange("all"); }} className="w-full text-left px-3 py-1.5 text-sm text-[#2563eb] hover:bg-[#f1f5f9]">Clear all</button>
+            <button onClick={() => { onChange("all"); }} className="w-full text-left px-3 py-1.5 text-sm text-[#1e293b] hover:bg-[#f1f5f9]">Clear all</button>
             {categories.map((c) => (
               <label key={c} className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#334155] hover:bg-[#f1f5f9] cursor-pointer">
                 <input type="checkbox" checked={chosen.includes(c)} onChange={() => toggle(c)} />

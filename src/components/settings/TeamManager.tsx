@@ -49,7 +49,7 @@ export function TeamManager({ members }: { members: Member[] }) {
           <h3 className="text-sm font-semibold text-[#334155]">Team</h3>
           <p className="text-[12px] text-[#94a3b8] mt-0.5">Everyone here can see this client&apos;s findings. Invite by email; if they already have an account they&apos;re given access to this client.</p>
         </div>
-        <button onClick={() => setInviteOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8]">
+        <button onClick={() => setInviteOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a]">
           <UserPlus size={14} /> Invite
         </button>
       </div>
@@ -69,8 +69,8 @@ export function TeamManager({ members }: { members: Member[] }) {
             </div>
           )}
           <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@hospital.org" className="w-full mb-3 px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
-          <button disabled={sending || !email} onClick={sendInvite} className="px-4 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8] disabled:opacity-50 inline-flex items-center gap-1.5">
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@hospital.org" className="w-full mb-3 px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
+          <button disabled={sending || !email} onClick={sendInvite} className="px-4 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a] disabled:opacity-50 inline-flex items-center gap-1.5">
             {sending && <Loader2 size={13} className="animate-spin" />} Send invite
           </button>
         </div>
@@ -84,7 +84,7 @@ export function TeamManager({ members }: { members: Member[] }) {
               <div className="min-w-0">
                 <div className="text-[13.5px] font-medium text-[#0f172a] flex items-center gap-2">
                   {m.full_name || m.email}
-                  {m.is_platform_owner && <span className="text-[10px] font-semibold text-[#1f6fd4] bg-[#eff4ff] px-1.5 py-0.5 rounded">OWNER</span>}
+                  {m.is_platform_owner && <span className="text-[10px] font-semibold text-[#1e293b] bg-[#eff4ff] px-1.5 py-0.5 rounded">OWNER</span>}
                   {m.via === "shared" && <span className="text-[10px] font-semibold text-[#3730a3] bg-[#eef2ff] px-1.5 py-0.5 rounded">SHARED ACCESS</span>}
                   {!m.is_active && <span className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">DEACTIVATED</span>}
                 </div>

@@ -160,7 +160,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
                           <span>{t.label}{t.req && <span className="text-[#b45309]">*</span>}</span>
                         </div>
                         <select value={mapping[t.key] || ""} onChange={(e) => setMapping({ ...mapping, [t.key]: e.target.value })}
-                          className={`w-full h-9 border rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#2563eb] ${t.req && !mapping[t.key] ? "border-[#f4b6b6] bg-[#fdeceb]" : "border-[#e2e6ec]"}`}>
+                          className={`w-full h-9 border rounded-lg px-3 text-[13px] focus:outline-none focus:border-[#1e293b] ${t.req && !mapping[t.key] ? "border-[#f4b6b6] bg-[#fdeceb]" : "border-[#e2e6ec]"}`}>
                           <option value="">— Not mapped —</option>
                           {headers.map((h) => <option key={h} value={h}>{h}</option>)}
                         </select>
@@ -173,7 +173,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
             </div>
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#edf0f4] sticky bottom-0 bg-white rounded-b-2xl">
               <button onClick={() => setRows(null)} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Cancel</button>
-              <button onClick={runImport} disabled={busy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-50 flex items-center gap-2">
+              <button onClick={runImport} disabled={busy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] disabled:opacity-50 flex items-center gap-2">
                 {busy && <Loader2 size={14} className="animate-spin" />} Import {rows.length.toLocaleString()} rows
               </button>
             </div>
@@ -190,7 +190,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
             </p>
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { setSyncPrompt(null); router.refresh(); }} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">Skip</button>
-              <button onClick={reapplyMissing} disabled={syncBusy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#1f6fd4] text-white hover:bg-[#1a5fb8] disabled:opacity-50 flex items-center gap-2">
+              <button onClick={reapplyMissing} disabled={syncBusy} className="px-5 py-2 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] disabled:opacity-50 flex items-center gap-2">
                 {syncBusy && <Loader2 size={14} className="animate-spin" />} Re-apply {syncPrompt.missing}
               </button>
             </div>

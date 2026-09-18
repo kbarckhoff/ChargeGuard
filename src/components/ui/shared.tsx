@@ -44,7 +44,7 @@ export function Badge({
 export function ProgressBar({
   value,
   max = 100,
-  color = "#2563eb",
+  color = "#1e293b",
   height = 6,
   showLabel = false,
 }: {
@@ -75,7 +75,7 @@ export function ProgressBar({
 // ─── KPICard ─────────────────────────────────────────────────
 const TILE: Record<string, string> = {
   blue: "bg-[#eaf1fe] text-[#3b82f6]",
-  orange: "bg-[#eef2ff] text-[#2563eb]",
+  orange: "bg-[#eef2ff] text-[#1e293b]",
   green: "bg-[#e7f7ef] text-[#12b76a]",
   purple: "bg-[#f1ebfe] text-[#7c3aed]",
   amber: "bg-[#fef4e2] text-[#f59e0b]",
@@ -99,7 +99,7 @@ export function KPICard({
   // Highlighted card = filled indigo-to-blue gradient tile (reference hero KPI).
   if (highlight) {
     return (
-      <div className="rounded-2xl p-5 text-white shadow-[0_10px_24px_rgba(79,70,229,0.30)] bg-gradient-to-br from-[#2563eb] to-[#3b82f6]">
+      <div className="rounded-2xl p-5 text-white shadow-[0_10px_24px_rgba(79,70,229,0.30)] bg-gradient-to-br from-[#1e293b] to-[#3b82f6]">
         <div className="flex items-start justify-between">
           <span className="text-[13px] text-white/85">{label}</span>
           <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Icon size={18} /></span>
@@ -163,7 +163,7 @@ export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; label:
   critical: { color: "#dc2626", bg: "#fef2f2", label: "Critical" },
   high: { color: "#ea580c", bg: "#fff7ed", label: "High" },
   medium: { color: "#ca8a04", bg: "#fefce8", label: "Medium" },
-  low: { color: "#2563eb", bg: "#eff6ff", label: "Low" },
+  low: { color: "#1e293b", bg: "#eff6ff", label: "Low" },
   info: { color: "#6b7280", bg: "#f9fafb", label: "Info" },
 };
 
@@ -175,7 +175,7 @@ export function SeverityDot({ severity }: { severity: string }) {
 // ─── CDM Color helpers ───────────────────────────────────────
 export const CDM_COLORS: Record<string, { color: string; bg: string; label: string }> = {
   red: { color: "#dc2626", bg: "#fef2f2", label: "Invalid Code" },
-  blue: { color: "#2563eb", bg: "#eff6ff", label: "Filter Match" },
+  blue: { color: "#1e293b", bg: "#eff6ff", label: "Filter Match" },
   green: { color: "#16a34a", bg: "#f0fdf4", label: "Recommended Change" },
   purple: { color: "#9333ea", bg: "#faf5ff", label: "Advisory Review" },
   none: { color: "#6b7280", bg: "#ffffff", label: "No Issues" },

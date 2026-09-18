@@ -47,17 +47,17 @@ export default function UpdatePasswordPage() {
             <div>
               <label className="text-sm font-medium text-[#334155] block mb-1.5">New password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40"
                 placeholder="At least 8 characters" required minLength={8} />
             </div>
             <div>
               <label className="text-sm font-medium text-[#334155] block mb-1.5">Confirm password</label>
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/40"
+                className="w-full px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/40"
                 placeholder="Re-enter password" required minLength={8} />
             </div>
             <button type="submit" disabled={loading}
-              className="w-full py-2.5 bg-[#2563eb] text-white rounded-xl text-sm font-semibold hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl text-sm font-semibold hover:bg-[#0f172a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
               {loading && <Loader2 size={16} className="animate-spin" />} Save password
             </button>
           </form>

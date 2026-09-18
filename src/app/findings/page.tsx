@@ -189,7 +189,7 @@ export default async function FindingsPage({
         <div className="flex items-center gap-3 text-sm">
           <span className="text-[#94a3b8]">{(count || 0).toLocaleString()} total</span>
           <Badge variant="danger">{statusCounts.open} open</Badge>
-          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-semibold hover:bg-[#1d4ed8]">Report &amp; export</a>
+          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
           <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
         </div>
       </header>
@@ -199,7 +199,7 @@ export default async function FindingsPage({
           <div className="flex items-center justify-between gap-3 border-b border-[#e2e8f0]">
             <div className="flex gap-1">
               {TABS.map((t) => (
-                <a key={t} href={`/findings?auditId=${auditId}&tab=${t}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</a>
+                <a key={t} href={`/findings?auditId=${auditId}&tab=${t}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#1e293b] text-[#1e293b]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</a>
               ))}
             </div>
             {tab !== "peer" && (
@@ -232,7 +232,7 @@ export default async function FindingsPage({
                       <td className="px-3 py-2.5 font-medium text-[#0f172a]">{r.category}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-[#475569]">{r.count.toLocaleString()}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#0f172a]">{r.impact ? formatImpact(r.impact) : "—"}</td>
-                      <td className="px-3 py-2.5 text-right"><a href={`/findings?auditId=${auditId}&category=${encodeURIComponent(r.category)}`} className="text-[12px] text-[#1f6fd4] hover:underline">View</a></td>
+                      <td className="px-3 py-2.5 text-right"><a href={`/findings?auditId=${auditId}&category=${encodeURIComponent(r.category)}`} className="text-[12px] text-[#1e293b] hover:underline">View</a></td>
                     </tr>
                   ))}
                 </tbody>
@@ -248,7 +248,7 @@ export default async function FindingsPage({
                   <AlertTriangle size={16} className="text-[#8a5a1a]" />
                   <h3 className="text-[13.5px] font-semibold text-[#8a5a1a]">Pending EHR Sync · {lagging.length}</h3>
                 </div>
-                <a href={`/api/change-log/export?auditId=${auditId}`} className="text-[12px] font-semibold text-[#1f6fd4] hover:underline">Re-export fix file</a>
+                <a href={`/api/change-log/export?auditId=${auditId}`} className="text-[12px] font-semibold text-[#1e293b] hover:underline">Re-export fix file</a>
               </div>
               <p className="text-[12px] text-[#8a5a1a]/90 mb-3">You already reviewed and approved these fixes; they haven't been applied in the EHR yet, so they need no action here.</p>
               <div className="space-y-1.5">

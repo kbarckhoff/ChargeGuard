@@ -16,7 +16,7 @@ type Review = { id: string; name: string };
 const STATUS_STYLE: Record<string, string> = {
   logged: "text-[#3730a3] bg-[#eef2ff]",
   pending: "text-[#8a5a1a] bg-[#fef4e6]",
-  exported: "text-[#1f6fd4] bg-[#eff4ff]",
+  exported: "text-[#1e293b] bg-[#eff4ff]",
   approved_missing: "text-[#b42318] bg-[#fdeceb]",
   implemented: "text-[#067647] bg-[#e7f7ef]",
   void: "text-[#94a3b8] bg-[#f1f5f9]",
@@ -52,7 +52,7 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
             {reviews.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </div>
-        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white bg-[#1f6fd4] hover:bg-[#1a5fb8]">
+        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium text-white bg-[#1e293b] hover:bg-[#0f172a]">
           <Plus size={14} /> Add manual entry
         </button>
         <div className="ml-auto flex items-center gap-2">
@@ -109,12 +109,12 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   {e.status !== "void" && (editId === e.id ? (
                     <span className="flex items-center gap-2">
-                      <button onClick={() => saveEdit(e.id)} disabled={busy === e.id} className="text-[#1f6fd4]"><Check size={14} /></button>
+                      <button onClick={() => saveEdit(e.id)} disabled={busy === e.id} className="text-[#1e293b]"><Check size={14} /></button>
                       <button onClick={() => setEditId(null)} className="text-[#94a3b8]"><X size={14} /></button>
                     </span>
                   ) : (
                     <span className="flex items-center gap-2.5">
-                      <button onClick={() => { setEditId(e.id); setEditVal(e.new_value || ""); setEditDate(e.effective_date || ""); }} title="Edit" className="text-[#64748b] hover:text-[#1f6fd4]"><Pencil size={13} /></button>
+                      <button onClick={() => { setEditId(e.id); setEditVal(e.new_value || ""); setEditDate(e.effective_date || ""); }} title="Edit" className="text-[#64748b] hover:text-[#1e293b]"><Pencil size={13} /></button>
                       <button onClick={() => voidEntry(e.id)} disabled={busy === e.id} className="text-[12px] text-[#b42318] hover:underline">Void</button>
                     </span>
                   ))}
@@ -154,7 +154,7 @@ function ManualEntryModal({ auditId, onClose, onSaved }: { auditId: string; onCl
     } catch (e: any) { setErr(e.message); setBusy(false); }
   };
 
-  const inp = "w-full h-9 border border-[#e2e8f0] rounded-lg px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20";
+  const inp = "w-full h-9 border border-[#e2e8f0] rounded-lg px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20";
   const lab = "block text-[12px] font-medium text-[#475569] mb-1";
 
   return (
@@ -200,7 +200,7 @@ function ManualEntryModal({ auditId, onClose, onSaved }: { auditId: string; onCl
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[#eef0f4]">
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-[#e2e8f0] text-[#374151] hover:bg-[#f6f7f9]">Cancel</button>
-          <button onClick={save} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#1f6fd4] text-white hover:bg-[#1a5fb8] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Save entry</button>
+          <button onClick={save} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] disabled:opacity-50 flex items-center gap-2">{busy && <Loader2 size={14} className="animate-spin" />} Save entry</button>
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ export default async function BenchmarksPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-5">
           <div className="bg-white rounded-xl border border-[#e2e8f0] p-5 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#eff4ff] flex items-center justify-center shrink-0"><ShieldCheck size={19} className="text-[#2563eb]" /></div>
+            <div className="w-10 h-10 rounded-lg bg-[#eff4ff] flex items-center justify-center shrink-0"><ShieldCheck size={19} className="text-[#1e293b]" /></div>
             <div>
               <h2 className="text-sm font-semibold text-[#0f172a]">CMS reference data</h2>
               <p className="text-[13px] text-[#64748b] mt-1">

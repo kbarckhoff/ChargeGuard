@@ -38,14 +38,14 @@ export function ScanButton({ auditId }: { auditId: string }) {
     sev === "critical" ? "#dc2626" :
     sev === "high" ? "#ea580c" :
     sev === "medium" ? "#ca8a04" :
-    sev === "low" ? "#2563eb" : "#6b7280";
+    sev === "low" ? "#1e293b" : "#6b7280";
 
   return (
     <div className="space-y-4">
       <button
         onClick={runScan}
         disabled={scanning}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563eb] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 shadow-sm"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] text-white rounded-lg text-sm font-medium hover:bg-[#0f172a] transition-colors disabled:opacity-50 shadow-sm"
       >
         {scanning ? (<><Loader2 size={15} className="animate-spin" />Scanning…</>) : (<><Zap size={15} />Run CDM Scan</>)}
       </button>

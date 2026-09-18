@@ -52,7 +52,7 @@ function ClientSwitcher() {
               <button key={o.id} onClick={() => pick(o.id)}
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-[#111827] hover:bg-[#f6f7f9] text-left">
                 <span className="truncate">{o.name}</span>
-                {o.id === activeId && <Check size={14} className="text-[#1f6fd4] shrink-0" />}
+                {o.id === activeId && <Check size={14} className="text-[#1e293b] shrink-0" />}
               </button>
             ))}
           </div>
@@ -87,7 +87,7 @@ export function AppSidebar() {
     router.refresh();
   };
   return (
-    <aside className="w-[224px] shrink-0 bg-[#1f6fd4] text-white flex flex-col min-h-screen">
+    <aside className="w-[224px] shrink-0 bg-[#1e293b] text-white flex flex-col min-h-screen">
       <div className="flex items-center gap-1.5 px-5 h-14">
         <img src="/logo-mark.png" alt="ChargeGuard" className="w-[30px] h-[30px] object-contain" />
         <span className="font-bold text-[15px] tracking-tight">ChargeGuard</span>

@@ -7,7 +7,7 @@ const FEE_SCHEDULES: { name: string; icon: LucideIcon; key: string; color: strin
   { name: "Clinical Lab Fee Schedule", icon: FlaskConical, key: "clinical_lab_fee", color: "#dc2626" },
   { name: "Professional Fee Schedule", icon: Stethoscope, key: "professional_fee", color: "#ea580c" },
   { name: "DME Fee Schedule", icon: DollarSign, key: "dme_fee", color: "#ca8a04" },
-  { name: "APC Status T/Q1/Q2/Q3", icon: Activity, key: "apc_t_q", color: "#2563eb" },
+  { name: "APC Status T/Q1/Q2/Q3", icon: Activity, key: "apc_t_q", color: "#1e293b" },
   { name: "APC Status S", icon: Target, key: "apc_s", color: "#9333ea" },
   { name: "APC Status X", icon: Layers, key: "apc_x", color: "#0d9488" },
   { name: "Market Pricing", icon: TrendingUp, key: "market", color: "#6b7280" },

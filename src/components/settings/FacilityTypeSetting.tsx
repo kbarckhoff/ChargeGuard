@@ -35,7 +35,7 @@ export function FacilityTypeSetting({ initial }: { initial: FacilityType }) {
           {saving && <Loader2 size={14} className="animate-spin text-[#94a3b8]" />}
           {saved && <span className="inline-flex items-center gap-1 text-[12px] text-[#067647]"><Check size={13} /> Saved</span>}
           <select value={value} onChange={(e) => save(e.target.value as FacilityType)} disabled={saving}
-            className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20">
+            className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20">
             {FACILITY_TYPES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
         </div>

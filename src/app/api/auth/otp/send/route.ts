@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { genCode, hashCode } from "@/lib/otp";
-import { sendEmail, sesConfigured } from "@/lib/email";
+import { sendEmail, sesConfigured, renderEmail } from "@/lib/email";
 import { OTP_COOKIE, signOtpValue } from "@/lib/otp-cookie";
 
 export const runtime = "nodejs";
@@ -51,9 +51,15 @@ export async function POST() {
       `Your ChargeGuard verification code is ${code}\n\n` +
       `Enter it to finish signing in. The code expires in 10 minutes.\n\n` +
       `If you didn't try to sign in, you can ignore this email.`;
+    const html = renderEmail({
+      title: "Your sign-in code",
+      paragraphs: ["Enter this code to finish signing in. It expires in 10 minutes."],
+      code,
+      footnote: "If you didn't try to sign in, you can safely ignore this email.",
+    });
 
     let emailed = false;
-    try { emailed = (await sendEmail([user.email], subject, text)).ok; } catch { emailed = false; }
+    try { emailed = (await sendEmail([user.email], subject, text, html)).ok; } catch { emailed = false; }
 
     return NextResponse.json({ ok: true, emailed });
   } catch (e: any) {

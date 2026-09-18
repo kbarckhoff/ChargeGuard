@@ -66,10 +66,10 @@ function ClientSwitcher() {
     <div className="relative mr-1" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-xs bg-[#f6f7f9] border border-[#e2e6ec] text-[#374151] font-medium pl-2.5 pr-2 py-1.5 rounded-full hover:border-[#2563eb]/50"
+        className="flex items-center gap-2 text-xs bg-[#f6f7f9] border border-[#e2e6ec] text-[#374151] font-medium pl-2.5 pr-2 py-1.5 rounded-full hover:border-[#1e293b]/50"
         title="Switch client"
       >
-        <Building2 size={13} className="text-[#2563eb]" />
+        <Building2 size={13} className="text-[#1e293b]" />
         <span className="max-w-[180px] truncate">{busy ? "Switching…" : activeName}</span>
         {busy ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={13} className="text-[#9aa2af]" />}
       </button>
@@ -82,13 +82,13 @@ function ClientSwitcher() {
               <button key={o.id} onClick={() => pick(o.id)}
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-[#111827] hover:bg-[#f6f7f9] text-left">
                 <span className="truncate">{o.name}</span>
-                {o.id === activeId && <Check size={14} className="text-[#2563eb] shrink-0" />}
+                {o.id === activeId && <Check size={14} className="text-[#1e293b] shrink-0" />}
               </button>
             ))}
             {orgs.length === 0 && <div className="px-3 py-2 text-[13px] text-[#9aa2af]">No clients yet</div>}
           </div>
           <div className="border-t border-[#eef2f7] mt-1 pt-1">
-            <button onClick={addClient} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[#2563eb] hover:bg-[#f6f7f9]">
+            <button onClick={addClient} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[#1e293b] hover:bg-[#f6f7f9]">
               <Plus size={14} /> New client
             </button>
           </div>
@@ -113,7 +113,7 @@ export default function TopNav() {
       <div className="h-[60px] px-6 flex items-center gap-5">
         <Link href="/runs" className="flex items-center gap-2.5">
           <div className="w-[30px] h-[30px] rounded-[9px] bg-[#1e3a8a] flex items-center justify-center">
-            <Shield size={16} className="text-[#2563eb]" />
+            <Shield size={16} className="text-[#1e293b]" />
           </div>
           <span className="font-bold text-[16px] tracking-tight text-[#1e3a8a]">ChargeGuard</span>
         </Link>
@@ -124,7 +124,7 @@ export default function TopNav() {
             <input
               type="text"
               placeholder="Search charge codes, findings, tasks…"
-              className="w-full h-[38px] pl-10 pr-3 rounded-[10px] bg-[#f6f7f9] border border-[#e2e6ec] text-[13px] text-[#111827] placeholder-[#9aa2af] focus:outline-none focus:bg-white focus:border-[#2563eb]"
+              className="w-full h-[38px] pl-10 pr-3 rounded-[10px] bg-[#f6f7f9] border border-[#e2e6ec] text-[13px] text-[#111827] placeholder-[#9aa2af] focus:outline-none focus:bg-white focus:border-[#1e293b]"
             />
           </div>
         </div>

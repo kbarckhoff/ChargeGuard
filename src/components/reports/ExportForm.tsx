@@ -85,7 +85,7 @@ export function ExportForm({
         <button
           onClick={() => handleExport("xlsx")}
           disabled={downloading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#2563eb] text-white rounded-lg text-sm font-medium hover:bg-[#1d4ed8] disabled:opacity-50 shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#1e293b] text-white rounded-lg text-sm font-medium hover:bg-[#0f172a] disabled:opacity-50 shadow-sm"
         >
           {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
           Download Excel Report

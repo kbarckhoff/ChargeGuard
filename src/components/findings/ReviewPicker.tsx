@@ -12,7 +12,7 @@ export function ReviewPicker({ runs, auditId }: { runs: { id: string; name: stri
       <select
         value={auditId}
         onChange={(e) => router.push(`/findings?auditId=${e.target.value}`)}
-        className="h-8 border border-[#e2e8f0] rounded-lg px-2 text-[13px] bg-white max-w-[220px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+        className="h-8 border border-[#e2e8f0] rounded-lg px-2 text-[13px] bg-white max-w-[220px] focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20"
       >
         {runs.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
       </select>

@@ -54,11 +54,11 @@ export function AdminClientDetail({ org, members, departments, isActive }: { org
 
   return (
     <div>
-      <Link href="/admin" className="inline-flex items-center gap-1.5 text-[13px] text-[#1f6fd4] hover:underline mb-4"><ArrowLeft size={14} /> All hospitals</Link>
+      <Link href="/admin" className="inline-flex items-center gap-1.5 text-[13px] text-[#1e293b] hover:underline mb-4"><ArrowLeft size={14} /> All hospitals</Link>
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#eff4ff] flex items-center justify-center"><Building2 size={20} className="text-[#1f6fd4]" /></div>
+          <div className="w-10 h-10 rounded-xl bg-[#eff4ff] flex items-center justify-center"><Building2 size={20} className="text-[#1e293b]" /></div>
           <div>
             <h1 className="text-xl font-semibold text-[#0f172a] flex items-center gap-2">{org.name}{isActive && <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">ACTIVE</span>}</h1>
             <p className="text-[12px] text-[#94a3b8]">{members.length} {members.length === 1 ? "user" : "users"} · {departments.length} departments</p>
@@ -67,7 +67,7 @@ export function AdminClientDetail({ org, members, departments, isActive }: { org
         {isActive ? (
           <span className="inline-flex items-center gap-1 text-[13px] text-[#067647] font-medium"><Check size={15} /> Working here</span>
         ) : (
-          <button onClick={switchTo} className="px-3.5 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8]">Switch to this hospital</button>
+          <button onClick={switchTo} className="px-3.5 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a]">Switch to this hospital</button>
         )}
       </div>
 
@@ -79,15 +79,15 @@ export function AdminClientDetail({ org, members, departments, isActive }: { org
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-[12px] font-medium text-[#64748b] block mb-1">Hospital name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
           </div>
           <div>
             <label className="text-[12px] font-medium text-[#64748b] block mb-1">Contact email</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
           </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8] disabled:opacity-50">{saving && <Loader2 size={13} className="animate-spin" />} Save changes</button>
+          <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a] disabled:opacity-50">{saving && <Loader2 size={13} className="animate-spin" />} Save changes</button>
           {savedMsg && <span className="text-[13px] text-[#067647]">{savedMsg}</span>}
         </div>
       </div>
@@ -126,8 +126,8 @@ export function AdminClientDetail({ org, members, departments, isActive }: { org
           )}
           <label className="text-[12px] font-medium text-[#64748b] block mb-1">Add a user to this hospital</label>
           <div className="flex items-center gap-2">
-            <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="name@hospital.org" className="flex-1 px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" />
-            <button onClick={invite} disabled={inviting || !inviteEmail} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1f6fd4] text-white rounded-lg text-[13px] font-medium hover:bg-[#1a5fb8] disabled:opacity-50">{inviting ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={14} />} Invite</button>
+            <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="name@hospital.org" className="flex-1 px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
+            <button onClick={invite} disabled={inviting || !inviteEmail} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1e293b] text-white rounded-lg text-[13px] font-medium hover:bg-[#0f172a] disabled:opacity-50">{inviting ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={14} />} Invite</button>
           </div>
         </div>
       </div>

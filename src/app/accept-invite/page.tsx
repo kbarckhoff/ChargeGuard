@@ -73,11 +73,11 @@ export default function AcceptInvitePage() {
             <p className="text-sm text-[#64748b] mb-5">Join {orgName || "your team"} on ChargeGuard as <span className="font-medium text-[#334155]">{email}</span>.</p>
             {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
             <label className="text-sm font-medium text-[#334155] block mb-1.5">Full name</label>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full mb-4 px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" placeholder="Jane Smith" />
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full mb-4 px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" placeholder="Jane Smith" />
             <label className="text-sm font-medium text-[#334155] block mb-1.5">Set a password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="w-full mb-1 px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1f6fd4]/20" placeholder="At least 8 characters" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="w-full mb-1 px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" placeholder="At least 8 characters" />
             <p className="text-[11px] text-[#94a3b8] mb-5">Minimum 8 characters.</p>
-            <button type="submit" disabled={submitting} className="w-full py-2.5 bg-[#1f6fd4] text-white rounded-xl text-sm font-medium hover:bg-[#1a5fb8] disabled:opacity-50">
+            <button type="submit" disabled={submitting} className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl text-sm font-medium hover:bg-[#0f172a] disabled:opacity-50">
               {submitting ? "Creating your account…" : "Accept invite"}
             </button>
           </form>

@@ -99,11 +99,11 @@ export function RunsHome({ runs, kpis, hospitalName }: {
             <h1 className="text-[22px] font-bold tracking-tight text-[#0f172a]">CDM review runs</h1>
             <p className="text-[13px] text-[#64748b] mt-0.5 flex items-center gap-1.5">
               {hospitalName
-                ? <><Building2 size={14} className="text-[#2563eb]" /> {hospitalName}</>
+                ? <><Building2 size={14} className="text-[#1e293b]" /> {hospitalName}</>
                 : "Start your first CDM review below."}
             </p>
           </div>
-          <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8]">
+          <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1e293b] text-white text-sm font-semibold hover:bg-[#0f172a]">
             <Plus size={16} /> Start review
           </button>
         </div>
@@ -122,16 +122,16 @@ export function RunsHome({ runs, kpis, hospitalName }: {
                       <Lock size={13} className="text-[#94a3b8]" /> {hospitalName}
                     </div>
                   ) : (
-                    <input value={hospital} onChange={(e) => setHospital(e.target.value)} placeholder="Entity name" className="w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
+                    <input value={hospital} onChange={(e) => setHospital(e.target.value)} placeholder="Entity name" className="w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
                   )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#475569] mb-1.5">Review name</label>
-                  <input value={reviewName} onChange={(e) => setReviewName(e.target.value)} placeholder="e.g. Q3 2026 CDM Review" className="w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
+                  <input value={reviewName} onChange={(e) => setReviewName(e.target.value)} placeholder="e.g. Q3 2026 CDM Review" className="w-full h-10 border border-[#e2e6ec] rounded-lg px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
                 </div>
               </div>
               <div className="flex justify-end mt-3">
-                <button onClick={startReview} disabled={busy || !canStart} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8] disabled:opacity-50">
+                <button onClick={startReview} disabled={busy || !canStart} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-[#1e293b] text-white text-sm font-semibold hover:bg-[#0f172a] disabled:opacity-50">
                   {busy ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />} Start &amp; go to Intake
                 </button>
               </div>
@@ -142,7 +142,7 @@ export function RunsHome({ runs, kpis, hospitalName }: {
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {kpi("$ opportunity found", money(kpis.opportunityFound), DollarSign, "#059669", "#e7f7ef")}
-            {kpi("$ captured", money(kpis.captured), CheckCircle2, "#2563eb", "#eff4ff")}
+            {kpi("$ captured", money(kpis.captured), CheckCircle2, "#1e293b", "#eff4ff")}
             {kpi("CDM runs", kpis.runCount.toLocaleString(), ClipboardList, "#7c3aed", "#f3effe")}
           </div>
 
@@ -150,7 +150,7 @@ export function RunsHome({ runs, kpis, hospitalName }: {
           {runs.length === 0 ? (
             <div className="bg-white rounded-xl border border-[#e6e9f2] p-10 text-center">
               <p className="text-[#64748b] mb-4">No reviews yet.</p>
-              <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8]"><Plus size={16} /> Start a review</button>
+              <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1e293b] text-white text-sm font-semibold hover:bg-[#0f172a]"><Plus size={16} /> Start a review</button>
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-[#e6e9f2] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
