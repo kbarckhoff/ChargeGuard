@@ -104,7 +104,7 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         rule_id: "8.B", charge_item_id: item.id,
         title: `Bundled code (SI=B) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries OPPS Status Indicator B — Medicare bundles its payment into the related procedure's APC and never pays it separately on outpatient claims.`,
-        severity: "medium", category: "Bundled (SI=B)",
+        severity: "info", category: "Bundled (SI=B)",
         // Gross in scope, not opportunity (payment is bundled into the APC).
         financial_impact: undefined,
         recommendation: "Confirm this line is not billed expecting separate payment. Keep for charge capture/cost tracking only; its reimbursement is included in the primary procedure's APC.",
@@ -117,7 +117,7 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         rule_id: "8.Q", charge_item_id: item.id,
         title: `Conditionally packaged (SI=${si}) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries SI=${si}: ${Q_PACKAGING[si]}. Separate payment depends on what else is billed on the same claim/date.`,
-        severity: "medium", category: "Conditional Packaging (SI=Q1-Q4)",
+        severity: "info", category: "Conditional Packaging (SI=Q1-Q4)",
         // Scope, not opportunity: payment depends on claim-level combinations and
         // cannot be scored as a dollar figure without claim data.
         financial_impact: undefined,
@@ -131,7 +131,7 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         rule_id: "15", charge_item_id: item.id,
         title: `Pass-through / C-APC code (SI=${si}) ${code} - ${procNum}`,
         description: `"${item.charge_description}" (${code}) carries SI=${si}: ${PASS_THROUGH_SI[si]}.`,
-        severity: "high", category: "Pass-Through & New Technology",
+        severity: "info", category: "Pass-Through & New Technology",
         // Scope (gross of pass-through lines); the real dollar signal is the ASP
         // markup delta flagged separately below (rule 15.ASP).
         financial_impact: undefined,

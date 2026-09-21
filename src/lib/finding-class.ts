@@ -11,33 +11,44 @@
 //                   single code sits on many lines, which must be cleaned before
 //                   the line can be trusted.
 
-export type FindingClass = "code_validity" | "pricing" | "data_quality";
+export type FindingClass = "code_validity" | "pricing" | "data_quality" | "informational";
 
 export const CLASS_LABELS: Record<FindingClass, string> = {
   code_validity: "Code Validity",
   pricing: "Pricing",
   data_quality: "Data Quality",
+  informational: "Informational",
 };
 
 export const CLASS_BLURB: Record<FindingClass, string> = {
   code_validity: "Coding & fee-schedule fixes",
   pricing: "Market & benchmark pricing",
   data_quality: "Missing, duplicate or unclear data",
+  informational: "Payment-status context, no fix",
 };
 
 export const CLASS_COLOR: Record<FindingClass, string> = {
   code_validity: "#0a6cff", // brand blue — the quick, high-certainty fixes
   pricing: "#7c3aed",       // violet — strategic pricing work
   data_quality: "#d97706",  // amber — cleanup
+  informational: "#64748b", // slate — reference/status, not a defect
 };
 
 // Explicit map for every category the rule engine currently emits. Anything not
 // listed falls through to the keyword heuristic below, so new rules still land
 // somewhere sensible without a code change here.
 const EXPLICIT: Record<string, FindingClass> = {
+  // ── Informational: OPPS payment-status facts about a code, not CDM defects.
+  //    High-volume by nature (Q/B status blanket a large share of outpatient
+  //    codes); kept out of the fix-it counts so the real work is visible. ──
+  "Conditional Packaging (SI=Q1-Q4)": "informational",
+  "Bundled (SI=B)": "informational",
+  "Pass-Through & New Technology": "informational",
+
   // ── Data quality: missing/blank/duplicate data, same code on many lines ──
   "Description": "data_quality",
   "Missing Code": "data_quality",
+  "Supply - Missing HCPCS": "data_quality",
   "Duplicate": "data_quality",
   "Pricing - Missing": "data_quality",
   "Peer Pricing (Data Quality)": "data_quality",
@@ -57,11 +68,9 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Bilateral Pricing": "code_validity",
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",
-  "Bundled (SI=B)": "code_validity",
   "Claim Unit Outlier (Claims)": "code_validity",
   "Coding Opportunity": "code_validity",
   "Compliance": "code_validity",
-  "Conditional Packaging (SI=Q1-Q4)": "code_validity",
   "Device-Procedure Crosswalk": "code_validity",
   "Inactive Formulary": "code_validity",
   "Lab - Panel/Component Bundling": "code_validity",
@@ -72,7 +81,6 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Modifier 25 Co-Billing (Claims)": "code_validity",
   "Multi Rev Code": "code_validity",
   "New / Recommended Codes": "code_validity",
-  "Pass-Through & New Technology": "code_validity",
   "Pharmacy Billing Unit": "code_validity",
   "Pharmacy NDC Mismatch": "code_validity",
   "Pharmacy UOM Mismatch": "code_validity",
@@ -94,7 +102,8 @@ export function classForCategory(category: string | null | undefined): FindingCl
   if (hit) return hit;
   const c = raw.toLowerCase();
   // Fallback heuristic for any future/unknown category.
-  if (/duplicate|missing (code|price)|no rev|blank|unclear|data quality|description/.test(c)) return "data_quality";
+  if (/packaged|packaging|\bsi=|status indicator|pass-through/.test(c)) return "informational";
+  if (/duplicate|missing (code|price|hcpcs)|no rev|blank|unclear|data quality|description/.test(c)) return "data_quality";
   if (/peer|competitor|benchmark|markup|consistency|transparency|shoppable|market/.test(c)) return "pricing";
   return "code_validity";
 }

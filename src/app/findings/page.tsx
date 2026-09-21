@@ -99,7 +99,7 @@ export default async function FindingsPage({
 
   // Optional fix-type class filter (Code Validity / Pricing / Data Quality) from
   // clicking a summary card. Scopes the table to that class within the tab.
-  const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality"];
+  const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality", "informational"];
   const activeClass: FindingClass | null = CLASSES.includes(sp.class as FindingClass) ? (sp.class as FindingClass) : null;
   const classCats = activeClass ? categoriesInClass(categories, activeClass).filter((c) => bucketCats.includes(c)) : null;
   const tableCats = classCats ?? bucketCats;
@@ -168,7 +168,7 @@ export default async function FindingsPage({
   const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
 
   // Fix-type class breakdown for the summary cards (scoped to the active tab).
-  const classCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0 };
+  const classCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0, informational: 0 };
   for (const f of scope) classCounts[classForCategory(f.category)] += 1;
 
   // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
@@ -285,8 +285,8 @@ export default async function FindingsPage({
 
           {/* Summary Cards — by fix type, so quick coding fixes are separable
               from the pricing bulk. Click a card to filter the table. */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {(["code_validity", "pricing", "data_quality"] as FindingClass[]).map((cls) => {
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {(["code_validity", "pricing", "data_quality", "informational"] as FindingClass[]).map((cls) => {
               const active = activeClass === cls;
               const href = active
                 ? `/findings?auditId=${auditId}&tab=${tab}`
