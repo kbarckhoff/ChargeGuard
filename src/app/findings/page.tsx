@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
+import { getActor } from "@/lib/roles";
 import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
@@ -11,7 +12,7 @@ import { AlertTriangle, Download } from "lucide-react";
 export default async function FindingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string }>;
+  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string }>;
 }) {
   const sp = await searchParams;
   const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
@@ -27,6 +28,14 @@ export default async function FindingsPage({
 
   const { orgId: __org, isPlatformOwner: __owner } = await resolveActiveOrg(supabaseAdmin, user!.id);
   const userData = { org_id: __org, is_platform_owner: __owner };
+
+  // Assignment context: who can assign, the user directory (for the picker and
+  // for showing assignee names), and the current user id.
+  const actor = await getActor(supabaseAdmin, user!.id);
+  const { data: orgUsers } = await supabaseAdmin.from("users").select("id, full_name, email, department, is_active").eq("org_id", userData!.org_id);
+  const assignUsers = (orgUsers || []).filter((u: any) => u.is_active).map((u: any) => ({ id: u.id, full_name: u.full_name || u.email, email: u.email, department: u.department || null }));
+  const assigneeNames: Record<string, string> = {};
+  for (const u of orgUsers || []) assigneeNames[(u as any).id] = (u as any).full_name || (u as any).email;
 
   // Everyone in a client sees all of that client's findings (department-level
   // gating was removed).
@@ -122,6 +131,11 @@ export default async function FindingsPage({
   }
   if (sp.search) {
     query = query.ilike("title", `%${sp.search}%`);
+  }
+  if (sp.assignee && sp.assignee !== "all") {
+    if (sp.assignee === "none") query = query.is("assigned_to", null);
+    else if (sp.assignee === "me") query = query.eq("assigned_to", user!.id);
+    else query = query.eq("assigned_to", sp.assignee);
   }
 
   const { data: findings, count } = await query.range(from, to);
@@ -298,6 +312,11 @@ export default async function FindingsPage({
             categoryFilter={sp.category || "all"}
             search={sp.search || ""}
             categories={bucketCats}
+            canAssign={actor.canAssign}
+            currentUserId={user!.id}
+            users={assignUsers}
+            assigneeNames={assigneeNames}
+            assigneeFilter={sp.assignee || "all"}
           />
           </>)}
         </div>

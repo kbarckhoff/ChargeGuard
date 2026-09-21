@@ -22,6 +22,7 @@ interface FindingRow {
   resolution_note?: string | null;
   is_carried?: boolean | null;
   tier?: number | null;
+  assigned_to?: string | null;
   charge_items: {
     procedure_number: string;
     charge_description: string;
@@ -59,6 +60,8 @@ const TIER_META: Record<number, { label: string; title: string; cls: string }> =
   4: { label: "T4 N/A before", title: "Previously marked N/A, showing up again", cls: "bg-[#f1f5f9] text-[#475569]" },
 };
 
+type PickUser = { id: string; full_name: string; email: string; department: string | null };
+
 export function FindingsTable({
   findings,
   total,
@@ -70,6 +73,11 @@ export function FindingsTable({
   categoryFilter,
   search,
   categories,
+  canAssign = false,
+  currentUserId = null,
+  users = [],
+  assigneeNames = {},
+  assigneeFilter = "all",
 }: {
   findings: FindingRow[];
   total: number;
@@ -81,6 +89,11 @@ export function FindingsTable({
   categoryFilter: string;
   search: string;
   categories: string[];
+  canAssign?: boolean;
+  currentUserId?: string | null;
+  users?: PickUser[];
+  assigneeNames?: Record<string, string>;
+  assigneeFilter?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -142,6 +155,13 @@ export function FindingsTable({
           <option value="4">T4 · N/A before</option>
         </select>
         <CategoryMultiSelect categories={categories} selected={categoryFilter} onChange={(v) => updateParams({ category: v })} />
+        <select value={assigneeFilter} onChange={(e) => updateParams({ assignee: e.target.value })}
+          className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white">
+          <option value="all">All assignees</option>
+          <option value="me">Assigned to me</option>
+          <option value="none">Unassigned</option>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+        </select>
       </div>
 
       {/* Table */}
@@ -155,6 +175,7 @@ export function FindingsTable({
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Category</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Charge Item</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Status</th>
+                <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Assigned</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs">Tier</th>
                 <th className="px-3 py-2.5 text-right font-medium text-[#475569] text-xs">Impact</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#475569] text-xs w-8" />
@@ -183,6 +204,11 @@ export function FindingsTable({
                       {f.is_carried && <span title={f.resolution_note || "Carried from a prior review"} className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">CARRIED</span>}
                     </div>
                   </td>
+                  <td className="px-3 py-2.5 text-xs">
+                    {f.assigned_to
+                      ? <span className="text-[#334155]">{assigneeNames[f.assigned_to] || "Assigned"}</span>
+                      : <span className="text-[#94a3b8]">Unassigned</span>}
+                  </td>
                   <td className="px-3 py-2.5">
                     {(() => { const t = TIER_META[f.tier || 1]; return <span title={t.title} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${t.cls}`}>{t.label}</span>; })()}
                   </td>
@@ -196,7 +222,7 @@ export function FindingsTable({
               ))}
               {findings.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#94a3b8] text-sm">
+                  <td colSpan={9} className="py-12 text-center text-[#94a3b8] text-sm">
                     No findings match the current filters.
                   </td>
                 </tr>
@@ -218,7 +244,7 @@ export function FindingsTable({
 
       {/* Detail Drawer */}
       {selected && (
-        <FindingDrawer finding={selected} onClose={() => setSelected(null)} />
+        <FindingDrawer finding={selected} onClose={() => setSelected(null)} canAssign={canAssign} users={users} assigneeNames={assigneeNames} />
       )}
     </>
   );
@@ -226,11 +252,24 @@ export function FindingsTable({
 
 // ─── Finding Detail Drawer ───────────────────────────────────
 
-function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () => void }) {
+function FindingDrawer({ finding, onClose, canAssign, users, assigneeNames }: { finding: FindingRow; onClose: () => void; canAssign: boolean; users: PickUser[]; assigneeNames: Record<string, string> }) {
   const [updating, setUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(finding.status);
   const [note, setNote] = useState(finding.resolution_note || "");
+  const [assignee, setAssignee] = useState(finding.assigned_to || "");
+  const [assigning, setAssigning] = useState(false);
   const router = useRouter();
+
+  const assign = async (uid: string) => {
+    setAssignee(uid); setAssigning(true);
+    try {
+      await fetch("/api/findings/assign", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId: finding.id, assignee_id: uid || null }),
+      });
+      router.refresh();
+    } catch { /* ignore */ } finally { setAssigning(false); }
+  };
 
   const updateStatus = async (newStatus: string) => {
     setUpdating(true);
@@ -349,8 +388,23 @@ function FindingDrawer({ finding, onClose }: { finding: FindingRow; onClose: () 
           )}
         </div>
 
-        {/* Disposition (present-only — no file edits yet) */}
+        {/* Assignment + Disposition */}
         <div className="px-5 py-4 border-t border-[#e2e8f0] bg-[#f8fafc] space-y-3">
+          <div>
+            <div className="text-xs font-medium text-[#64748b] mb-1.5">Assigned to</div>
+            {canAssign ? (
+              <div className="flex items-center gap-2">
+                <select value={assignee} onChange={(e) => assign(e.target.value)} disabled={assigning}
+                  className="flex-1 text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20">
+                  <option value="">Unassigned</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.full_name}{u.department ? ` · ${u.department}` : ""}</option>)}
+                </select>
+                {assigning && <Loader2 size={14} className="animate-spin text-[#94a3b8]" />}
+              </div>
+            ) : (
+              <div className="text-sm text-[#334155]">{finding.assigned_to ? (assigneeNames[finding.assigned_to] || "Assigned") : "Unassigned"}</div>
+            )}
+          </div>
           <div>
             <div className="text-xs font-medium text-[#64748b] mb-1.5">Disposition</div>
             <div className="flex flex-wrap gap-1.5">

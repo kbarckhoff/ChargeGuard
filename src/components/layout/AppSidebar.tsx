@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2 } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, Users, History } from "lucide-react";
 
 type Org = { id: string; name: string };
 
@@ -68,6 +68,7 @@ function ClientSwitcher() {
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
+  { label: "My Work Queue", href: "/queue", icon: Inbox },
   { label: "Change Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -78,8 +79,15 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isOwner, setIsOwner] = useState(false);
+  const [isSuper, setIsSuper] = useState(false);
+  const [canAssign, setCanAssign] = useState(false);
   useEffect(() => {
-    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.isPlatformOwner) setIsOwner(true); }).catch(() => {});
+    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d) return;
+      if (d.isPlatformOwner) setIsOwner(true);
+      if (d.isSuper) setIsSuper(true);
+      if (d.canAssign) setCanAssign(true);
+    }).catch(() => {});
   }, []);
   const logout = async () => {
     await createClient().auth.signOut();
@@ -103,8 +111,18 @@ export function AppSidebar() {
             </Link>
           );
         })}
+        {canAssign && (
+          <Link href="/audit-log" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/audit-log") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+            <History size={17} /> Audit Log
+          </Link>
+        )}
+        {isSuper && (
+          <Link href="/admin/users" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin/users") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+            <Users size={17} /> Users &amp; Roles
+          </Link>
+        )}
         {isOwner && (
-          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname === "/admin" || pathname.startsWith("/admin/") && !pathname.startsWith("/admin/users") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
             <Building2 size={17} /> Admin
           </Link>
         )}

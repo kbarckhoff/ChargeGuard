@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { ACTIVE_ORG_COOKIE, resolveActiveOrg, listMemberOrgs } from "@/lib/active-org";
+import { getActor } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,8 @@ export async function GET() {
       // Regular users see the clients they belong to (home org + org_members).
       orgs = await listMemberOrgs(db, user.id, ownOrg);
     }
-    return NextResponse.json({ isPlatformOwner, activeOrgId: orgId, ownOrg, orgs });
+    const actor = await getActor(db, user.id);
+    return NextResponse.json({ isPlatformOwner, activeOrgId: orgId, ownOrg, orgs, appRole: actor.appRole, canAssign: actor.canAssign, isSuper: actor.isSuper });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });
   }

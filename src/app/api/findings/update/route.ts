@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { findingId, status, note } = await request.json();
+    const { findingId, status, note, action_taken, effective_date } = await request.json();
 
     if (!findingId || !status) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -44,6 +44,24 @@ export async function POST(request: Request) {
       .from("findings")
       .update(updates)
       .eq("id", findingId);
+
+    // Audit log: record this disposition (assign/accept/reject/na/note) with the
+    // reviewer's note, action taken, and effective date, tied to who + when.
+    if (!error) {
+      try {
+        const { data: fa } = await supabaseAdmin.from("findings").select("org_id, audit_id").eq("id", findingId).single();
+        if (fa) {
+          await supabaseAdmin.from("finding_activity").insert({
+            org_id: (fa as any).org_id, audit_id: (fa as any).audit_id, finding_id: findingId,
+            actor_id: user.id,
+            action: status === "rejected" ? "rejected" : status === "accepted" || status === "resolved" ? "accepted" : status === "na" ? "na" : "note",
+            note: typeof note === "string" ? note : null,
+            action_taken: typeof action_taken === "string" ? (action_taken.trim() || null) : null,
+            effective_date: typeof effective_date === "string" ? (effective_date || null) : null,
+          });
+        }
+      } catch { /* audit log is best-effort */ }
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

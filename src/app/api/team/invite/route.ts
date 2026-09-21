@@ -37,8 +37,10 @@ export async function POST(request: Request) {
     const { data: me } = await db.from("users").select("org_id, is_platform_owner, full_name").eq("id", user.id).single();
     if (!me?.org_id) return NextResponse.json({ error: "No organization" }, { status: 404 });
 
-    const { email, org_id } = await request.json();
+    const { email, org_id, full_name: fullNameIn, app_role: appRoleIn, department } = await request.json();
     if (!email || !/.+@.+\..+/.test(email)) return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+    const appRole = ["super_user", "analyst", "member"].includes(appRoleIn) ? appRoleIn : "member";
+    const dept = (department || "").toString().trim() || null;
     // Add to the client the inviter is currently working in (platform owners may
     // target another org explicitly).
     const { orgId: activeOrg } = await resolveActiveOrg(db, user.id);
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, added: true, emailed });
     }
 
-    const fullName = nameFromEmail(cleanEmail);
+    const fullName = (fullNameIn || "").toString().trim() || nameFromEmail(cleanEmail);
     const tempPassword = genTempPassword();
 
     // Create the auth user with the temp password (email pre-confirmed).
@@ -99,7 +101,8 @@ export async function POST(request: Request) {
 
     // Create their profile row in the target org.
     const { error: uErr } = await db.from("users").insert({
-      id: uid, org_id: targetOrg, email: cleanEmail, full_name: fullName, role: "auditor", is_active: true,
+      id: uid, org_id: targetOrg, email: cleanEmail, full_name: fullName, role: "auditor",
+      app_role: appRole, department: dept, is_active: true,
     });
     if (uErr) {
       await db.auth.admin.deleteUser(uid).catch(() => {});
