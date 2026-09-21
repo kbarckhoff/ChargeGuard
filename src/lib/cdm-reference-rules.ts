@@ -12,6 +12,7 @@ import { getReference, refNum, normalizeHcpcs } from "./cms-reference";
 import { getProcDevice, classifyDevice, getVaccine, NEW_CODES } from "./device-crosswalk";
 import ptData from "./price-transparency-data.json";
 import { getBenchmark } from "./pricing-benchmark";
+import { isPharmacyLine } from "./pharmacy";
 
 export interface RuleResult {
   title: string;
@@ -848,11 +849,14 @@ export function runPriceTransparencyRules(items: any[]): RuleResult[] {
 const BM_LOW = 0.75;   // client charge below this fraction of peer avg = underpriced
 const BM_HIGH = 3.0;   // client charge above this multiple of peer avg = over-market
 
-export function runBenchmarkRules(items: any[], state?: string | null): RuleResult[] {
+export function runBenchmarkRules(items: any[], state?: string | null, formularyCodes?: Set<string> | null): RuleResult[] {
   const out: RuleResult[] = [];
   for (const item of items) {
     const price = num(item.gross_charge);
     if (price <= 0) continue;
+    // Pharmacy lines aren't comparable to peers on gross charge (formularies
+    // differ), so keep them out of the CMS peer benchmark.
+    if (isPharmacyLine(item, formularyCodes)) continue;
     const code = (item.hcpcs_cpt_code || "").trim();
     if (!code) continue;
 

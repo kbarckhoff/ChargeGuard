@@ -244,7 +244,11 @@ function chip(text: string, tone: string) {
 /* ---------- STEP 1: INTAKE ---------- */
 function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume }: any) {
   const facilityType: FacilityType = "short_term_acute";
-  const [reviewPeriod, setReviewPeriod] = useState<string>(initialReviewPeriod || "");
+  const todayIso = new Date().toISOString().slice(0, 10);
+  // Review date is no longer a manual input — it defaults to today. If this
+  // review has no date recorded yet, persist today's date once on mount so the
+  // scan's effective-date filtering and the reports show a consistent value.
+  const [reviewPeriod, setReviewPeriod] = useState<string>(initialReviewPeriod || todayIso);
   const [lowVolume, setLowVolume] = useState<string>(initialLowVolume != null ? String(initialLowVolume) : "10");
   const [savingPeriod, setSavingPeriod] = useState(false);
   const savePeriod = async (v: string) => {
@@ -256,6 +260,14 @@ function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCount
       });
     } finally { setSavingPeriod(false); }
   };
+  useEffect(() => {
+    if (!initialReviewPeriod && !locked) savePeriod(todayIso);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const reviewDateLabel = (() => {
+    const d = new Date(`${reviewPeriod}T00:00:00`);
+    return isNaN(d.getTime()) ? reviewPeriod : d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  })();
   const saveThreshold = async (v: string) => {
     await fetch("/api/audits/period", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -275,8 +287,8 @@ function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCount
           <div><label className={labelCls}>Entity name</label><input className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} defaultValue={hospitalName} disabled={locked} /></div>
           <div>
             <label className={labelCls}>Review date {savingPeriod && <span className="text-[#94a3b8]">· saving…</span>}</label>
-            <input type="date" className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={reviewPeriod} disabled={locked} onChange={(e) => savePeriod(e.target.value)} />
-            <p className="text-xs text-[#9aa2af] mt-1.5">Sets the review year. Codes not yet effective by this date are skipped.</p>
+            <div className={inputCls + " bg-[#f6f7f9] text-[#6b7280] flex items-center"}>{reviewDateLabel}</div>
+            <p className="text-xs text-[#9aa2af] mt-1.5">Set to today automatically. Codes not yet effective by this date are skipped.</p>
           </div>
           <div>
             <label className={labelCls}>Low-volume threshold (RVU analysis)</label>

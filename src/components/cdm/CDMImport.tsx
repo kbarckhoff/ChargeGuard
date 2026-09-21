@@ -37,6 +37,25 @@ const ALIASES: Record<string, string[]> = {
   service_line: ["serviceline", "svcline", "servicearea"],
 };
 const norm = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+const FILE_TYPE = "cdm";
+// Signature for a header set (order-independent), matched against saved configs.
+const headerSig = (headers: string[]) => headers.map(norm).filter(Boolean).sort().join("|");
+
+// Look for a previously-saved mapping whose headers match this file's headers.
+async function savedMappingFor(headers: string[]): Promise<Record<string, string> | null> {
+  try {
+    const res = await fetch("/api/import-configs");
+    if (!res.ok) return null;
+    const { configs } = await res.json();
+    const sig = headerSig(headers);
+    const auto = `auto:${FILE_TYPE}:${sig}`;
+    // Prefer the auto-remembered config for this exact header set; otherwise any
+    // saved config whose sample_headers match the same signature.
+    const hit = (configs || []).find((c: any) => c.name === auto)
+      || (configs || []).find((c: any) => Array.isArray(c.sample_headers) && headerSig(c.sample_headers) === sig);
+    return hit?.column_mappings || null;
+  } catch { return null; }
+}
 
 function autoMap(headers: string[]) {
   const normed = headers.map((h) => ({ raw: h, n: norm(h) }));
@@ -71,12 +90,15 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
     const file = e.target.files?.[0];
     if (!file) return;
     setBusy(true); setMsg("Reading file…");
-    const load = (data: Record<string, any>[]) => {
+    const load = async (data: Record<string, any>[]) => {
       const clean = data.filter((x) => x && Object.keys(x).length);
       if (!clean.length) { setMsg("No rows found in the file."); setBusy(false); return; }
       const hdrs = Object.keys(clean[0]);
-      setRows(clean); setHeaders(hdrs); setMapping(autoMap(hdrs)); setFileName(file.name);
-      setBusy(false); setMsg(null);
+      // Re-use a saved mapping for these exact headers if we have one; otherwise
+      // fall back to the alias-based auto-match.
+      const saved = await savedMappingFor(hdrs);
+      setRows(clean); setHeaders(hdrs); setMapping(saved || autoMap(hdrs)); setFileName(file.name);
+      setBusy(false); setMsg(saved ? "Reused your saved column mapping for this file layout." : null);
     };
     try {
       const lower = file.name.toLowerCase();
@@ -100,7 +122,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
       const chunk = rows!.slice(i, i + CHUNK);
       const res = await fetch("/api/import", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auditId, items: chunk, columnMappings: mapping, replace: i === 0 }),
+        body: JSON.stringify({ auditId, items: chunk, columnMappings: mapping, replace: i === 0, fileType: FILE_TYPE, fileHeaders: i === 0 ? headers : undefined }),
       });
       const j = await res.json();
       if (!res.ok) { setMsg("Failed: " + (j.error || res.status)); setBusy(false); return; }

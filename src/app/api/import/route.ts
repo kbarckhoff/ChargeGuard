@@ -29,11 +29,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { auditId, items, columnMappings, saveMappingAs, replace } = await request.json();
+    const { auditId, items, columnMappings, saveMappingAs, replace, fileType, fileHeaders } = await request.json();
 
     if (!auditId || !items || !columnMappings) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    // Deterministic signature for a set of column headers, so the next upload
+    // with the same headers can re-use this mapping automatically.
+    const headerSig = (headers: string[]) =>
+      headers.map((h) => String(h).toLowerCase().replace(/[^a-z0-9]/g, "")).filter(Boolean).sort().join("|");
 
     if (await isAuditLocked(supabaseAdmin, auditId)) {
       return NextResponse.json({ error: "This quarter is completed (locked). Reopen it to import." }, { status: 409 });
@@ -44,7 +49,7 @@ export async function POST(request: Request) {
       await supabaseAdmin.from("charge_items").delete().eq("audit_id", auditId);
     }
 
-    // Optionally save the column mapping for reuse
+    // Optionally save the column mapping under a user-supplied name.
     if (saveMappingAs) {
       const sampleHeaders = Object.values(columnMappings).filter(Boolean) as string[];
       await supabaseAdmin.from("cdm_import_configs").insert({
@@ -52,6 +57,22 @@ export async function POST(request: Request) {
         name: saveMappingAs,
         column_mappings: columnMappings,
         sample_headers: sampleHeaders,
+        created_by: user.id,
+      });
+    }
+
+    // Auto-remember the mapping keyed by file type + header signature (first
+    // chunk only). Next time a file with the same headers is uploaded, the client
+    // finds this config and applies the mapping without the user re-matching.
+    if (replace && Array.isArray(fileHeaders) && fileHeaders.length) {
+      const sig = headerSig(fileHeaders as string[]);
+      const name = `auto:${String(fileType || "cdm")}:${sig}`;
+      await supabaseAdmin.from("cdm_import_configs").delete().eq("org_id", userData.org_id).eq("name", name);
+      await supabaseAdmin.from("cdm_import_configs").insert({
+        org_id: userData.org_id,
+        name,
+        column_mappings: columnMappings,
+        sample_headers: fileHeaders,
         created_by: user.id,
       });
     }

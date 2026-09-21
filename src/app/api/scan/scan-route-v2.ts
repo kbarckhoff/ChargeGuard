@@ -705,6 +705,9 @@ export async function POST(request: Request) {
       for (const f of data) if (f.charge_code) formularyByCode.set(String(f.charge_code), f);
       if (data.length < 1000) break;
     }
+    // Charge codes on the formulary — excluded from peer/benchmark pricing since
+    // formularies differ across like facilities and aren't comparable.
+    const formularyCodes = new Set<string>(formularyByCode.keys());
 
     // Load imported 837 claim lines (if any) for the Phase-2 claims rules.
     const claimLines: any[] = [];
@@ -766,9 +769,9 @@ export async function POST(request: Request) {
       ...runModifierRules(allItems, usageByCode),
       ...runInternalPricingRules(allItems),
       ...runRvuRules(allItems, usageByCode, lowVolumeThreshold),
-      ...runBenchmarkRules(allItems, auditState),
+      ...runBenchmarkRules(allItems, auditState, formularyCodes),
       ...runClaimsRules(allItems, claimLines),
-      ...runPeerCompetitorRules(allItems, peerRows),
+      ...runPeerCompetitorRules(allItems, peerRows, formularyCodes),
     ];
     // Effective-date awareness: skip findings for CDM lines whose code/line is not
     // yet effective by the review date (e.g. a code effective 1/1/2026 in a 2025

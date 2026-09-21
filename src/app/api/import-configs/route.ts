@@ -27,7 +27,7 @@ export async function GET() {
 
     const { data: configs } = await supabaseAdmin
       .from("cdm_import_configs")
-      .select("id, name, column_mappings, created_at")
+      .select("id, name, column_mappings, sample_headers, created_at")
       .eq("org_id", userData.org_id)
       .order("created_at", { ascending: false });
 

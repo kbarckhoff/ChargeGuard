@@ -26,6 +26,22 @@ const STATUS_LABEL: Record<string, string> = {
   approved_missing: "Approved · missing", implemented: "Implemented", void: "Void",
 };
 
+// Whether an accepted change shows up in the most recent CDM upload. Driven by
+// the smart-sync reconcile that runs when a new chargemaster is imported:
+//   implemented      → the latest CDM reflects the change  (green check)
+//   approved_missing → approved & sent, still not in the latest CDM (red X)
+//   exported         → sent to the client, awaiting the next CDM to re-check
+//   logged/pending   → not yet sent, so there is nothing to verify
+function ImplementedCell({ status }: { status: string }) {
+  if (status === "implemented")
+    return <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#067647]"><Check size={14} /> Yes</span>;
+  if (status === "approved_missing")
+    return <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#b42318]" title="Approved but not in the latest CDM"><X size={14} /> No</span>;
+  if (status === "exported")
+    return <span className="text-[11px] text-[#8a5a1a]" title="Sent to the client; will re-check on the next CDM upload">Awaiting</span>;
+  return <span className="text-[#cbd5e1]">—</span>;
+}
+
 export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: Entry[]; reviews: Review[]; latestAuditId: string | null }) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("active");
@@ -76,11 +92,11 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
             <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#e2e8f0]">
               <th className="px-3 py-2.5">#</th><th className="px-3 py-2.5">Line</th><th className="px-3 py-2.5">Action</th>
               <th className="px-3 py-2.5">Field</th><th className="px-3 py-2.5">Old → New</th><th className="px-3 py-2.5">Rationale</th>
-              <th className="px-3 py-2.5">Approver</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5"></th>
+              <th className="px-3 py-2.5">Approver</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5">Implemented</th><th className="px-3 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
-            {shown.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-[#94a3b8]">No change-log entries. Accept a finding to stage a change, or add a manual entry to document a CDM update.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={10} className="px-3 py-8 text-center text-[#94a3b8]">No change-log entries. Accept a finding to stage a change, or add a manual entry to document a CDM update.</td></tr>}
             {shown.map((e) => (
               <tr key={e.id} className="border-b border-[#f1f5f9] align-top">
                 <td className="px-3 py-2.5 text-[#94a3b8]">{e.change_number ?? "—"}</td>
@@ -106,6 +122,7 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
                 <td className="px-3 py-2.5 max-w-[240px]"><div className="text-[#475569] line-clamp-2">{e.rationale}</div></td>
                 <td className="px-3 py-2.5 text-[#64748b]">{e.approver_name || "—"}</td>
                 <td className="px-3 py-2.5"><span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status] || ""}`}>{STATUS_LABEL[e.status] || e.status}</span></td>
+                <td className="px-3 py-2.5"><ImplementedCell status={e.status} /></td>
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   {e.status !== "void" && (editId === e.id ? (
                     <span className="flex items-center gap-2">

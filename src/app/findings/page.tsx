@@ -2,17 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
-import { Badge, SeverityDot, SEVERITY_CONFIG, ProgressBar, EmptyState, formatImpact } from "@/components/ui/shared";
+import { Badge, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
 import { AlertTriangle, Download } from "lucide-react";
 
 export default async function FindingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string }>;
+  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string; class?: string }>;
 }) {
   const sp = await searchParams;
   const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
@@ -96,6 +97,13 @@ export default async function FindingsPage({
   const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
   const bucketCats = categoriesInBucket(categories, tab);
 
+  // Optional fix-type class filter (Code Validity / Pricing / Data Quality) from
+  // clicking a summary card. Scopes the table to that class within the tab.
+  const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality"];
+  const activeClass: FindingClass | null = CLASSES.includes(sp.class as FindingClass) ? (sp.class as FindingClass) : null;
+  const classCats = activeClass ? categoriesInClass(categories, activeClass).filter((c) => bucketCats.includes(c)) : null;
+  const tableCats = classCats ?? bucketCats;
+
   // Build the paginated table query, scoped to the active tab's categories.
   const page = parseInt(sp.page || "1");
   const pageSize = 50;
@@ -109,8 +117,8 @@ export default async function FindingsPage({
     .eq("ehr_lagging", false)
     .order("severity", { ascending: true })
     .order("created_at", { ascending: false });
-  // Scope the table to the current tab's bucket (peer tab has its own view).
-  if (tab !== "peer") query = query.in("category", bucketCats.length ? bucketCats : ["__none__"]);
+  // Scope the table to the current tab's bucket (and the class filter if set).
+  if (tab !== "peer") query = query.in("category", tableCats.length ? tableCats : ["__none__"]);
 
   if (sp.severity && sp.severity !== "all") {
     query = query.eq("severity", sp.severity);
@@ -149,14 +157,6 @@ export default async function FindingsPage({
     (!sp.search || (f.title || "").toLowerCase().includes(sp.search.toLowerCase()))
   );
 
-  const severityCounts = {
-    critical: scope.filter((f) => f.severity === "critical").length,
-    high: scope.filter((f) => f.severity === "high").length,
-    medium: scope.filter((f) => f.severity === "medium").length,
-    low: scope.filter((f) => f.severity === "low").length,
-    info: scope.filter((f) => f.severity === "info").length,
-  };
-
   const statusCounts = {
     open: scope.filter((f) => f.status === "open").length,
     in_review: scope.filter((f) => f.status === "in_review").length,
@@ -166,6 +166,10 @@ export default async function FindingsPage({
   };
 
   const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
+
+  // Fix-type class breakdown for the summary cards (scoped to the active tab).
+  const classCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0 };
+  for (const f of scope) classCounts[classForCategory(f.category)] += 1;
 
   // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
   // Shown read-only so the reviewer isn't asked to Accept the same fix again.
@@ -279,24 +283,30 @@ export default async function FindingsPage({
             </div>
           )}
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-            {Object.entries(SEVERITY_CONFIG).map(([key, cfg]) => (
-              <div key={key} className="bg-white rounded-xl border border-[#e2e8f0] p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-                  <span className="text-xs text-[#64748b]">{cfg.label}</span>
-                </div>
-                <div className="text-xl font-semibold text-[#0f172a]">
-                  {severityCounts[key as keyof typeof severityCounts]}
-                </div>
-              </div>
-            ))}
+          {/* Summary Cards — by fix type, so quick coding fixes are separable
+              from the pricing bulk. Click a card to filter the table. */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {(["code_validity", "pricing", "data_quality"] as FindingClass[]).map((cls) => {
+              const active = activeClass === cls;
+              const href = active
+                ? `/findings?auditId=${auditId}&tab=${tab}`
+                : `/findings?auditId=${auditId}&tab=${tab}&class=${cls}`;
+              return (
+                <a key={cls} href={href}
+                  className={`bg-white rounded-xl border p-4 transition-colors ${active ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#e2e8f0] hover:border-[#cbd5e1]"}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR[cls] }} />
+                    <span className="text-xs font-medium text-[#334155]">{CLASS_LABELS[cls]}</span>
+                  </div>
+                  <div className="text-xl font-semibold text-[#0f172a]">{classCounts[cls].toLocaleString()}</div>
+                  <div className="text-[11px] text-[#94a3b8] mt-0.5">{CLASS_BLURB[cls]}</div>
+                </a>
+              );
+            })}
             <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
               <div className="text-xs text-[#64748b] mb-1">Est. Impact</div>
-              <div className="text-xl font-semibold text-[#0f172a]">
-                {formatImpact(totalImpact)}
-              </div>
+              <div className="text-xl font-semibold text-[#0f172a]">{formatImpact(totalImpact)}</div>
+              {activeClass && <div className="text-[11px] text-[#94a3b8] mt-0.5">Filtered: {CLASS_LABELS[activeClass]}</div>}
             </div>
           </div>
 

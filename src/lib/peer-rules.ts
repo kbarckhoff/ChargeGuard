@@ -13,6 +13,7 @@
 import type { RuleResult } from "./cdm-reference-rules";
 import { normalizeHcpcs, getReference } from "./cms-reference";
 import { descMatchScore, confidenceLabel } from "./peer-match";
+import { isPharmacyLine } from "./pharmacy";
 
 export interface PeerPrice { hcpcs: string; gross_charge: number | null; competitor: string }
 
@@ -21,7 +22,7 @@ const PC_HIGH = 1.5;  // above this multiple of the competitor average = over-ma
 
 const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[]): RuleResult[] {
+export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[], formularyCodes?: Set<string> | null): RuleResult[] {
   const out: RuleResult[] = [];
   if (!peerRows || peerRows.length === 0) return out;
 
@@ -44,6 +45,9 @@ export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[]): Rul
   for (const item of items) {
     const price = Number(item.gross_charge) || 0;
     if (price <= 0) continue;
+    // Formularies differ across like facilities, so pharmacy lines are not
+    // comparable on gross charge — leave them out of peer pricing.
+    if (isPharmacyLine(item, formularyCodes)) continue;
     const k = normalizeHcpcs(item.hcpcs_cpt_code || "");
     if (!k || !avg.has(k)) continue; // only codes a competitor also lists
     if (!byCode.has(k)) byCode.set(k, []);

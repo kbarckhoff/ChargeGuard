@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { normalizeHcpcs, getReference, refNum } from "@/lib/cms-reference";
 import { descMatchScore, confidenceLabel } from "@/lib/peer-match";
+import { isPharmacyLine } from "@/lib/pharmacy";
 import * as XLSX from "xlsx-js-style";
 
 export const maxDuration = 60;
@@ -96,16 +97,28 @@ export async function GET(request: Request) {
     // share each code: a code on one line is a clean 1-to-1 comparison; a code on
     // several lines is ambiguous (usually a coding issue), so we flag it rather
     // than trust the price gap.
+    // Formulary charge codes for this review — pharmacy lines are excluded from
+    // peer pricing (formularies differ across like facilities).
+    const formularyCodes = new Set<string>();
+    for (let off = 0; ; off += 1000) {
+      const { data } = await db.from("charge_formulary").select("charge_code").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      for (const f of data) if (f.charge_code) formularyCodes.add(String(f.charge_code));
+      if (data.length < 1000) break;
+    }
+
     const rows: any[] = [];
     const codeCount = new Map<string, number>();
-    const summary = { below: 0, above: 0, at: 0, total: 0, noRate: 0, ambiguousLines: 0, ambiguousCodes: 0, drugExcluded: 0, placeholderDropped: 0 };
+    const summary = { below: 0, above: 0, at: 0, total: 0, noRate: 0, ambiguousLines: 0, ambiguousCodes: 0, drugExcluded: 0, placeholderDropped: 0, pharmacyExcluded: 0 };
     for (let off = 0; ; off += 1000) {
-      const { data } = await db.from("charge_items").select("procedure_number, hcpcs_cpt_code, gross_charge, charge_description").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await db.from("charge_items").select("procedure_number, hcpcs_cpt_code, gross_charge, charge_description, revenue_code").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
       for (const r of data) {
         const code = normalizeHcpcs(r.hcpcs_cpt_code);
         const your = parseFloat(String(r.gross_charge)) || 0;
         if (!code || your <= 0) continue;
+        // Drop pharmacy lines (pharmacy rev code or on the formulary).
+        if (isPharmacyLine(r, formularyCodes)) { summary.pharmacyExcluded++; continue; }
         const p = peer.get(code);
         if (!p) continue;
         // Per-competitor price for this code, dropping any competitor whose price
