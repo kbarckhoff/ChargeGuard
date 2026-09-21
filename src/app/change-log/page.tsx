@@ -33,7 +33,7 @@ export default async function ChangeLogPage() {
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-base font-semibold text-[#0f172a]">Change Log</h1>
+        <h1 className="text-base font-semibold text-[#0f172a]">Audit Log</h1>
         <span className="text-sm text-[#94a3b8]">{pending} pending · {exported} awaiting EHR implementation</span>
       </header>
       <div className="flex-1 overflow-y-auto p-6">

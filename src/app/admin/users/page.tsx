@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
 import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminTabs } from "@/components/admin/AdminTabs";
 
 // Users & Roles for the active client. Super User (platform owner) manages who
 // has access, their role, and their department (department is display-only).
@@ -28,8 +29,9 @@ export default async function AdminUsersPage() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="max-w-4xl mx-auto px-8 py-8">
-        <h1 className="text-xl font-semibold text-[#0f172a] mb-1">Users &amp; Roles{org?.name ? ` — ${org.name}` : ""}</h1>
-        <p className="text-sm text-[#64748b] mb-6">Add people to this client, set their role, and record their department. The Charge Master Analyst can assign findings to anyone here.</p>
+        <h1 className="text-xl font-semibold text-[#0f172a] mb-4">Admin</h1>
+        <AdminTabs />
+        <p className="text-sm text-[#64748b] mb-6">Add people to {org?.name || "this client"}, set their role, and record their department. The Charge Master Analyst can assign findings to anyone here.</p>
         <AdminUsers users={users} />
       </div>
     </div>

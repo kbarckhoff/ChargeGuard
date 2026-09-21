@@ -4,27 +4,50 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, Users, History } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox } from "lucide-react";
 
 type Org = { id: string; name: string };
+type OrgInfo = { orgs: Org[]; activeOrgId: string | null; isPlatformOwner: boolean; isSuper: boolean; canAssign: boolean };
 
-// Client switcher shown to anyone with access to more than one client
-// (platform owners, or users granted shared access to multiple clients).
-function ClientSwitcher() {
+// Cache the org/role payload so the sidebar renders the right nav instantly on
+// every client-side navigation instead of refetching and flickering. Backed by
+// a module variable (survives route changes) and sessionStorage (survives reload).
+const CACHE_KEY = "cg_orginfo";
+let orgCache: OrgInfo | null = null;
+function readCache(): OrgInfo | null {
+  if (orgCache) return orgCache;
+  try { const s = sessionStorage.getItem(CACHE_KEY); if (s) { orgCache = JSON.parse(s); return orgCache; } } catch { /* ignore */ }
+  return null;
+}
+function writeCache(v: OrgInfo) {
+  orgCache = v;
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(v)); } catch { /* ignore */ }
+}
+function useOrgInfo(): OrgInfo | null {
+  const [info, setInfo] = useState<OrgInfo | null>(() => (typeof window !== "undefined" ? readCache() : null));
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d || !alive) return;
+      const next: OrgInfo = {
+        orgs: d.orgs || [], activeOrgId: d.activeOrgId || null,
+        isPlatformOwner: !!d.isPlatformOwner, isSuper: !!d.isSuper, canAssign: !!d.canAssign,
+      };
+      writeCache(next); setInfo(next);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return info;
+}
+
+function ClientSwitcher({ info }: { info: OrgInfo | null }) {
   const router = useRouter();
-  const [orgs, setOrgs] = useState<Org[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(info?.activeOrgId ?? null);
+  useEffect(() => { if (info?.activeOrgId) setActiveId(info.activeOrgId); }, [info?.activeOrgId]);
 
-  useEffect(() => {
-    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (!d) return;
-      setOrgs(d.orgs || []);
-      setActiveId(d.activeOrgId || null);
-    }).catch(() => {});
-  }, []);
-
+  const orgs = info?.orgs || [];
   if (orgs.length < 2) return null;
   const activeName = orgs.find((o) => o.id === activeId)?.name || "Select client";
 
@@ -32,7 +55,9 @@ function ClientSwitcher() {
     if (id === activeId) { setOpen(false); return; }
     setBusy(true);
     await fetch("/api/orgs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ org_id: id }) });
-    setActiveId(id); setBusy(false); setOpen(false);
+    setActiveId(id);
+    if (orgCache) writeCache({ ...orgCache, activeOrgId: id });
+    setBusy(false); setOpen(false);
     router.refresh();
   };
 
@@ -62,34 +87,26 @@ function ClientSwitcher() {
   );
 }
 
-// Global menu: the hub (Dashboard), Findings & Analysis (results across reviews),
-// the CDM Change Log (accepted changes across runs), the CMS reference data
-// (References), and Settings.
+// Global menu. The audit log holds the CDM change history (accepted changes,
+// manual entries) across runs.
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
   { label: "My Work Queue", href: "/queue", icon: Inbox },
-  { label: "Change Log", href: "/change-log", icon: ClipboardList },
+  { label: "Audit Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-// Persistent left navigation for the hub pages (Panacea-style blue rail).
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [isOwner, setIsOwner] = useState(false);
-  const [isSuper, setIsSuper] = useState(false);
-  const [canAssign, setCanAssign] = useState(false);
-  useEffect(() => {
-    fetch("/api/orgs").then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (!d) return;
-      if (d.isPlatformOwner) setIsOwner(true);
-      if (d.isSuper) setIsSuper(true);
-      if (d.canAssign) setCanAssign(true);
-    }).catch(() => {});
-  }, []);
+  const info = useOrgInfo();
+  const isOwner = !!info?.isPlatformOwner;
+
   const logout = async () => {
+    try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+    orgCache = null;
     await createClient().auth.signOut();
     router.push("/auth/login");
     router.refresh();
@@ -100,7 +117,7 @@ export function AppSidebar() {
         <img src="/logo-mark.png" alt="ChargeGuard" className="w-[30px] h-[30px] object-contain" />
         <span className="font-bold text-[15px] tracking-tight">ChargeGuard</span>
       </div>
-      <ClientSwitcher />
+      <ClientSwitcher info={info} />
       <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">
         {NAV.map((n) => {
           const active = pathname === n.href || (n.href === "/runs" && pathname === "/");
@@ -111,18 +128,8 @@ export function AppSidebar() {
             </Link>
           );
         })}
-        {canAssign && (
-          <Link href="/audit-log" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/audit-log") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
-            <History size={17} /> Audit Log
-          </Link>
-        )}
-        {isSuper && (
-          <Link href="/admin/users" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin/users") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
-            <Users size={17} /> Users &amp; Roles
-          </Link>
-        )}
         {isOwner && (
-          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname === "/admin" || pathname.startsWith("/admin/") && !pathname.startsWith("/admin/users") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
             <Building2 size={17} /> Admin
           </Link>
         )}
