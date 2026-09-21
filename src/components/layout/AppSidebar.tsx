@@ -114,7 +114,7 @@ export function AppSidebar() {
   return (
     <aside className="w-[224px] shrink-0 bg-[#1e293b] text-white flex flex-col min-h-screen">
       <div className="flex items-center gap-1.5 px-5 h-14">
-        <img src="/logo-mark.png" alt="ChargeGuard" className="w-[30px] h-[30px] object-contain" />
+        <img src="/logo-white.png" alt="ChargeGuard" className="w-[30px] h-[30px] object-contain" />
         <span className="font-bold text-[15px] tracking-tight">ChargeGuard</span>
       </div>
       <ClientSwitcher info={info} />
