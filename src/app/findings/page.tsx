@@ -77,24 +77,40 @@ export default async function FindingsPage({
     );
   }
 
-  // Get ALL findings (paged) first — drives the summary, the roll-up, and the
-  // per-tab bucketing (Supabase caps each response at 1000 rows).
-  const allFindings: { severity: string; status: string; financial_impact: number | null; category: string | null; title: string | null }[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    let statsQuery = supabaseAdmin
-      .from("findings")
-      .select("severity, status, financial_impact, category, title")
-      .eq("audit_id", auditId)
-      .eq("ehr_lagging", false)
-      .order("id", { ascending: true }); // stable sort so range paging can't repeat rows
-    const { data, error } = await statsQuery.range(offset, offset + 999);
-    if (error || !data || data.length === 0) break;
-    allFindings.push(...data);
-    if (data.length < 1000) break;
+  // Summary/roll-up data comes from a single grouped aggregate — one row per
+  // (category, status) with a count and summed impact — instead of pulling every
+  // finding row (a big review has ~18k+ rows, which made every filter change slow).
+  type Agg = { category: string | null; status: string | null; cnt: number; impact: number };
+  let agg: Agg[] = [];
+  const { data: aggData, error: aggErr } = await supabaseAdmin.rpc("findings_rollup", { p_audit: auditId });
+  if (!aggErr && Array.isArray(aggData)) {
+    agg = (aggData as any[]).map((r) => ({ category: r.category, status: r.status, cnt: Number(r.cnt) || 0, impact: Number(r.impact) || 0 }));
+  } else {
+    // Fallback for DBs without the findings_rollup function: page through rows
+    // and aggregate in memory (slower, but keeps the page working).
+    const tmp = new Map<string, Agg>();
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabaseAdmin
+        .from("findings")
+        .select("status, financial_impact, category")
+        .eq("audit_id", auditId)
+        .eq("ehr_lagging", false)
+        .order("id", { ascending: true })
+        .range(offset, offset + 999);
+      if (error || !data || data.length === 0) break;
+      for (const f of data as any[]) {
+        const k = `${f.category}||${f.status}`;
+        const e = tmp.get(k) || { category: f.category, status: f.status, cnt: 0, impact: 0 };
+        e.cnt += 1; e.impact += f.financial_impact || 0; tmp.set(k, e);
+      }
+      if (data.length < 1000) break;
+    }
+    agg = [...tmp.values()];
   }
+  const grandTotal = agg.reduce((s, a) => s + a.cnt, 0);
 
   // Categories present, and the subset that falls in the active tab's bucket.
-  const categories = [...new Set(allFindings.map((f) => f.category).filter((c): c is string => !!c))].sort();
+  const categories = [...new Set(agg.map((a) => a.category).filter((c): c is string => !!c))].sort();
   const bucketCats = categoriesInBucket(categories, tab);
 
   // Optional fix-type class filter (Code Validity / Pricing / Data Quality) from
@@ -149,27 +165,24 @@ export default async function FindingsPage({
   const { data: findings, count } = await query.range(from, to);
   const totalPages = Math.ceil((count || 0) / pageSize);
 
-  // Summary cards + status counts, scoped to the active bucket, active category
-  // filter, and search (not the severity filter, so the breakdown stays useful).
-  const scope = allFindings.filter((f) =>
-    (tab === "peer" || bucketForCategory(f.category) === tab) &&
-    (selectedCategories.length === 0 || (f.category != null && selectedCategories.includes(f.category))) &&
-    (!sp.search || (f.title || "").toLowerCase().includes(sp.search.toLowerCase()))
+  // Summary cards + status counts, scoped to the active bucket and category
+  // filter, computed from the aggregate (cheap). Search only narrows the table.
+  const scopeAgg = agg.filter((a) =>
+    (tab === "peer" || bucketForCategory(a.category) === tab) &&
+    (selectedCategories.length === 0 || (a.category != null && selectedCategories.includes(a.category)))
   );
 
-  const statusCounts = {
-    open: scope.filter((f) => f.status === "open").length,
-    in_review: scope.filter((f) => f.status === "in_review").length,
-    accepted: scope.filter((f) => f.status === "accepted" || f.status === "resolved").length,
-    rejected: scope.filter((f) => f.status === "rejected").length,
-    na: scope.filter((f) => f.status === "na").length,
-  };
+  const statusCounts = { open: 0, in_review: 0, accepted: 0, rejected: 0, na: 0 };
+  for (const a of scopeAgg) {
+    const s = a.status === "resolved" ? "accepted" : (a.status || "");
+    if (s in statusCounts) (statusCounts as Record<string, number>)[s] += a.cnt;
+  }
 
-  const totalImpact = scope.reduce((s, f) => s + (f.financial_impact || 0), 0);
+  const totalImpact = scopeAgg.reduce((s, a) => s + a.impact, 0);
 
   // Fix-type class breakdown for the summary cards (scoped to the active tab).
   const classCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0, informational: 0 };
-  for (const f of scope) classCounts[classForCategory(f.category)] += 1;
+  for (const a of scopeAgg) classCounts[classForCategory(a.category)] += a.cnt;
 
   // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
   // Shown read-only so the reviewer isn't asked to Accept the same fix again.
@@ -185,11 +198,11 @@ export default async function FindingsPage({
   // Roll-up: collapse the full flag list into systemic issues by category, ranked
   // by dollar exposure, so the page leads with "what matters" not the raw volume.
   const byCat = new Map<string, { count: number; impact: number }>();
-  for (const f of allFindings) {
-    if (bucketForCategory(f.category) !== tab) continue; // roll-up follows the active tab
-    const c = f.category || "Uncategorized";
+  for (const a of agg) {
+    if (bucketForCategory(a.category) !== tab) continue; // roll-up follows the active tab
+    const c = a.category || "Uncategorized";
     const e = byCat.get(c) || { count: 0, impact: 0 };
-    e.count += 1; e.impact += f.financial_impact || 0;
+    e.count += a.cnt; e.impact += a.impact;
     byCat.set(c, e);
   }
   const rollup = [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.impact - a.impact);
@@ -232,7 +245,7 @@ export default async function FindingsPage({
               <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
                 <div>
                   <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {allFindings.length.toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
+                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {grandTotal.toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
                 </div>
                 {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
               </div>
