@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
-import { Badge, EmptyState, formatImpact } from "@/components/ui/shared";
+import { EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { TodoTable, type TodoGroup } from "@/components/audit/TodoTable";
 import { RecordTable, type RecordLine } from "@/components/audit/RecordTable";
@@ -244,12 +244,6 @@ export default async function FindingsPage({
     (selectedCategories.length === 0 || (a.category != null && selectedCategories.includes(a.category)))
   );
 
-  const statusCounts = { open: 0, in_review: 0, accepted: 0, rejected: 0, na: 0 };
-  for (const a of scopeAgg) {
-    const s = a.status === "resolved" ? "accepted" : (a.status || "");
-    if (s in statusCounts) (statusCounts as Record<string, number>)[s] += a.cnt;
-  }
-
   const totalImpact = scopeAgg.reduce((s, a) => s + a.impact, 0);
 
   // Fix-type class breakdown. Cards show distinct TO-DO counts (from the grouped
@@ -300,8 +294,6 @@ export default async function FindingsPage({
           <ReviewPicker runs={runList} auditId={auditId!} />
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#94a3b8]">{((viewMode === "record" ? recordTotal : viewMode === "lines" ? count : groupTotal) || 0).toLocaleString()} {viewMode === "record" ? "lines with issues" : viewMode === "lines" ? "lines" : activeClass === "informational" ? "informational" : "to-dos"}</span>
-          <Badge variant="danger">{statusCounts.open} open</Badge>
           <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
           <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
           <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
@@ -309,16 +301,13 @@ export default async function FindingsPage({
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-4">
-          {/* Sub-tabs: CDM | RVU | Formulary | Peer Review — each exportable */}
-          <div className="flex items-center justify-between gap-3 border-b border-[#e2e8f0]">
+          {/* Sub-tabs: CDM | RVU | Formulary | Peer Review */}
+          <div className="flex items-center gap-3 border-b border-[#e2e8f0]">
             <div className="flex gap-1">
               {TABS.map((t) => (
                 <a key={t} href={`/findings?auditId=${auditId}&tab=${t}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#1e293b] text-[#1e293b]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</a>
               ))}
             </div>
-            {tab !== "peer" && (
-              <a href={`/api/findings/export?auditId=${auditId}&bucket=${tab}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 mb-1 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Export {BUCKET_LABELS[tab]}</a>
-            )}
           </div>
 
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
