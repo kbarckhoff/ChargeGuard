@@ -122,7 +122,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
       const chunk = rows!.slice(i, i + CHUNK);
       const res = await fetch("/api/import", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auditId, items: chunk, columnMappings: mapping, replace: i === 0, fileType: FILE_TYPE, fileHeaders: i === 0 ? headers : undefined }),
+        body: JSON.stringify({ auditId, items: chunk, columnMappings: mapping, replace: i === 0, fileType: FILE_TYPE, fileHeaders: i === 0 ? headers : undefined, rowOffset: i }),
       });
       const j = await res.json();
       if (!res.ok) { setMsg("Failed: " + (j.error || res.status)); setBusy(false); return; }

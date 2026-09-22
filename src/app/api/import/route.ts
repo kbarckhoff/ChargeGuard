@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { auditId, items, columnMappings, saveMappingAs, replace, fileType, fileHeaders } = await request.json();
+    const { auditId, items, columnMappings, saveMappingAs, replace, fileType, fileHeaders, rowOffset } = await request.json();
 
     if (!auditId || !items || !columnMappings) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -78,10 +78,13 @@ export async function POST(request: Request) {
     }
 
     // Transform rows
-    const chargeItems = items.map((row: Record<string, string>) => {
+    const baseRow = typeof rowOffset === "number" ? rowOffset : null;
+    const chargeItems = items.map((row: Record<string, string>, idx: number) => {
       const mapped: Record<string, unknown> = {
         audit_id: auditId,
         org_id: userData.org_id,
+        // 1-based position in the source file (record 1 = first data row).
+        ...(baseRow != null ? { source_row: baseRow + idx + 1 } : {}),
       };
 
       Object.entries(columnMappings).forEach(([targetCol, sourceCol]) => {

@@ -189,34 +189,41 @@ export default async function FindingsPage({
     }));
   }
 
-  // By-CDM-line rows: a page of charge_items with their in-scope findings.
+  // By-CDM-line rows: only CDM lines that HAVE an in-scope finding, one row per
+  // line, ordered by the line's original file position (record #).
   let recordLines: RecordLine[] = [];
   let recordTotal = 0;
   if (viewMode === "record" && tab !== "peer") {
-    const q = (sp.search || "").trim();
-    let ciQuery = supabaseAdmin
-      .from("charge_items")
-      .select("id, procedure_number, hcpcs_cpt_code, charge_description, revenue_code, gross_charge", { count: "exact" })
-      .eq("audit_id", auditId)
-      .order("procedure_number", { ascending: true });
-    if (q) ciQuery = ciQuery.or(`procedure_number.ilike.%${q}%,hcpcs_cpt_code.ilike.%${q}%,charge_description.ilike.%${q}%`);
-    const { data: ci, count: ciCount } = await ciQuery.range(from, to);
-    recordTotal = ciCount || 0;
-    const ids = (ci || []).map((r: any) => r.id);
-    const byLine: Record<string, any[]> = {};
-    if (ids.length) {
-      const { data: fs } = await supabaseAdmin
+    const SEV_RANK: Record<string, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+    const rankToSev = (r: number) => (r >= 5 ? "critical" : r >= 4 ? "high" : r >= 3 ? "medium" : r >= 2 ? "low" : r >= 1 ? "info" : null);
+    const rows: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await supabaseAdmin
         .from("findings")
-        .select("*, charge_items(procedure_number, charge_description, hcpcs_cpt_code, revenue_code, gross_charge)")
+        .select("charge_item_id, severity, category, financial_impact, charge_items(source_row, procedure_number, hcpcs_cpt_code, charge_description)")
         .eq("audit_id", auditId).eq("ehr_lagging", false)
-        .in("charge_item_id", ids)
-        .in("category", tableCats.length ? tableCats : ["__none__"]);
-      for (const f of fs || []) { const k = (f as any).charge_item_id; (byLine[k] ||= []).push(f); }
+        .in("category", tableCats.length ? tableCats : ["__none__"])
+        .order("id", { ascending: true }).range(off, off + 999);
+      if (error || !data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < 1000) break;
     }
-    recordLines = (ci || []).map((r: any) => ({
-      id: r.id, procedure_number: r.procedure_number, hcpcs_cpt_code: r.hcpcs_cpt_code,
-      charge_description: r.charge_description, revenue_code: r.revenue_code, gross_charge: r.gross_charge,
-      findings: byLine[r.id] || [],
+    const q = (sp.search || "").toLowerCase();
+    const map = new Map<string, { id: string; rec: number | null; proc: string | null; hcpcs: string | null; desc: string | null; count: number; impact: number; sev: number; cats: Set<string> }>();
+    for (const r of rows as any[]) {
+      const id = r.charge_item_id; if (!id) continue;
+      const ci = r.charge_items || {};
+      const e = map.get(id) || { id, rec: ci.source_row ?? null, proc: ci.procedure_number ?? null, hcpcs: ci.hcpcs_cpt_code ?? null, desc: ci.charge_description ?? null, count: 0, impact: 0, sev: 0, cats: new Set<string>() };
+      e.count += 1; e.impact += r.financial_impact || 0; e.sev = Math.max(e.sev, SEV_RANK[r.severity] || 0); if (r.category) e.cats.add(r.category);
+      map.set(id, e);
+    }
+    let arr = [...map.values()];
+    if (q) arr = arr.filter((l) => (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q) || String(l.rec ?? "").includes(q));
+    arr.sort((a, b) => ((a.rec ?? 1e12) - (b.rec ?? 1e12)) || String(a.proc || "").localeCompare(String(b.proc || "")));
+    recordTotal = arr.length;
+    recordLines = arr.slice(from, from + pageSize).map((l) => ({
+      id: l.id, record_no: l.rec, procedure_number: l.proc, hcpcs_cpt_code: l.hcpcs, charge_description: l.desc,
+      issue_count: l.count, worst_sev: rankToSev(l.sev), categories: [...l.cats], impact: l.impact,
     }));
   }
 
@@ -285,7 +292,7 @@ export default async function FindingsPage({
           <ReviewPicker runs={runList} auditId={auditId!} />
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#94a3b8]">{((lineView ? count : groupTotal) || 0).toLocaleString()} {activeClass === "informational" ? "informational" : lineView ? "lines" : "to-dos"}</span>
+          <span className="text-[#94a3b8]">{((viewMode === "record" ? recordTotal : viewMode === "lines" ? count : groupTotal) || 0).toLocaleString()} {viewMode === "record" ? "lines with issues" : viewMode === "lines" ? "lines" : activeClass === "informational" ? "informational" : "to-dos"}</span>
           <Badge variant="danger">{statusCounts.open} open</Badge>
           <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
           <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
