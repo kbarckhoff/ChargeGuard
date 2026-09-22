@@ -53,11 +53,12 @@ const statusVariant = (s: string): any =>
   s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "in_review" ? "purple" : s === "na" ? "default" : "default";
 
 // Tier badge: how the finding relates to prior reviews of the same line.
-const TIER_META: Record<number, { label: string; title: string; cls: string }> = {
-  1: { label: "T1 New", title: "Brand new finding", cls: "bg-[#e0edff] text-[#0f172a]" },
-  2: { label: "T2 Accepted before", title: "Previously accepted, showing up again", cls: "bg-[#e7f7ef] text-[#067647]" },
-  3: { label: "T3 Denied before", title: "Previously denied, showing up again", cls: "bg-[#fde8e8] text-[#b42318]" },
-  4: { label: "T4 N/A before", title: "Previously marked N/A, showing up again", cls: "bg-[#f1f5f9] text-[#475569]" },
+// Tiers are neutral (no color) — color is reserved for status and attention.
+const TIER_META: Record<number, { label: string; title: string }> = {
+  1: { label: "T1 New", title: "Brand new finding" },
+  2: { label: "T2 Accepted before", title: "Previously accepted, showing up again" },
+  3: { label: "T3 Denied before", title: "Previously denied, showing up again" },
+  4: { label: "T4 N/A before", title: "Previously marked N/A, showing up again" },
 };
 
 type PickUser = { id: string; full_name: string; email: string; department: string | null };
@@ -210,7 +211,7 @@ export function FindingsTable({
                       : <span className="text-[#94a3b8]">Unassigned</span>}
                   </td>
                   <td className="px-3 py-2.5">
-                    {(() => { const t = TIER_META[f.tier || 1]; return <span title={t.title} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${t.cls}`}>{t.label}</span>; })()}
+                    {(() => { const t = TIER_META[f.tier || 1]; return <span title={t.title} className="text-[11px] text-[#64748b]">{t.label}</span>; })()}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-[#475569]">
                     {f.financial_impact ? `$${f.financial_impact.toLocaleString()}` : "—"}

@@ -4,6 +4,7 @@ import { resolveActiveOrg } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
 import { Badge, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
+import { TodoTable, type TodoGroup } from "@/components/audit/TodoTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
@@ -13,7 +14,7 @@ import { AlertTriangle, Download } from "lucide-react";
 export default async function FindingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string; class?: string }>;
+  searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string; class?: string; view?: string }>;
 }) {
   const sp = await searchParams;
   const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
@@ -127,6 +128,10 @@ export default async function FindingsPage({
   const defaultCats = todoCats.length ? todoCats : bucketCats;
   const tableCats = classCats ?? defaultCats;
 
+  // Default view groups findings into distinct to-dos; ?view=lines shows the
+  // full per-line table (with assignment + per-line disposition).
+  const lineView = sp.view === "lines";
+
   // Build the paginated table query, scoped to the active tab's categories.
   const page = parseInt(sp.page || "1");
   const pageSize = 50;
@@ -169,8 +174,31 @@ export default async function FindingsPage({
     else query = query.eq("assigned_to", sp.assignee);
   }
 
-  const { data: findings, count } = await query.range(from, to);
-  const totalPages = Math.ceil((count || 0) / pageSize);
+  const { data: findings, count } = lineView
+    ? await query.range(from, to)
+    : { data: [] as any[], count: 0 };
+
+  // Grouped to-do view (default): collapse findings sharing a category+code into
+  // one row via the findings_todos aggregate.
+  let groups: TodoGroup[] = [];
+  let groupTotal = 0;
+  if (!lineView && tab !== "peer") {
+    const { data: todoData } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId });
+    const q = (sp.search || "").toLowerCase();
+    const filtered = ((Array.isArray(todoData) ? todoData : []) as any[]).filter((g) =>
+      bucketForCategory(g.category) === tab &&
+      tableCats.includes(g.category) &&
+      (selectedCategories.length === 0 || selectedCategories.includes(g.category)) &&
+      (!q || (g.code || "").toLowerCase().includes(q) || (g.sample_title || "").toLowerCase().includes(q))
+    ).sort((a, b) => (Number(b.impact) - Number(a.impact)) || (Number(b.line_count) - Number(a.line_count)));
+    groupTotal = filtered.length;
+    groups = filtered.slice(from, from + pageSize).map((g) => ({
+      grp_key: g.grp_key, category: g.category, code: g.code || "",
+      line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0,
+      impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null,
+    }));
+  }
+  const totalPages = Math.ceil(((lineView ? count : groupTotal) || 0) / pageSize);
 
   // Summary cards + status counts, scoped to the active bucket and category
   // filter, computed from the aggregate (cheap). Search only narrows the table.
@@ -227,7 +255,7 @@ export default async function FindingsPage({
           <ReviewPicker runs={runList} auditId={auditId!} />
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#94a3b8]">{(count || 0).toLocaleString()} {activeClass === "informational" ? "informational" : "to-dos"}</span>
+          <span className="text-[#94a3b8]">{((lineView ? count : groupTotal) || 0).toLocaleString()} {activeClass === "informational" ? "informational" : lineView ? "lines" : "to-dos"}</span>
           <Badge variant="danger">{statusCounts.open} open</Badge>
           <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
           <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
@@ -333,24 +361,41 @@ export default async function FindingsPage({
             </div>
           </div>
 
-          {/* Findings Table */}
-          <FindingsTable
-            findings={findings || []}
-            total={count || 0}
-            page={page}
-            totalPages={totalPages}
-            severityFilter={sp.severity || "all"}
-            statusFilter={sp.status || "all"}
-            tierFilter={sp.tier || "all"}
-            categoryFilter={sp.category || "all"}
-            search={sp.search || ""}
-            categories={bucketCats}
-            canAssign={actor.canAssign}
-            currentUserId={user!.id}
-            users={assignUsers}
-            assigneeNames={assigneeNames}
-            assigneeFilter={sp.assignee || "all"}
-          />
+          {/* To-dos (grouped) by default; full per-line table under ?view=lines */}
+          {lineView ? (
+            <>
+              <div className="flex items-center justify-between">
+                <a href={`/findings?auditId=${auditId}&tab=${tab}${activeClass ? `&class=${activeClass}` : ""}`} className="text-[13px] text-[#1e293b] hover:underline">&larr; Back to to-dos</a>
+                <span className="text-[12px] text-[#94a3b8]">Line-by-line view</span>
+              </div>
+              <FindingsTable
+                findings={findings || []}
+                total={count || 0}
+                page={page}
+                totalPages={totalPages}
+                severityFilter={sp.severity || "all"}
+                statusFilter={sp.status || "all"}
+                tierFilter={sp.tier || "all"}
+                categoryFilter={sp.category || "all"}
+                search={sp.search || ""}
+                categories={bucketCats}
+                canAssign={actor.canAssign}
+                currentUserId={user!.id}
+                users={assignUsers}
+                assigneeNames={assigneeNames}
+                assigneeFilter={sp.assignee || "all"}
+              />
+            </>
+          ) : (
+            <TodoTable
+              groups={groups}
+              total={groupTotal}
+              page={page}
+              totalPages={totalPages}
+              auditId={auditId!}
+              search={sp.search || ""}
+            />
+          )}
           </>)}
         </div>
       </div>
