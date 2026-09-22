@@ -417,6 +417,7 @@ export default async function FindingsPage({
               canAssign={actor.canAssign}
               users={assignUsers}
               assigneeNames={assigneeNames}
+              scopeCats={tableCats}
             />
           ) : lineView ? (
             <>

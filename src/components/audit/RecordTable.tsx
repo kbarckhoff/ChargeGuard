@@ -20,7 +20,7 @@ export type RecordLine = {
 };
 
 export function RecordTable({
-  lines, total, page, totalPages, search, canAssign, users, assigneeNames,
+  lines, total, page, totalPages, search, canAssign, users, assigneeNames, scopeCats = [],
 }: {
   lines: RecordLine[];
   total: number;
@@ -30,6 +30,7 @@ export function RecordTable({
   canAssign: boolean;
   users: { id: string; full_name: string; email: string; department: string | null }[];
   assigneeNames: Record<string, string>;
+  scopeCats?: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,7 +52,8 @@ export function RecordTable({
     if (!members[l.id]) {
       setLoadingId(l.id);
       try {
-        const r = await fetch(`/api/findings/by-line?lineId=${encodeURIComponent(l.id)}`);
+        const catsParam = scopeCats.length ? `&cats=${encodeURIComponent(scopeCats.join("|"))}` : "";
+        const r = await fetch(`/api/findings/by-line?lineId=${encodeURIComponent(l.id)}${catsParam}`);
         const d = await r.json();
         setMembers((prev) => ({ ...prev, [l.id]: d.lines || [] }));
       } catch { /* ignore */ } finally { setLoadingId(null); }
