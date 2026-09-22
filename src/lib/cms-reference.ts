@@ -36,6 +36,10 @@ const ASP_DOSAGE: Record<string, { asp?: string; dosage?: string }> = aspDosageD
 // takes effect without a redeploy. Falls back to REF (bundled) if the table is
 // empty or unreachable.
 let LIVE: Record<string, CmsReference> | null = null;
+// When LIVE was last loaded (ms). Reused across scans in a warm serverless
+// container so back-to-back scans don't re-pull the whole reference table.
+let LIVE_AT = 0;
+const LIVE_TTL_MS = 10 * 60 * 1000; // 10 min — reference only changes quarterly
 
 const DB_COLUMNS = "hcpcs,short_desc,si,apc_payment,mc_fee,mc_rvu,pf_fee,pf_rvu,clfs,asp,dosage,retired";
 
@@ -46,6 +50,8 @@ const DB_COLUMNS = "hcpcs,short_desc,si,apc_payment,mc_fee,mc_rvu,pf_fee,pf_rvu,
  */
 export async function loadReferenceFromDb(db: any): Promise<number> {
   try {
+    // Warm-container reuse: skip the reload if we loaded it very recently.
+    if (LIVE && Date.now() - LIVE_AT < LIVE_TTL_MS) return Object.keys(LIVE).length;
     const map: Record<string, CmsReference> = {};
     for (let off = 0; ; off += 1000) {
       const { data, error } = await db.from("cms_reference").select(DB_COLUMNS).range(off, off + 999);
@@ -56,7 +62,7 @@ export async function loadReferenceFromDb(db: any): Promise<number> {
       }
       if (data.length < 1000) break;
     }
-    if (Object.keys(map).length > 0) { LIVE = map; return Object.keys(map).length; }
+    if (Object.keys(map).length > 0) { LIVE = map; LIVE_AT = Date.now(); return Object.keys(map).length; }
     return 0;
   } catch {
     return 0; // keep bundled fallback

@@ -54,25 +54,31 @@ export default async function ReportsPage({
     );
   }
 
-  // Get finding stats for the summary — page past Supabase's 1000-row cap
-  const findings: { severity: string; status: string; category: string | null; financial_impact: number | null }[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await supabaseAdmin
-      .from("findings")
-      .select("severity, status, category, financial_impact")
-      .eq("audit_id", audit.id)
-      .range(offset, offset + 999);
-    if (error || !data || data.length === 0) break;
-    findings.push(...data);
-    if (data.length < 1000) break;
+  // Summary counts from a single grouped aggregate (one row per category+status)
+  // instead of pulling every finding row.
+  let total = 0, open = 0, accepted = 0, resolved = 0, rejected = 0, totalImpact = 0;
+  const { data: agg } = await supabaseAdmin.rpc("findings_rollup", { p_audit: audit.id });
+  if (Array.isArray(agg)) {
+    for (const r of agg as any[]) {
+      const n = Number(r.cnt) || 0;
+      total += n; totalImpact += Number(r.impact) || 0;
+      if (r.status === "open") open += n;
+      else if (r.status === "accepted") accepted += n;
+      else if (r.status === "resolved") resolved += n;
+      else if (r.status === "rejected") rejected += n;
+    }
+  } else {
+    // Fallback if the aggregate function isn't present yet.
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabaseAdmin.from("findings").select("status, financial_impact").eq("audit_id", audit.id).range(offset, offset + 999);
+      if (error || !data || data.length === 0) break;
+      for (const f of data as any[]) {
+        total++; totalImpact += f.financial_impact || 0;
+        if (f.status === "open") open++; else if (f.status === "accepted") accepted++; else if (f.status === "resolved") resolved++; else if (f.status === "rejected") rejected++;
+      }
+      if (data.length < 1000) break;
+    }
   }
-
-  const total = findings?.length || 0;
-  const open = findings?.filter((f) => f.status === "open").length || 0;
-  const accepted = findings?.filter((f) => f.status === "accepted").length || 0;
-  const resolved = findings?.filter((f) => f.status === "resolved").length || 0;
-  const rejected = findings?.filter((f) => f.status === "rejected").length || 0;
-  const totalImpact = findings?.reduce((s, f) => s + (f.financial_impact || 0), 0) || 0;
 
   return (
     <>
