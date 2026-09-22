@@ -5,6 +5,7 @@ import { getActor } from "@/lib/roles";
 import { Badge, EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
 import { TodoTable, type TodoGroup } from "@/components/audit/TodoTable";
+import { RecordTable, type RecordLine } from "@/components/audit/RecordTable";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
@@ -128,65 +129,54 @@ export default async function FindingsPage({
   const defaultCats = todoCats.length ? todoCats : bucketCats;
   const tableCats = classCats ?? defaultCats;
 
-  // Default view groups findings into distinct to-dos; ?view=lines shows the
-  // full per-line table (with assignment + per-line disposition).
-  const lineView = sp.view === "lines";
+  // View mode: grouped to-dos (default), by CDM line (record), or the full
+  // per-finding line list (?view=lines).
+  const viewMode = sp.view === "record" ? "record" : sp.view === "lines" ? "lines" : "grouped";
+  const lineView = viewMode === "lines";
 
-  // Build the paginated table query, scoped to the active tab's categories.
   const page = parseInt(sp.page || "1");
   const pageSize = 50;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabaseAdmin
-    .from("findings")
-    .select("*, charge_items(procedure_number, charge_description, hcpcs_cpt_code, revenue_code, gross_charge)", { count: "exact" })
-    .eq("audit_id", auditId)
-    .eq("ehr_lagging", false)
-    .order("severity", { ascending: true })
-    .order("created_at", { ascending: false });
-  // Scope the table to the current tab's bucket (and the class filter if set).
-  if (tab !== "peer") query = query.in("category", tableCats.length ? tableCats : ["__none__"]);
-
-  if (sp.severity && sp.severity !== "all") {
-    query = query.eq("severity", sp.severity);
-  }
-  if (sp.status && sp.status !== "all") {
-    query = query.eq("status", sp.status);
-  }
-  if (sp.tier && sp.tier !== "all") {
-    // A finding with no stored tier is a brand-new (T1) finding.
-    if (sp.tier === "1") query = query.or("tier.eq.1,tier.is.null");
-    else query = query.eq("tier", Number(sp.tier));
-  }
   const selectedCategories = (sp.category && sp.category !== "all")
     ? sp.category.split(",").map((c) => c.trim()).filter(Boolean)
     : [];
-  if (selectedCategories.length > 0) {
-    query = query.in("category", selectedCategories);
-  }
-  if (sp.search) {
-    query = query.ilike("title", `%${sp.search}%`);
-  }
-  if (sp.assignee && sp.assignee !== "all") {
-    if (sp.assignee === "none") query = query.is("assigned_to", null);
-    else if (sp.assignee === "me") query = query.eq("assigned_to", user!.id);
-    else query = query.eq("assigned_to", sp.assignee);
+
+  // Distinct to-do groups (one per category+code) — drives the cards' to-do
+  // counts and the grouped table. One cheap aggregate call.
+  let allGroups: any[] = [];
+  if (tab !== "peer") {
+    const { data: todoData } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId });
+    allGroups = ((Array.isArray(todoData) ? todoData : []) as any[]).filter((g) => bucketForCategory(g.category) === tab);
   }
 
-  const { data: findings, count } = lineView
-    ? await query.range(from, to)
-    : { data: [] as any[], count: 0 };
+  // Per-finding list (only for ?view=lines).
+  let findings: any[] = [];
+  let count = 0;
+  if (lineView) {
+    let query = supabaseAdmin
+      .from("findings")
+      .select("*, charge_items(procedure_number, charge_description, hcpcs_cpt_code, revenue_code, gross_charge)", { count: "exact" })
+      .eq("audit_id", auditId).eq("ehr_lagging", false)
+      .order("severity", { ascending: true }).order("created_at", { ascending: false });
+    if (tab !== "peer") query = query.in("category", tableCats.length ? tableCats : ["__none__"]);
+    if (sp.severity && sp.severity !== "all") query = query.eq("severity", sp.severity);
+    if (sp.status && sp.status !== "all") query = query.eq("status", sp.status);
+    if (sp.tier && sp.tier !== "all") { if (sp.tier === "1") query = query.or("tier.eq.1,tier.is.null"); else query = query.eq("tier", Number(sp.tier)); }
+    if (selectedCategories.length > 0) query = query.in("category", selectedCategories);
+    if (sp.search) query = query.ilike("title", `%${sp.search}%`);
+    if (sp.assignee && sp.assignee !== "all") { if (sp.assignee === "none") query = query.is("assigned_to", null); else if (sp.assignee === "me") query = query.eq("assigned_to", user!.id); else query = query.eq("assigned_to", sp.assignee); }
+    const r = await query.range(from, to);
+    findings = r.data || []; count = r.count || 0;
+  }
 
-  // Grouped to-do view (default): collapse findings sharing a category+code into
-  // one row via the findings_todos aggregate.
+  // Grouped to-do rows.
   let groups: TodoGroup[] = [];
   let groupTotal = 0;
-  if (!lineView && tab !== "peer") {
-    const { data: todoData } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId });
+  if (viewMode === "grouped" && tab !== "peer") {
     const q = (sp.search || "").toLowerCase();
-    const filtered = ((Array.isArray(todoData) ? todoData : []) as any[]).filter((g) =>
-      bucketForCategory(g.category) === tab &&
+    const filtered = allGroups.filter((g) =>
       tableCats.includes(g.category) &&
       (selectedCategories.length === 0 || selectedCategories.includes(g.category)) &&
       (!q || (g.code || "").toLowerCase().includes(q) || (g.sample_title || "").toLowerCase().includes(q))
@@ -198,7 +188,39 @@ export default async function FindingsPage({
       impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null,
     }));
   }
-  const totalPages = Math.ceil(((lineView ? count : groupTotal) || 0) / pageSize);
+
+  // By-CDM-line rows: a page of charge_items with their in-scope findings.
+  let recordLines: RecordLine[] = [];
+  let recordTotal = 0;
+  if (viewMode === "record" && tab !== "peer") {
+    const q = (sp.search || "").trim();
+    let ciQuery = supabaseAdmin
+      .from("charge_items")
+      .select("id, procedure_number, hcpcs_cpt_code, charge_description, revenue_code, gross_charge", { count: "exact" })
+      .eq("audit_id", auditId)
+      .order("procedure_number", { ascending: true });
+    if (q) ciQuery = ciQuery.or(`procedure_number.ilike.%${q}%,hcpcs_cpt_code.ilike.%${q}%,charge_description.ilike.%${q}%`);
+    const { data: ci, count: ciCount } = await ciQuery.range(from, to);
+    recordTotal = ciCount || 0;
+    const ids = (ci || []).map((r: any) => r.id);
+    const byLine: Record<string, any[]> = {};
+    if (ids.length) {
+      const { data: fs } = await supabaseAdmin
+        .from("findings")
+        .select("*, charge_items(procedure_number, charge_description, hcpcs_cpt_code, revenue_code, gross_charge)")
+        .eq("audit_id", auditId).eq("ehr_lagging", false)
+        .in("charge_item_id", ids)
+        .in("category", tableCats.length ? tableCats : ["__none__"]);
+      for (const f of fs || []) { const k = (f as any).charge_item_id; (byLine[k] ||= []).push(f); }
+    }
+    recordLines = (ci || []).map((r: any) => ({
+      id: r.id, procedure_number: r.procedure_number, hcpcs_cpt_code: r.hcpcs_cpt_code,
+      charge_description: r.charge_description, revenue_code: r.revenue_code, gross_charge: r.gross_charge,
+      findings: byLine[r.id] || [],
+    }));
+  }
+
+  const totalPages = Math.ceil(((viewMode === "lines" ? count : viewMode === "record" ? recordTotal : groupTotal) || 0) / pageSize);
 
   // Summary cards + status counts, scoped to the active bucket and category
   // filter, computed from the aggregate (cheap). Search only narrows the table.
@@ -215,9 +237,17 @@ export default async function FindingsPage({
 
   const totalImpact = scopeAgg.reduce((s, a) => s + a.impact, 0);
 
-  // Fix-type class breakdown for the summary cards (scoped to the active tab).
+  // Fix-type class breakdown. Cards show distinct TO-DO counts (from the grouped
+  // aggregate), not raw flags. Fall back to flag counts if the to-do function
+  // isn't available yet (pre-migration).
   const classCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0, informational: 0 };
   for (const a of scopeAgg) classCounts[classForCategory(a.category)] += a.cnt;
+  const classToDoCounts: Record<FindingClass, number> = { code_validity: 0, pricing: 0, data_quality: 0, informational: 0 };
+  for (const g of allGroups) {
+    if (selectedCategories.length && !selectedCategories.includes(g.category)) continue;
+    classToDoCounts[classForCategory(g.category)] += 1;
+  }
+  const cardCounts = allGroups.length > 0 ? classToDoCounts : classCounts;
 
   // Lagging EHR: approved in a prior review, re-found now, not yet in the EHR.
   // Shown read-only so the reviewer isn't asked to Accept the same fix again.
@@ -349,7 +379,7 @@ export default async function FindingsPage({
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR[cls] }} />
                     <span className="text-xs font-medium text-[#334155]">{CLASS_LABELS[cls]}</span>
                   </div>
-                  <div className="text-xl font-semibold text-[#0f172a]">{classCounts[cls].toLocaleString()}</div>
+                  <div className="text-xl font-semibold text-[#0f172a]">{cardCounts[cls].toLocaleString()}</div>
                   <div className="text-[11px] text-[#94a3b8] mt-0.5">{CLASS_BLURB[cls]}</div>
                 </a>
               );
@@ -361,12 +391,34 @@ export default async function FindingsPage({
             </div>
           </div>
 
-          {/* To-dos (grouped) by default; full per-line table under ?view=lines */}
-          {lineView ? (
+          {/* View toggle: grouped to-dos vs one row per CDM line */}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[#64748b]">View:</span>
+            {([["grouped", "Grouped to-dos"], ["record", "By CDM line"]] as [string, string][]).map(([v, label]) => {
+              const on = viewMode === v || (v === "grouped" && viewMode === "lines");
+              const href = `/findings?auditId=${auditId}&tab=${tab}${activeClass ? `&class=${activeClass}` : ""}${v === "record" ? "&view=record" : ""}`;
+              return (
+                <a key={v} href={href} className={`px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border ${on ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]"}`}>{label}</a>
+              );
+            })}
+          </div>
+
+          {viewMode === "record" ? (
+            <RecordTable
+              lines={recordLines}
+              total={recordTotal}
+              page={page}
+              totalPages={totalPages}
+              search={sp.search || ""}
+              canAssign={actor.canAssign}
+              users={assignUsers}
+              assigneeNames={assigneeNames}
+            />
+          ) : lineView ? (
             <>
               <div className="flex items-center justify-between">
                 <a href={`/findings?auditId=${auditId}&tab=${tab}${activeClass ? `&class=${activeClass}` : ""}`} className="text-[13px] text-[#1e293b] hover:underline">&larr; Back to to-dos</a>
-                <span className="text-[12px] text-[#94a3b8]">Line-by-line view</span>
+                <span className="text-[12px] text-[#94a3b8]">Line-by-line (per finding)</span>
               </div>
               <FindingsTable
                 findings={findings || []}

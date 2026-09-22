@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, SeverityDot, SEVERITY_CONFIG } from "@/components/ui/shared";
 import { Search, X, ChevronRight, Loader2 } from "lucide-react";
 
-interface FindingRow {
+export interface FindingRow {
   id: string;
   title: string;
   description: string;
@@ -253,7 +253,7 @@ export function FindingsTable({
 
 // ─── Finding Detail Drawer ───────────────────────────────────
 
-function FindingDrawer({ finding, onClose, canAssign, users, assigneeNames }: { finding: FindingRow; onClose: () => void; canAssign: boolean; users: PickUser[]; assigneeNames: Record<string, string> }) {
+export function FindingDrawer({ finding, onClose, canAssign, users, assigneeNames }: { finding: FindingRow; onClose: () => void; canAssign: boolean; users: PickUser[]; assigneeNames: Record<string, string> }) {
   const [updating, setUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(finding.status);
   const [note, setNote] = useState(finding.resolution_note || "");
