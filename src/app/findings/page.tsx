@@ -4,8 +4,8 @@ import { resolveActiveOrg } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
 import { EmptyState, formatImpact } from "@/components/ui/shared";
 import { FindingsTable } from "@/components/audit/FindingsTable";
-import { TodoTable, type TodoGroup } from "@/components/audit/TodoTable";
 import { RecordTable, type RecordLine } from "@/components/audit/RecordTable";
+import { FindingsWorkspace } from "@/components/audit/FindingsWorkspace";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
@@ -79,6 +79,51 @@ export default async function FindingsPage({
     );
   }
 
+  // View mode: grouped to-dos (default), by CDM line (record), or the full
+  // per-finding line list (?view=lines).
+  const viewMode = sp.view === "record" ? "record" : sp.view === "lines" ? "lines" : "grouped";
+
+  // Header shared by all modes.
+  const headerEl = (
+    <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center gap-3">
+        <h1 className="text-base font-semibold text-[#0f172a]">Findings &amp; Analysis</h1>
+        <ReviewPicker runs={runList} auditId={auditId!} />
+      </div>
+      <div className="flex items-center gap-3 text-sm">
+        <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
+        <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
+        <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
+      </div>
+    </header>
+  );
+
+  // GROUPED MODE (default): load the two aggregates once and let a client
+  // workspace do all tab/card/category/search/pagination in memory — so those
+  // interactions are instant (no server round-trip per click).
+  if (viewMode === "grouped") {
+    const { data: aggData } = await supabaseAdmin.rpc("findings_rollup", { p_audit: auditId });
+    const agg = (Array.isArray(aggData) ? aggData : []).map((r: any) => ({ category: r.category, status: r.status, cnt: Number(r.cnt) || 0, impact: Number(r.impact) || 0 }));
+    const allTodos: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId }).range(off, off + 999);
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      allTodos.push(...data);
+      if (data.length < 1000) break;
+    }
+    const todos = allTodos.map((g: any) => ({ grp_key: g.grp_key, category: g.category, code: g.code || "", line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0, impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null }));
+    const { data: laggingFindings } = await supabaseAdmin.from("findings").select("id, title, category, resolution_note, charge_items(procedure_number, hcpcs_cpt_code)").eq("audit_id", auditId).eq("ehr_lagging", true).order("category");
+    return (
+      <>
+        {headerEl}
+        <div className="flex-1 overflow-y-auto p-6">
+          <FindingsWorkspace auditId={auditId!} agg={agg} allTodos={todos} lagging={(laggingFindings as any) || []} />
+        </div>
+      </>
+    );
+  }
+
+  // ── RECORD / LINES MODES (server-rendered) ──────────────────
   // Summary/roll-up data comes from a single grouped aggregate — one row per
   // (category, status) with a count and summed impact — instead of pulling every
   // finding row (a big review has ~18k+ rows, which made every filter change slow).
@@ -129,9 +174,6 @@ export default async function FindingsPage({
   const defaultCats = todoCats.length ? todoCats : bucketCats;
   const tableCats = classCats ?? defaultCats;
 
-  // View mode: grouped to-dos (default), by CDM line (record), or the full
-  // per-finding line list (?view=lines).
-  const viewMode = sp.view === "record" ? "record" : sp.view === "lines" ? "lines" : "grouped";
   const lineView = viewMode === "lines";
 
   const page = parseInt(sp.page || "1");
@@ -179,24 +221,6 @@ export default async function FindingsPage({
     findings = r.data || []; count = r.count || 0;
   }
 
-  // Grouped to-do rows.
-  let groups: TodoGroup[] = [];
-  let groupTotal = 0;
-  if (viewMode === "grouped" && tab !== "peer") {
-    const q = (sp.search || "").toLowerCase();
-    const filtered = allGroups.filter((g) =>
-      tableCats.includes(g.category) &&
-      (selectedCategories.length === 0 || selectedCategories.includes(g.category)) &&
-      (!q || (g.code || "").toLowerCase().includes(q) || (g.sample_title || "").toLowerCase().includes(q))
-    ).sort((a, b) => (Number(b.impact) - Number(a.impact)) || (Number(b.line_count) - Number(a.line_count)));
-    groupTotal = filtered.length;
-    groups = filtered.slice(from, from + pageSize).map((g) => ({
-      grp_key: g.grp_key, category: g.category, code: g.code || "",
-      line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0,
-      impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null,
-    }));
-  }
-
   // By-CDM-line rows: only CDM lines that HAVE an in-scope finding, one row per
   // line, ordered by the line's original file position (record #).
   let recordLines: RecordLine[] = [];
@@ -235,7 +259,7 @@ export default async function FindingsPage({
     }));
   }
 
-  const totalPages = Math.ceil(((viewMode === "lines" ? count : viewMode === "record" ? recordTotal : groupTotal) || 0) / pageSize);
+  const totalPages = Math.ceil(((viewMode === "record" ? recordTotal : count) || 0) / pageSize);
 
   // Summary cards + status counts, scoped to the active bucket and category
   // filter, computed from the aggregate (cheap). Search only narrows the table.
@@ -443,16 +467,7 @@ export default async function FindingsPage({
                 assigneeFilter={sp.assignee || "all"}
               />
             </>
-          ) : (
-            <TodoTable
-              groups={groups}
-              total={groupTotal}
-              page={page}
-              totalPages={totalPages}
-              auditId={auditId!}
-              search={sp.search || ""}
-            />
-          )}
+          ) : null}
           </>)}
         </div>
       </div>
