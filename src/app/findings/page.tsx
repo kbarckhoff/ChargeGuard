@@ -147,8 +147,16 @@ export default async function FindingsPage({
   // counts and the grouped table. One cheap aggregate call.
   let allGroups: any[] = [];
   if (tab !== "peer") {
-    const { data: todoData } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId });
-    allGroups = ((Array.isArray(todoData) ? todoData : []) as any[]).filter((g) => bucketForCategory(g.category) === tab);
+    // PostgREST caps rpc results at 1000 rows by default; a big review has far
+    // more distinct to-dos, so page through them all.
+    const todoAll: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId }).range(off, off + 999);
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      todoAll.push(...data);
+      if (data.length < 1000) break;
+    }
+    allGroups = todoAll.filter((g) => bucketForCategory(g.category) === tab);
   }
 
   // Per-finding list (only for ?view=lines).

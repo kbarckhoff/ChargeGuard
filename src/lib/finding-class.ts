@@ -63,10 +63,13 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Pricing Consistency": "pricing",
   "Consistency": "pricing",
   "Price Transparency (Shoppable Services)": "pricing",
+  // Fee-schedule-derived, but the fix is a price change → Pricing (not Code Validity).
+  "Bilateral Pricing": "pricing",
+  "Laboratory Pricing (CLFS)": "pricing",
+  "SI=A Non-OPPS Fee Schedule": "pricing",
 
   // ── Code validity: coding correctness + fee-schedule compliance ──
   "Add-On - Missing Primary": "code_validity",
-  "Bilateral Pricing": "code_validity",
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",
   "Claim Unit Outlier (Claims)": "code_validity",
@@ -76,7 +79,6 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Inactive Formulary": "code_validity",
   "Lab - Panel/Component Bundling": "code_validity",
   "Lab - Revenue Leakage": "code_validity",
-  "Laboratory Pricing (CLFS)": "code_validity",
   "Missing Modifier": "code_validity",
   "Modifier - Compliance Risk": "code_validity",
   "Modifier 25 Co-Billing (Claims)": "code_validity",
@@ -90,7 +92,6 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Retired HCPCS": "code_validity",
   "Revenue Code Mismatch": "code_validity",
   "Revenue Code": "code_validity",
-  "SI=A Non-OPPS Fee Schedule": "code_validity",
   "Self-Admin Drugs (Rev 637)": "code_validity",
   "Unbundling Modifier (Claims)": "code_validity",
   "Vaccine Admin Coding": "code_validity",
@@ -104,7 +105,7 @@ export function classForCategory(category: string | null | undefined): FindingCl
   // Fallback heuristic for any future/unknown category.
   if (/packaged|packaging|\bsi=|status indicator|pass-through|rvu|low volume/.test(c)) return "informational";
   if (/duplicate|missing (code|price|hcpcs)|no rev|blank|unclear|data quality|description/.test(c)) return "data_quality";
-  if (/peer|competitor|benchmark|markup|consistency|transparency|shoppable|market/.test(c)) return "pricing";
+  if (/peer|competitor|benchmark|markup|consistency|transparency|shoppable|market|pricing|fee schedule|clfs|bilateral/.test(c)) return "pricing";
   return "code_validity";
 }
 
