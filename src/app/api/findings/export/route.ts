@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { bucketForCategory, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { classForCategory, CLASS_LABELS } from "@/lib/finding-class";
 
-// Export the findings for one bucket (cdm | rvu | formulary | peer) as CSV.
+// Export findings as CSV — one bucket (cdm | rvu | formulary | peer), or the
+// entire list when bucket=all.
 export async function GET(request: Request) {
   try {
     const sc = await createSessionClient();
@@ -16,7 +18,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const auditId = searchParams.get("auditId");
-    const bucket = (searchParams.get("bucket") || "cdm") as FindingBucket;
+    const bucketParam = searchParams.get("bucket") || "cdm";
+    const isAll = bucketParam === "all";
+    const bucket = bucketParam as FindingBucket;
     if (!auditId) return NextResponse.json({ error: "auditId is required" }, { status: 400 });
 
     // Page through all findings for the audit (Supabase caps at 1000/response).
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
       if (data.length < 1000) break;
     }
 
-    const filtered = rows.filter((r) => bucketForCategory(r.category) === bucket);
+    const filtered = isAll ? rows : rows.filter((r) => bucketForCategory(r.category) === bucket);
 
     const STATUS: Record<string, string> = { open: "Open", in_review: "Under Review", accepted: "Accepted", rejected: "Denied", na: "N/A", resolved: "Accepted" };
     const TIER: Record<number, string> = { 1: "1 - New", 2: "2 - Accepted before", 3: "3 - Denied before", 4: "4 - N/A before" };
@@ -43,11 +47,12 @@ export async function GET(request: Request) {
       const s = v == null ? "" : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = ["Tier", "Status", "Severity", "Category", "Finding", "Charge Code", "HCPCS/CPT", "Rev Code", "Description", "Price", "Est. Impact", "Detail", "Recommendation", "Reviewer Note"];
+    const header = ["Work type", "Tier", "Status", "Severity", "Category", "Finding", "Charge Code", "HCPCS/CPT", "Rev Code", "Description", "Price", "Est. Impact", "Detail", "Recommendation", "Reviewer Note"];
     const lines = [header.join(",")];
     for (const r of filtered) {
       const ci = r.charge_items || {};
       lines.push([
+        CLASS_LABELS[classForCategory(r.category)],
         TIER[r.tier] || (r.tier ?? ""),
         STATUS[r.status] || r.status,
         r.severity,
@@ -65,7 +70,7 @@ export async function GET(request: Request) {
       ].map(esc).join(","));
     }
     const csv = lines.join("\n") + "\n";
-    const fname = `${BUCKET_LABELS[bucket].replace(/\s+/g, "-").toLowerCase()}.csv`;
+    const fname = isAll ? "all-findings.csv" : `${BUCKET_LABELS[bucket].replace(/\s+/g, "-").toLowerCase()}.csv`;
     return new NextResponse(csv, {
       headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${fname}"` },
     });

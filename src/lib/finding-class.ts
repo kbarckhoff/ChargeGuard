@@ -44,6 +44,7 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Conditional Packaging (SI=Q1-Q4)": "informational",
   "Bundled (SI=B)": "informational",
   "Pass-Through & New Technology": "informational",
+  "RVU / Low Volume": "informational", // review/retire candidates, not CDM edits
 
   // ── Data quality: missing/blank/duplicate data, same code on many lines ──
   "Description": "data_quality",
@@ -84,7 +85,6 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Pharmacy Billing Unit": "code_validity",
   "Pharmacy NDC Mismatch": "code_validity",
   "Pharmacy UOM Mismatch": "code_validity",
-  "RVU / Low Volume": "code_validity",
   "Radiology - Incorrect Modifier": "code_validity",
   "Radiology - Missing Modifier": "code_validity",
   "Retired HCPCS": "code_validity",
@@ -102,7 +102,7 @@ export function classForCategory(category: string | null | undefined): FindingCl
   if (hit) return hit;
   const c = raw.toLowerCase();
   // Fallback heuristic for any future/unknown category.
-  if (/packaged|packaging|\bsi=|status indicator|pass-through/.test(c)) return "informational";
+  if (/packaged|packaging|\bsi=|status indicator|pass-through|rvu|low volume/.test(c)) return "informational";
   if (/duplicate|missing (code|price|hcpcs)|no rev|blank|unclear|data quality|description/.test(c)) return "data_quality";
   if (/peer|competitor|benchmark|markup|consistency|transparency|shoppable|market/.test(c)) return "pricing";
   return "code_validity";

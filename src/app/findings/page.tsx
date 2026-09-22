@@ -113,12 +113,19 @@ export default async function FindingsPage({
   const categories = [...new Set(agg.map((a) => a.category).filter((c): c is string => !!c))].sort();
   const bucketCats = categoriesInBucket(categories, tab);
 
-  // Optional fix-type class filter (Code Validity / Pricing / Data Quality) from
-  // clicking a summary card. Scopes the table to that class within the tab.
+  // Fix-type class filter (Code Validity / Pricing / Data Quality / Informational)
+  // from clicking a summary card.
   const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality", "informational"];
   const activeClass: FindingClass | null = CLASSES.includes(sp.class as FindingClass) ? (sp.class as FindingClass) : null;
+  // To-dos = everything in this tab except Informational (SI=Q/B, pass-through,
+  // RVU low-volume). The page leads with to-dos; informational is one click (the
+  // Informational card) or the full download away.
+  const todoCats = bucketCats.filter((c) => classForCategory(c) !== "informational");
   const classCats = activeClass ? categoriesInClass(categories, activeClass).filter((c) => bucketCats.includes(c)) : null;
-  const tableCats = classCats ?? bucketCats;
+  // Default view is to-dos only; if a tab is entirely informational (RVU tab),
+  // fall back to its items so it isn't blank.
+  const defaultCats = todoCats.length ? todoCats : bucketCats;
+  const tableCats = classCats ?? defaultCats;
 
   // Build the paginated table query, scoped to the active tab's categories.
   const page = parseInt(sp.page || "1");
@@ -200,6 +207,8 @@ export default async function FindingsPage({
   const byCat = new Map<string, { count: number; impact: number }>();
   for (const a of agg) {
     if (bucketForCategory(a.category) !== tab) continue; // roll-up follows the active tab
+    // Lead with actionable to-dos; drop informational unless the tab is all-info.
+    if (todoCats.length && classForCategory(a.category) === "informational") continue;
     const c = a.category || "Uncategorized";
     const e = byCat.get(c) || { count: 0, impact: 0 };
     e.count += a.cnt; e.impact += a.impact;
@@ -218,8 +227,9 @@ export default async function FindingsPage({
           <ReviewPicker runs={runList} auditId={auditId!} />
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#94a3b8]">{(count || 0).toLocaleString()} total</span>
+          <span className="text-[#94a3b8]">{(count || 0).toLocaleString()} {activeClass === "informational" ? "informational" : "to-dos"}</span>
           <Badge variant="danger">{statusCounts.open} open</Badge>
+          <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
           <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
           <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
         </div>
