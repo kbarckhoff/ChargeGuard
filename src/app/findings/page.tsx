@@ -104,14 +104,10 @@ export default async function FindingsPage({
   if (viewMode === "grouped") {
     const { data: aggData } = await supabaseAdmin.rpc("findings_rollup", { p_audit: auditId });
     const agg = (Array.isArray(aggData) ? aggData : []).map((r: any) => ({ category: r.category, status: r.status, cnt: Number(r.cnt) || 0, impact: Number(r.impact) || 0 }));
-    const allTodos: any[] = [];
-    for (let off = 0; ; off += 1000) {
-      const { data, error } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId }).range(off, off + 999);
-      if (error || !Array.isArray(data) || data.length === 0) break;
-      allTodos.push(...data);
-      if (data.length < 1000) break;
-    }
-    const todos = allTodos.map((g: any) => ({ grp_key: g.grp_key, category: g.category, code: g.code || "", line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0, impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null }));
+    // One ranged call returns all groups (overrides PostgREST's 1000-row default)
+    // instead of ~13 sequential pages — much faster initial load.
+    const { data: todoData } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId }).range(0, 99999);
+    const todos = (Array.isArray(todoData) ? todoData : []).map((g: any) => ({ grp_key: g.grp_key, category: g.category, code: g.code || "", line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0, impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null }));
     const { data: laggingFindings } = await supabaseAdmin.from("findings").select("id, title, category, resolution_note, charge_items(procedure_number, hcpcs_cpt_code)").eq("audit_id", auditId).eq("ehr_lagging", true).order("category");
     return (
       <>
