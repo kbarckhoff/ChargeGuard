@@ -119,7 +119,7 @@ export default async function FindingsPage({
       <>
         {headerEl}
         <div className="flex-1 overflow-y-auto p-6">
-          <FindingsWorkspace auditId={auditId!} agg={agg} allTodos={todos} lagging={(laggingFindings as any) || []} />
+          <FindingsWorkspace auditId={auditId!} agg={agg} allTodos={todos} lagging={(laggingFindings as any) || []} canAssign={actor.canAssign} users={assignUsers} assigneeNames={assigneeNames} />
         </div>
       </>
     );

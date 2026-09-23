@@ -15,7 +15,9 @@ export async function GET(request: Request) {
     const grpKey = searchParams.get("grpKey");
     if (!auditId || !grpKey) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-    const sel = "id, title, status, tier, financial_impact, resolution_note, charge_items(procedure_number, hcpcs_cpt_code, revenue_code, charge_description, gross_charge)";
+    // Full finding rows so the expand can open the same detail drawer as the
+    // By-CDM-line view (issue details, recommendation, assignment, disposition).
+    const sel = "*, charge_items(procedure_number, hcpcs_cpt_code, revenue_code, charge_description, gross_charge)";
     let rows: any[] = [];
     if (grpKey.startsWith("L:")) {
       const { data } = await admin.from("findings").select(sel).eq("id", grpKey.slice(2));

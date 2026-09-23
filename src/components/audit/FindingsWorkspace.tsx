@@ -5,6 +5,7 @@ import { Badge, formatImpact } from "@/components/ui/shared";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
+import { FindingDrawer, type FindingRow } from "@/components/audit/FindingsTable";
 import { Search, ChevronRight, ChevronDown, Loader2, Check, X, MinusCircle, AlertTriangle } from "lucide-react";
 
 type Agg = { category: string | null; status: string | null; cnt: number; impact: number };
@@ -19,12 +20,15 @@ const STATUS_LABEL: Record<string, string> = { open: "Open", in_review: "Under R
 const statusVariant = (s: string): any => s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "in_review" ? "purple" : s === "na" ? "default" : "default";
 
 export function FindingsWorkspace({
-  auditId, agg, allTodos, lagging,
+  auditId, agg, allTodos, lagging, canAssign = false, users = [], assigneeNames = {},
 }: {
   auditId: string;
   agg: Agg[];
   allTodos: TodoGroup[];
   lagging: Lagging[];
+  canAssign?: boolean;
+  users?: { id: string; full_name: string; email: string; department: string | null }[];
+  assigneeNames?: Record<string, string>;
 }) {
   const [tab, setTab] = useState<FindingBucket>("cdm");
   const [activeClass, setActiveClass] = useState<FindingClass | null>(null);
@@ -38,6 +42,7 @@ export function FindingsWorkspace({
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [lines, setLines] = useState<Record<string, any[]>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<FindingRow | null>(null);
 
   const reset = (t: FindingBucket) => { setTab(t); setActiveClass(null); setSelectedCats([]); setSearch(""); setPage(1); };
 
@@ -240,17 +245,21 @@ export function FindingsWorkspace({
                       <tr key={g.grp_key + "-x"} className="bg-[#fbfcfe] border-b border-[#f1f5f9]">
                         <td /><td colSpan={5} className="px-3 py-2">
                           {loadingKey === g.grp_key ? <div className="flex items-center gap-2 text-[12px] text-[#94a3b8] py-2"><Loader2 size={13} className="animate-spin" /> Loading lines…</div> : (
-                            <div className="rounded-lg border border-[#eef2f7] overflow-hidden"><table className="w-full text-[12.5px]"><tbody>
-                              {(lines[g.grp_key] || []).map((l: any) => (
-                                <tr key={l.id} className="border-b border-[#f1f5f9] last:border-0">
-                                  <td className="px-3 py-1.5 text-[#64748b] w-[120px]">{l.charge_items?.procedure_number || "—"}</td>
-                                  <td className="px-3 py-1.5 text-[#334155]">{l.charge_items?.charge_description || l.title}</td>
-                                  <td className="px-3 py-1.5 text-[#64748b] w-[90px]">{l.charge_items?.gross_charge != null ? `$${Number(l.charge_items.gross_charge).toLocaleString()}` : ""}</td>
-                                  <td className="px-3 py-1.5 w-[110px]"><Badge variant={statusVariant(l.status)}>{STATUS_LABEL[l.status] || l.status}</Badge></td>
-                                </tr>
-                              ))}
-                              {(lines[g.grp_key] || []).length === 0 && <tr><td className="px-3 py-2 text-[#94a3b8]">No lines.</td></tr>}
-                            </tbody></table></div>
+                            <div className="rounded-lg border border-[#eef2f7] bg-white overflow-hidden">
+                              <div className="px-3 py-1.5 text-[11px] text-[#94a3b8] bg-[#f8fafc] border-b border-[#eef2f7]">Click a line for full detail, or use the group buttons above to disposition all {g.line_count} at once.</div>
+                              <div className="divide-y divide-[#f1f5f9]">
+                                {(lines[g.grp_key] || []).map((l: any) => (
+                                  <button key={l.id} onClick={() => setDrawer(l)} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[#f4f6f8]">
+                                    <span className="text-[12px] text-[#64748b] w-[110px] shrink-0 tabular-nums">{l.charge_items?.procedure_number || "—"}</span>
+                                    <span className="flex-1 text-[12.5px] text-[#334155] truncate">{l.charge_items?.charge_description || l.title}</span>
+                                    <span className="text-[12px] text-[#64748b] w-[80px] text-right shrink-0">{l.charge_items?.gross_charge != null ? `$${Number(l.charge_items.gross_charge).toLocaleString()}` : ""}</span>
+                                    <Badge variant={statusVariant(l.status)}>{STATUS_LABEL[l.status] || l.status}</Badge>
+                                    <ChevronRight size={13} className="text-[#c5c5c0] shrink-0" />
+                                  </button>
+                                ))}
+                                {(lines[g.grp_key] || []).length === 0 && <div className="px-3 py-2 text-[12px] text-[#94a3b8]">No lines.</div>}
+                              </div>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -270,6 +279,8 @@ export function FindingsWorkspace({
           </div>
         </div>
       </>)}
+
+      {drawer && <FindingDrawer finding={drawer} onClose={() => setDrawer(null)} canAssign={canAssign} users={users} assigneeNames={assigneeNames} />}
     </div>
   );
 }
