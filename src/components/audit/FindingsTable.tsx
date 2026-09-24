@@ -300,11 +300,11 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
     } catch { setErr("Something went wrong."); } finally { setUpdating(false); }
   };
 
+  // Same three decisions offered everywhere (grouped to-dos, by-CDM-line, Work
+  // Queue) so the disposition control is consistent across the tool.
   const DISPOSITIONS: { value: string; label: string }[] = [
-    { value: "open", label: "Open" },
-    { value: "in_review", label: "Under Review" },
-    { value: "accepted", label: "Accepted" },
-    { value: "rejected", label: "Denied" },
+    { value: "accepted", label: "Accept" },
+    { value: "rejected", label: "Deny" },
     { value: "na", label: "N/A" },
   ];
 

@@ -147,7 +147,7 @@ function ActionPanel({ row }: { row: Row }) {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => submit("accepted")} disabled={!!busy} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-[#067647] text-white hover:bg-[#055c37] disabled:opacity-50 inline-flex items-center gap-1.5">{busy === "accepted" && <Loader2 size={13} className="animate-spin" />} Accept</button>
-            <button onClick={() => submit("rejected")} disabled={!!busy} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-[#b42318] text-white hover:bg-[#95170e] disabled:opacity-50 inline-flex items-center gap-1.5">{busy === "rejected" && <Loader2 size={13} className="animate-spin" />} Reject</button>
+            <button onClick={() => submit("rejected")} disabled={!!busy} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-[#b42318] text-white hover:bg-[#95170e] disabled:opacity-50 inline-flex items-center gap-1.5">{busy === "rejected" && <Loader2 size={13} className="animate-spin" />} Deny</button>
             <button onClick={() => submit("na")} disabled={!!busy} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-white border border-[#e2e8f0] text-[#475569] hover:bg-[#f1f5f9] disabled:opacity-50 inline-flex items-center gap-1.5">{busy === "na" && <Loader2 size={13} className="animate-spin" />} N/A</button>
           </div>
         </>

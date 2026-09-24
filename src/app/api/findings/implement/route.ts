@@ -27,17 +27,21 @@ export async function POST(request: Request) {
     const { data: f } = await db.from("findings").select("id, org_id, audit_id, status").eq("id", findingId).single();
     if (!f) return NextResponse.json({ error: "Finding not found" }, { status: 404 });
 
+    // Change-log entry → implemented (claimed done, awaiting next-run confirmation).
+    // Done FIRST and with an explicit error check: if this fails (e.g. a missing
+    // migration), we surface it instead of resolving the finding and reporting a
+    // false success. A 0-row match is not an error (some findings stage no change).
+    const { error: clErr } = await db.from("cdm_change_log")
+      .update({ status: "implemented", completed_by: user.id, implemented_at: now, updated_at: now })
+      .eq("source_finding_id", findingId)
+      .in("status", ["pending", "exported", "approved_missing"]);
+    if (clErr) return NextResponse.json({ error: `Could not update the audit-log entry: ${clErr.message}` }, { status: 500 });
+
     // Finding → resolved (work complete).
     const { error: fErr } = await db.from("findings")
       .update({ status: "resolved", resolved_at: now, resolved_by: user.id, ...(typeof note === "string" && note.trim() ? { resolution_note: note.trim() } : {}) })
       .eq("id", findingId);
     if (fErr) return NextResponse.json({ error: fErr.message }, { status: 500 });
-
-    // Change-log entry → implemented (claimed done, awaiting next-run confirmation).
-    await db.from("cdm_change_log")
-      .update({ status: "implemented", completed_by: user.id, implemented_at: now, updated_at: now })
-      .eq("source_finding_id", findingId)
-      .in("status", ["pending", "exported", "approved_missing"]);
 
     // Audit trail (best-effort).
     try {

@@ -156,7 +156,6 @@ export default async function FindingsPage({
     }
     agg = [...tmp.values()];
   }
-  const grandTotal = agg.reduce((s, a) => s + a.cnt, 0);
 
   // Categories present, and the subset that falls in the active tab's bucket.
   const categories = [...new Set(agg.map((a) => a.category).filter((c): c is string => !!c))].sort();
@@ -310,6 +309,10 @@ export default async function FindingsPage({
   const rollup = [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.impact - a.impact);
   const systemicCount = rollup.length;
   const totalExposure = rollup.reduce((s, r) => s + r.impact, 0);
+  // Headline flag count = the actionable flags in the roll-up (this tab, minus
+  // informational), so it matches the table beneath it rather than counting every
+  // flag across all tabs.
+  const rollupTotal = rollup.reduce((s, r) => s + r.count, 0);
   const topRollup = rollup.slice(0, 10);
 
   return (
@@ -343,7 +346,7 @@ export default async function FindingsPage({
               <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
                 <div>
                   <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {grandTotal.toLocaleString()} total flags · {formatImpact(totalExposure)} estimated exposure</p>
+                  <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(totalExposure)} estimated exposure</p>
                 </div>
                 {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
               </div>

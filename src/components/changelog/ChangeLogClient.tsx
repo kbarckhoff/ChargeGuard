@@ -52,14 +52,18 @@ function ConfirmedCell({ status }: { status: string }) {
 export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: Entry[]; reviews: Review[]; latestAuditId: string | null }) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("active");
-  const [reviewId, setReviewId] = useState(latestAuditId || "");
+  // "" = all reviews. This filter scopes the table by the review a change
+  // originated in; manual entries are added to the latest review.
+  const [reviewFilter, setReviewFilter] = useState("");
   const [busy, setBusy] = useState<string>("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
   const [editDate, setEditDate] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
-  const shown = entries.filter((e) => statusFilter === "all" ? true : statusFilter === "active" ? e.status !== "void" : statusFilter === "manual" ? e.source === "manual" : e.status === statusFilter);
+  const shown = entries
+    .filter((e) => !reviewFilter || e.audit_id === reviewFilter)
+    .filter((e) => statusFilter === "all" ? true : statusFilter === "active" ? e.status !== "void" : statusFilter === "manual" ? e.source === "manual" : e.status === statusFilter);
 
   const post = async (url: string, body: any) => (await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
 
@@ -71,7 +75,8 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
       <div className="bg-white rounded-xl border border-[#e2e8f0] p-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[#64748b]">Review</span>
-          <select value={reviewId} onChange={(e) => setReviewId(e.target.value)} className="text-[13px] border border-[#e2e8f0] rounded-lg px-2 py-1.5">
+          <select value={reviewFilter} onChange={(e) => setReviewFilter(e.target.value)} className="text-[13px] border border-[#e2e8f0] rounded-lg px-2 py-1.5">
+            <option value="">All reviews</option>
             {reviews.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </div>
@@ -131,8 +136,8 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
                 <td className="px-3 py-2.5 max-w-[240px]"><div className="text-[#475569] line-clamp-2">{e.rationale}</div></td>
                 <td className="px-3 py-2.5 text-[#64748b]">{e.decided_by_name || "—"}</td>
                 <td className="px-3 py-2.5 text-[#64748b]">{e.completed_by_name || "—"}</td>
-                <td className="px-3 py-2.5"><span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status] || ""}`}>{STATUS_LABEL[e.status] || e.status}</span></td>
-                <td className="px-3 py-2.5"><ConfirmedCell status={e.status} /></td>
+                <td className="px-3 py-2.5 whitespace-nowrap"><span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${STATUS_STYLE[e.status] || ""}`}>{STATUS_LABEL[e.status] || e.status}</span></td>
+                <td className="px-3 py-2.5 whitespace-nowrap"><ConfirmedCell status={e.status} /></td>
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   {e.status !== "void" && (editId === e.id ? (
                     <span className="flex items-center gap-2">
@@ -152,7 +157,7 @@ export function ChangeLogClient({ entries, reviews, latestAuditId }: { entries: 
         </table>
       </div>
 
-      {showAdd && <ManualEntryModal auditId={reviewId} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh(); }} />}
+      {showAdd && <ManualEntryModal auditId={reviewFilter || latestAuditId || ""} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); router.refresh(); }} />}
     </div>
   );
 }

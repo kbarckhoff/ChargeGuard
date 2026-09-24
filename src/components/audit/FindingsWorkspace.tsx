@@ -72,7 +72,10 @@ export function FindingsWorkspace({
     }
     return [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.impact - a.impact);
   }, [agg, tab, todoCats]);
-  const grandTotal = useMemo(() => agg.reduce((s, a) => s + a.cnt, 0), [agg]);
+  // Headline flag count = the actionable flags shown in the roll-up below (this
+  // tab, excluding informational), so the number matches the table. Informational
+  // context (SI=Q/B, RVU, shoppable) is surfaced in its own card, not counted here.
+  const rollupTotal = useMemo(() => rollup.reduce((s, r) => s + r.count, 0), [rollup]);
 
   // Filtered + sorted grouped rows for the table (client-side, instant).
   const filteredGroups = useMemo(() => {
@@ -131,7 +134,7 @@ export function FindingsWorkspace({
             <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
               <div>
                 <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {grandTotal.toLocaleString()} total flags · {formatImpact(rollup.reduce((s, r) => s + r.impact, 0))} estimated exposure</p>
+                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(rollup.reduce((s, r) => s + r.impact, 0))} estimated exposure</p>
               </div>
               {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
             </div>
