@@ -13,7 +13,7 @@ export const VALID_STATUSES = ["open", "in_review", "accepted", "rejected", "na"
 export async function applyDisposition(
   admin: Admin,
   userId: string,
-  args: { findingId: string; status: string; note?: string; action_taken?: string; effective_date?: string }
+  args: { findingId: string; status: string; note?: string; action_taken?: string; effective_date?: string; new_value?: string }
 ): Promise<{ error?: string }> {
   const { findingId, status, note, action_taken, effective_date } = args;
 
@@ -64,9 +64,13 @@ export async function applyDisposition(
           : field === "revenue_code" ? (ci.revenue_code || null)
           : field === "modifier" ? (ci.modifier_1 || null)
           : field === "hcpcs" ? (ci.hcpcs_cpt_code || null) : null;
-        let new_value: string | null = null;
-        const rec = String((f as any).recommendation || "");
-        if (field === "price") { const m = rec.replace(/,/g, "").match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/); if (m) new_value = m[1]; }
+        // Reviewer-entered corrected value takes precedence; fall back to parsing
+        // the recommendation (used by bulk group-accept, which has no single value).
+        let new_value: string | null = (typeof args.new_value === "string" && args.new_value.trim()) ? args.new_value.trim() : null;
+        if (!new_value) {
+          const rec = String((f as any).recommendation || "");
+          if (field === "price") { const m = rec.replace(/,/g, "").match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/); if (m) new_value = m[1]; }
+        }
         const rationale = (f as any).recommendation || (f as any).title || null;
 
         const { data: existing } = await admin
@@ -77,7 +81,8 @@ export async function applyDisposition(
         if (existing) {
           await admin.from("cdm_change_log").update({
             action_type, old_value, new_value, rationale, status: "pending",
-            source_finding_id: findingId, approver: userId, audit_id: (f as any).audit_id,
+            source_finding_id: findingId, requested_by: userId, audit_id: (f as any).audit_id,
+            completed_by: null, implemented_at: null,
             procedure_number: ci.procedure_number || null, hcpcs: ci.hcpcs_cpt_code || null,
             description: ci.charge_description || null, updated_at: new Date().toISOString(),
           }).eq("id", (existing as any).id);
@@ -90,7 +95,7 @@ export async function applyDisposition(
             org_id: (f as any).org_id, audit_id: (f as any).audit_id, change_number,
             line_key: lineKey, procedure_number: ci.procedure_number || null, hcpcs: ci.hcpcs_cpt_code || null,
             description: ci.charge_description || null, action_type, field, old_value, new_value, rationale,
-            status: "pending", source_finding_id: findingId, requested_by: userId, approver: userId,
+            status: "pending", source_finding_id: findingId, requested_by: userId,
           });
         }
       } else if (status === "open" || status === "in_review" || status === "rejected" || status === "na") {

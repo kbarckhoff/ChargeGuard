@@ -22,19 +22,23 @@ export default async function ChangeLogPage() {
     ]);
     const nameById: Record<string, string> = {};
     for (const u of users || []) nameById[(u as any).id] = (u as any).full_name;
-    entries = (rows || []).map((e: any) => ({ ...e, approver_name: e.approver ? nameById[e.approver] || null : null }));
+    entries = (rows || []).map((e: any) => ({
+      ...e,
+      decided_by_name: e.requested_by ? nameById[e.requested_by] || null : null,
+      completed_by_name: e.completed_by ? nameById[e.completed_by] || null : null,
+    }));
     reviews = (audits || []).map((a: any) => ({ id: a.id, name: a.name || "Untitled review" }));
     latestAuditId = reviews[0]?.id || null;
   }
 
   const pending = entries.filter((e) => e.status === "pending").length;
-  const exported = entries.filter((e) => e.status === "exported").length;
+  const awaiting = entries.filter((e) => e.status === "implemented" || e.status === "exported").length;
 
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
         <h1 className="text-base font-semibold text-[#0f172a]">Audit Log</h1>
-        <span className="text-sm text-[#94a3b8]">{pending} pending · {exported} awaiting EHR implementation</span>
+        <span className="text-sm text-[#94a3b8]">{pending} pending · {awaiting} awaiting confirmation</span>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">

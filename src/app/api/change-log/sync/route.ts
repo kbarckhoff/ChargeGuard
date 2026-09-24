@@ -22,10 +22,13 @@ function reflected(change: any, row: any | undefined): boolean {
 }
 
 // Smart-sync a new CDM upload against the org's approved changes.
-//  action "reconcile": mark exported changes that the new upload now reflects as
-//                      "implemented"; report those still missing.
-//  action "reapply":   re-stage the still-missing exported changes as pending on
-//                      this run so they can be re-exported.
+//  action "reconcile": confirm changes the new upload now reflects as "verified";
+//                      flag those still missing as "approved_missing" (not
+//                      confirmed). Runs over everything past the accept stage
+//                      (exported / implemented / verified / approved_missing), so
+//                      a change an assignee marked implemented gets independently
+//                      confirmed — or flagged if it regressed out of the CDM.
+//  action "reapply":   re-stage the still-missing changes as pending on this run.
 export async function POST(request: Request) {
   try {
     const sc = await createSessionClient();
@@ -50,28 +53,28 @@ export async function POST(request: Request) {
     const byKey: Record<string, any> = {};
     for (const r of rows) byKey[key(r)] = r;
 
-    // "Awaiting EHR sync" = exported or previously flagged approved-but-missing.
-    const { data: changes } = await db.from("cdm_change_log").select("*").eq("org_id", audit.org_id).in("status", ["exported", "approved_missing"]);
+    // Everything past the accept stage is re-checked against this upload.
+    const { data: changes } = await db.from("cdm_change_log").select("*").eq("org_id", audit.org_id).in("status", ["exported", "implemented", "verified", "approved_missing"]);
     const list = changes || [];
 
-    const implementedIds: string[] = [];
+    const verifiedIds: string[] = [];
     const missing: any[] = [];
     for (const c of list as any[]) {
-      if (reflected(c, byKey[c.line_key])) implementedIds.push(c.id);   // Case A: EHR now has it -> Closed & Synced
-      else missing.push(c);                                             // Case B: EHR still lagging
+      if (reflected(c, byKey[c.line_key])) verifiedIds.push(c.id);   // Case A: CDM now has it -> Verified
+      else missing.push(c);                                          // Case B: still not in the CDM
     }
 
     if (action === "reconcile") {
       const now = new Date().toISOString();
-      if (implementedIds.length) {
-        await db.from("cdm_change_log").update({ status: "implemented", implemented_at: now, updated_at: now }).in("id", implementedIds);
+      if (verifiedIds.length) {
+        await db.from("cdm_change_log").update({ status: "verified", verified_at: now, updated_at: now }).in("id", verifiedIds);
       }
-      // Flag still-missing exported entries as "approved but missing from EHR".
-      const toFlag = missing.filter((m) => m.status === "exported").map((m) => m.id);
+      // Flag still-missing entries as "approved but not confirmed in the CDM".
+      const toFlag = missing.map((m) => m.id);
       if (toFlag.length) {
         await db.from("cdm_change_log").update({ status: "approved_missing", updated_at: now }).in("id", toFlag);
       }
-      return NextResponse.json({ ok: true, implemented: implementedIds.length, missing: missing.length });
+      return NextResponse.json({ ok: true, verified: verifiedIds.length, missing: missing.length });
     }
 
     if (action === "reapply") {

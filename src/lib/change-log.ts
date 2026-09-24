@@ -22,6 +22,9 @@ export function changeActionForCategory(category: string | null | undefined): Ch
   return "modify";
 }
 
-// Change-log lifecycle statuses that mean "approved, sent to the client, but the
-// EHR hasn't reflected it yet" — these drive the lagging/Pending-EHR-Sync view.
-export const AWAITING_SYNC_STATUSES = ["exported", "approved_missing"] as const;
+// Change-log lifecycle statuses that mean "accepted and worked, but not yet
+// confirmed present in the latest CDM" — these drive the lagging/Pending-Sync
+// view. "implemented" = the assignee marked it done (awaiting confirmation);
+// "approved_missing" = a later run couldn't find it; "exported" = legacy sent.
+// "verified" is excluded: a later run confirmed it, so it's fully done.
+export const AWAITING_SYNC_STATUSES = ["exported", "implemented", "approved_missing"] as const;

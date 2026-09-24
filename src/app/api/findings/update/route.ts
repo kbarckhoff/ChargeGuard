@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { findingId, status, note, action_taken, effective_date } = await request.json();
+    const { findingId, status, note, action_taken, effective_date, new_value } = await request.json();
     if (!findingId || !status) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const { error } = await applyDisposition(supabaseAdmin, user.id, { findingId, status, note, action_taken, effective_date });
+    const { error } = await applyDisposition(supabaseAdmin, user.id, { findingId, status, note, action_taken, effective_date, new_value });
     if (error) return NextResponse.json({ error }, { status: 500 });
 
     return NextResponse.json({ success: true });
