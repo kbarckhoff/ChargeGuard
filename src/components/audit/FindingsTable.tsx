@@ -284,9 +284,16 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
 
   const updateStatus = async (newStatus: string) => {
     setErr("");
-    if (newStatus === "accepted" && needsValue && !newValue.trim()) {
-      setErr(`Enter the ${valueLabel.toLowerCase()} before accepting — it's recorded as the fix in the audit log.`);
-      return;
+    if (newStatus === "accepted") {
+      if (needsValue && !newValue.trim()) {
+        setErr(`Enter the ${valueLabel.toLowerCase()} before accepting — it's recorded as the fix in the audit log.`);
+        return;
+      }
+      // Accepting a finding must route it to someone who will implement the fix.
+      if (canAssign && !assignee) {
+        setErr("Assign this finding to someone before accepting — they'll mark it implemented once the CDM is updated.");
+        return;
+      }
     }
     setUpdating(true);
     try {
@@ -295,7 +302,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ findingId: finding.id, status: newStatus, note, new_value: newStatus === "accepted" ? newValue : undefined, effective_date: effDate }),
       });
-      if (res.ok) { setCurrentStatus(newStatus); router.refresh(); }
+      if (res.ok) { setCurrentStatus(newStatus); router.refresh(); onClose(); }
       else { const d = await res.json().catch(() => ({})); setErr(d.error || "Could not save."); }
     } catch { setErr("Something went wrong."); } finally { setUpdating(false); }
   };
@@ -408,7 +415,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
         {/* Assignment + Disposition */}
         <div className="px-5 py-4 border-t border-[#e2e8f0] bg-[#f8fafc] space-y-3">
           <div>
-            <div className="text-xs font-medium text-[#64748b] mb-1.5">Assigned to</div>
+            <div className="text-xs font-medium text-[#64748b] mb-1.5">Assigned to {canAssign && <span className="text-[#b45309]">*</span>}</div>
             {canAssign ? (
               <div className="flex items-center gap-2">
                 <select value={assignee} onChange={(e) => assign(e.target.value)} disabled={assigning}
