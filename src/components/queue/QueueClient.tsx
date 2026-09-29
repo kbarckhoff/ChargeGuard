@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, SeverityDot } from "@/components/ui/shared";
-import { Loader2, Check, ChevronDown } from "lucide-react";
+import { Loader2, Check, ChevronDown, Search } from "lucide-react";
 import { changeFieldForCategory } from "@/lib/change-log";
-import { classForCategory, CLASS_LABELS, type FindingClass } from "@/lib/finding-class";
 
 type Row = {
   id: string; title: string; description: string; category: string; severity: string; status: string;
@@ -16,10 +15,14 @@ type Row = {
 const STATUS_LABEL: Record<string, string> = { open: "Open", in_review: "Under Review", accepted: "Accepted", rejected: "Denied", na: "N/A", resolved: "Accepted" };
 const variant = (s: string): any => s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "na" ? "default" : "default";
 
+const REVIEW_STATUSES = ["open", "in_review", "accepted"];
+
 export function QueueClient({ rows }: { rows: Row[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [statusTab, setStatusTab] = useState<"all" | "review" | "implement">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | FindingClass>("all");
+  const [statusTab, setStatusTab] = useState<"review" | "implemented">("review");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [typeSearch, setTypeSearch] = useState("");
 
   if (!rows.length) {
     return (
@@ -30,30 +33,54 @@ export function QueueClient({ rows }: { rows: Row[] }) {
     );
   }
 
-  // Work classes present in the assigned items, for the Type dropdown.
-  const typesPresent = Array.from(new Set(rows.map((r) => classForCategory(r.category)))) as FindingClass[];
-  const inStatus = (r: Row) => statusTab === "all" ? true : statusTab === "review" ? (r.status === "open" || r.status === "in_review") : r.status === "accepted";
-  const reviewCount = rows.filter((r) => r.status === "open" || r.status === "in_review").length;
-  const implementCount = rows.filter((r) => r.status === "accepted").length;
-  const filtered = rows.filter((r) => inStatus(r) && (typeFilter === "all" || classForCategory(r.category) === typeFilter));
+  // Distinct finding categories present, for the Vanta-style Type filter.
+  const categories = Array.from(new Set(rows.map((r) => r.category).filter(Boolean))).sort();
+  const inStatus = (r: Row) => statusTab === "review" ? REVIEW_STATUSES.includes(r.status) : r.status === "resolved";
+  const reviewCount = rows.filter((r) => REVIEW_STATUSES.includes(r.status)).length;
+  const implementedCount = rows.filter((r) => r.status === "resolved").length;
+  const filtered = rows.filter((r) => inStatus(r) && (selectedTypes.length === 0 || selectedTypes.includes(r.category)));
 
   const tab = (key: typeof statusTab, label: string, n: number) => (
     <button onClick={() => setStatusTab(key)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium ${statusTab === key ? "bg-[#1e293b] text-white" : "text-[#475569] hover:bg-[#f1f5f9]"}`}>{label} <span className={statusTab === key ? "text-white/70" : "text-[#94a3b8]"}>{n}</span></button>
   );
+  const toggleType = (c: string) => setSelectedTypes((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
+  const shownCats = categories.filter((c) => c.toLowerCase().includes(typeSearch.trim().toLowerCase()));
 
   return (
     <div>
-      <p className="text-[13px] text-[#64748b] mb-4">Findings assigned to you that need action.</p>
+      <p className="text-[13px] text-[#64748b] mb-4">Findings assigned to you: review and accept them, then mark them implemented once the CDM is updated.</p>
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5">
-          {tab("all", "All", rows.length)}
           {tab("review", "To review", reviewCount)}
-          {tab("implement", "To implement", implementCount)}
+          {tab("implemented", "Implemented", implementedCount)}
         </div>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className="text-[13px] border border-[#e2e8f0] rounded-lg px-2.5 py-1.5 bg-white">
-          <option value="all">All types</option>
-          {typesPresent.map((c) => <option key={c} value={c}>{CLASS_LABELS[c]}</option>)}
-        </select>
+        <div className="relative">
+          <button onClick={() => setTypeOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-[13px] border border-[#e2e8f0] rounded-lg px-3 py-1.5 bg-white hover:bg-[#f8fafc]">
+            Type{selectedTypes.length > 0 && <span className="text-[11px] font-semibold text-white bg-[#1e293b] rounded-full px-1.5">{selectedTypes.length}</span>}
+            <ChevronDown size={14} className={`text-[#94a3b8] transition-transform ${typeOpen ? "rotate-180" : ""}`} />
+          </button>
+          {typeOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setTypeOpen(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-72 bg-white border border-[#e2e8f0] rounded-xl shadow-lg p-2">
+                <div className="flex items-center gap-2 px-2 py-1.5 mb-1 border border-[#e2e8f0] rounded-lg">
+                  <Search size={13} className="text-[#94a3b8]" />
+                  <input autoFocus value={typeSearch} onChange={(e) => setTypeSearch(e.target.value)} placeholder="Search" className="w-full text-[13px] outline-none" />
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {shownCats.map((c) => (
+                    <label key={c} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-[#334155] hover:bg-[#f1f5f9] cursor-pointer">
+                      <input type="checkbox" checked={selectedTypes.includes(c)} onChange={() => toggleType(c)} />
+                      <span className="truncate">{c}</span>
+                    </label>
+                  ))}
+                  {shownCats.length === 0 && <div className="px-2 py-2 text-[12px] text-[#94a3b8]">No matching types</div>}
+                </div>
+                {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="mt-1 w-full text-left px-2 py-1.5 text-[12px] text-[#1e293b] hover:bg-[#f1f5f9] rounded-lg">Clear {selectedTypes.length} selected</button>}
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <div className="space-y-2">
       {filtered.length === 0 && <div className="bg-white rounded-xl border border-[#e2e8f0] p-8 text-center text-[#94a3b8] text-sm">No items match this filter.</div>}

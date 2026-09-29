@@ -17,22 +17,23 @@ export default async function QueuePage() {
       .select("id, title, description, category, severity, status, financial_impact, recommendation, resolution_note, charge_items(procedure_number, hcpcs_cpt_code, charge_description, gross_charge)")
       .eq("org_id", orgId)
       .eq("assigned_to", user!.id)
-      // Active work only: things still needing action. Once a finding is marked
-      // implemented (resolved) or denied/N-A, it drops off the queue.
-      .in("status", ["open", "in_review", "accepted"])
+      // Everything assigned to you that's actionable or done: the queue shows
+      // "To review" (open/under-review/accepted) and "Implemented" (resolved).
+      // Denied / N-A drop off entirely.
+      .in("status", ["open", "in_review", "accepted", "resolved"])
       .order("status", { ascending: true })
       .order("severity", { ascending: true })
-      .limit(300);
+      .limit(500);
     rows = data || [];
   }
-  const open = rows.filter((r) => r.status === "open" || r.status === "in_review").length;
-  const toWork = rows.filter((r) => r.status === "accepted").length;
+  const toReview = rows.filter((r) => ["open", "in_review", "accepted"].includes(r.status)).length;
+  const implemented = rows.filter((r) => r.status === "resolved").length;
 
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
         <h1 className="text-base font-semibold text-[#0f172a]">My Work Queue</h1>
-        <span className="text-sm text-[#94a3b8]">{open} to review · {toWork} to implement</span>
+        <span className="text-sm text-[#94a3b8]">{toReview} to review · {implemented} implemented</span>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">
