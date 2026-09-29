@@ -82,5 +82,22 @@ export async function updateSession(request: NextRequest) {
     return redirectTo("/runs");
   }
 
+  // Stamp "last seen" so the Admin Users list reflects real activity (a
+  // token-refreshed session never updates Supabase's last_sign_in_at). Throttled
+  // to ~15 min via a cookie, so this writes at most once per interval per user,
+  // never on every request. Best-effort — never blocks or fails the request.
+  try {
+    const THROTTLE_MS = 15 * 60 * 1000;
+    const seen = Number(request.cookies.get("cg_seen")?.value || 0);
+    if (!seen || Date.now() - seen > THROTTLE_MS) {
+      supabaseResponse.cookies.set("cg_seen", String(Date.now()), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
+        method: "PATCH",
+        headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+      }).catch(() => {});
+    }
+  } catch { /* non-fatal */ }
+
   return supabaseResponse;
 }

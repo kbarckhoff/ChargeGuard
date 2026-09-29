@@ -20,7 +20,7 @@ export default async function AdminUsersPage() {
   if (orgId) {
     const { data } = await db
       .from("users")
-      .select("id, full_name, email, app_role, department, is_active, is_platform_owner")
+      .select("id, full_name, email, app_role, department, is_active, is_platform_owner, last_seen_at")
       .eq("org_id", orgId)
       .order("full_name");
 
@@ -36,7 +36,14 @@ export default async function AdminUsersPage() {
       }
     } catch { /* best-effort; column just shows "—" if unavailable */ }
 
-    users = (data || []).map((u: any) => ({ ...u, last_login: lastLogin[u.id] || null }));
+    // Show the most recent of the auth sign-in and our activity stamp, so an
+    // actively-logged-in user (long-lived session) reads as recent, not stale.
+    const latest = (a?: string | null, b?: string | null) => {
+      const ta = a ? Date.parse(a) : 0, tb = b ? Date.parse(b) : 0;
+      const t = Math.max(ta, tb);
+      return t ? new Date(t).toISOString() : null;
+    };
+    users = (data || []).map((u: any) => ({ ...u, last_login: latest(lastLogin[u.id], u.last_seen_at) }));
   }
 
   return (
