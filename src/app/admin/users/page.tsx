@@ -23,7 +23,20 @@ export default async function AdminUsersPage() {
       .select("id, full_name, email, app_role, department, is_active, is_platform_owner")
       .eq("org_id", orgId)
       .order("full_name");
-    users = data || [];
+
+    // Last sign-in comes from Supabase Auth, which stamps last_sign_in_at on
+    // every successful login. Page through the auth users to build an id → time map.
+    const lastLogin: Record<string, string> = {};
+    try {
+      for (let page = 1; page <= 25; page += 1) {
+        const { data: al } = await db.auth.admin.listUsers({ page, perPage: 200 });
+        const list = al?.users || [];
+        for (const au of list) if (au.last_sign_in_at) lastLogin[au.id] = au.last_sign_in_at;
+        if (list.length < 200) break;
+      }
+    } catch { /* best-effort; column just shows "—" if unavailable */ }
+
+    users = (data || []).map((u: any) => ({ ...u, last_login: lastLogin[u.id] || null }));
   }
 
   return (

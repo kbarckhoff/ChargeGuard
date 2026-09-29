@@ -5,9 +5,25 @@ import { useRouter } from "next/navigation";
 import { UserPlus, Loader2, Copy, Check, X } from "lucide-react";
 import { APP_ROLE_LABEL, type AppRole } from "@/lib/roles";
 
-type U = { id: string; full_name: string; email: string; app_role: AppRole; department: string | null; is_active: boolean; is_platform_owner: boolean };
+type U = { id: string; full_name: string; email: string; app_role: AppRole; department: string | null; is_active: boolean; is_platform_owner: boolean; last_login?: string | null };
 
 const ROLES: AppRole[] = ["super_user", "analyst", "member"];
+
+// "Sep 29, 2026 · 3 days ago" style; "Never" when the user hasn't signed in yet.
+function formatLastLogin(iso?: string | null): string {
+  if (!iso) return "Never";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const diff = Date.now() - d.getTime();
+  const day = 86400000;
+  let rel = "";
+  if (diff < 60000) rel = "just now";
+  else if (diff < 3600000) rel = `${Math.floor(diff / 60000)}m ago`;
+  else if (diff < day) rel = `${Math.floor(diff / 3600000)}h ago`;
+  else if (diff < 30 * day) rel = `${Math.floor(diff / day)}d ago`;
+  return rel ? `${date} · ${rel}` : date;
+}
 
 export function AdminUsers({ users }: { users: U[] }) {
   const router = useRouter();
@@ -96,7 +112,7 @@ export function AdminUsers({ users }: { users: U[] }) {
         <table className="w-full text-[13px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#e2e8f0]">
-              <th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Department</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5"></th>
+              <th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Department</th><th className="px-4 py-2.5">Last login</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
@@ -121,6 +137,7 @@ export function AdminUsers({ users }: { users: U[] }) {
                     {editing ? <input className={inp + " w-40"} value={edit.department} onChange={(e) => setEdit((p) => ({ ...p, department: e.target.value }))} placeholder="Department" />
                       : <span className="text-[#64748b]">{u.department || "—"}</span>}
                   </td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-[12px] text-[#64748b]">{formatLastLogin(u.last_login)}</td>
                   <td className="px-4 py-2.5">
                     {u.is_active ? <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">Active</span>
                       : <span className="text-[10px] font-semibold text-[#8a5a1a] bg-[#fef4e6] px-1.5 py-0.5 rounded">Deactivated</span>}
@@ -141,7 +158,7 @@ export function AdminUsers({ users }: { users: U[] }) {
                 </tr>
               );
             })}
-            {users.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-[#94a3b8]">No users yet. Add one above.</td></tr>}
+            {users.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-[#94a3b8]">No users yet. Add one above.</td></tr>}
           </tbody>
         </table>
       </div>
