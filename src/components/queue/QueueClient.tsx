@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge, SeverityDot } from "@/components/ui/shared";
 import { Loader2, Check, ChevronDown } from "lucide-react";
 import { changeFieldForCategory } from "@/lib/change-log";
+import { classForCategory, CLASS_LABELS, type FindingClass } from "@/lib/finding-class";
 
 type Row = {
   id: string; title: string; description: string; category: string; severity: string; status: string;
@@ -17,12 +18,46 @@ const variant = (s: string): any => s === "accepted" || s === "resolved" ? "succ
 
 export function QueueClient({ rows }: { rows: Row[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [statusTab, setStatusTab] = useState<"all" | "review" | "implement">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | FindingClass>("all");
+
   if (!rows.length) {
-    return <div className="bg-white rounded-xl border border-[#e2e8f0] p-10 text-center text-[#94a3b8] text-sm">Nothing assigned to you right now. When the Charge Master Analyst assigns you a finding, it shows up here.</div>;
+    return (
+      <div>
+        <p className="text-[13px] text-[#64748b] mb-4">Findings assigned to you that need action.</p>
+        <div className="bg-white rounded-xl border border-[#e2e8f0] p-10 text-center text-[#94a3b8] text-sm">Nothing assigned to you right now. When the Charge Master Analyst assigns you a finding, it shows up here.</div>
+      </div>
+    );
   }
+
+  // Work classes present in the assigned items, for the Type dropdown.
+  const typesPresent = Array.from(new Set(rows.map((r) => classForCategory(r.category)))) as FindingClass[];
+  const inStatus = (r: Row) => statusTab === "all" ? true : statusTab === "review" ? (r.status === "open" || r.status === "in_review") : r.status === "accepted";
+  const reviewCount = rows.filter((r) => r.status === "open" || r.status === "in_review").length;
+  const implementCount = rows.filter((r) => r.status === "accepted").length;
+  const filtered = rows.filter((r) => inStatus(r) && (typeFilter === "all" || classForCategory(r.category) === typeFilter));
+
+  const tab = (key: typeof statusTab, label: string, n: number) => (
+    <button onClick={() => setStatusTab(key)} className={`px-3 py-1.5 rounded-lg text-[13px] font-medium ${statusTab === key ? "bg-[#1e293b] text-white" : "text-[#475569] hover:bg-[#f1f5f9]"}`}>{label} <span className={statusTab === key ? "text-white/70" : "text-[#94a3b8]"}>{n}</span></button>
+  );
+
   return (
-    <div className="space-y-2">
-      {rows.map((r) => (
+    <div>
+      <p className="text-[13px] text-[#64748b] mb-4">Findings assigned to you that need action.</p>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          {tab("all", "All", rows.length)}
+          {tab("review", "To review", reviewCount)}
+          {tab("implement", "To implement", implementCount)}
+        </div>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className="text-[13px] border border-[#e2e8f0] rounded-lg px-2.5 py-1.5 bg-white">
+          <option value="all">All types</option>
+          {typesPresent.map((c) => <option key={c} value={c}>{CLASS_LABELS[c]}</option>)}
+        </select>
+      </div>
+      <div className="space-y-2">
+      {filtered.length === 0 && <div className="bg-white rounded-xl border border-[#e2e8f0] p-8 text-center text-[#94a3b8] text-sm">No items match this filter.</div>}
+      {filtered.map((r) => (
         <div key={r.id} className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
           <button onClick={() => setOpenId(openId === r.id ? null : r.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#f8fafc]">
             <SeverityDot severity={r.severity} />
@@ -38,6 +73,7 @@ export function QueueClient({ rows }: { rows: Row[] }) {
           {openId === r.id && <ActionPanel row={r} />}
         </div>
       ))}
+      </div>
     </div>
   );
 }
