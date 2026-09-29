@@ -43,6 +43,7 @@ export function FindingsWorkspace({
   const [lines, setLines] = useState<Record<string, any[]>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<FindingRow | null>(null);
+  const [rollupOpen, setRollupOpen] = useState(false); // Top-findings roll-up starts collapsed.
 
   const reset = (t: FindingBucket) => { setTab(t); setActiveClass(null); setSelectedCats([]); setSearch(""); setPage(1); };
 
@@ -131,14 +132,15 @@ export function FindingsWorkspace({
         {/* Roll-up */}
         {rollup.length > 0 && (
           <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
-            <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
+            <button onClick={() => setRollupOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-[#f8fafc]">
               <div>
                 <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
                 <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(rollup.reduce((s, r) => s + r.impact, 0))} estimated exposure</p>
               </div>
-              {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
-            </div>
-            <table className="w-full text-[13px]">
+              <span className="flex items-center gap-1.5 text-[11px] text-[#94a3b8] shrink-0">Top {Math.min(10, rollup.length)} shown <ChevronDown size={14} className={`transition-transform ${rollupOpen ? "rotate-180" : ""}`} /></span>
+            </button>
+            {rollupOpen && (
+            <table className="w-full text-[13px] border-t border-[#eef2f7]">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#f1f5f9]">
                   <th className="px-5 py-2 w-8">#</th><th className="px-3 py-2">Issue category</th>
@@ -157,6 +159,7 @@ export function FindingsWorkspace({
                 ))}
               </tbody>
             </table>
+            )}
           </div>
         )}
 

@@ -10,7 +10,7 @@ import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
-import { AlertTriangle, Download } from "lucide-react";
+import { AlertTriangle, Download, ChevronDown } from "lucide-react";
 
 export default async function FindingsPage({
   searchParams,
@@ -342,15 +342,15 @@ export default async function FindingsPage({
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
           {/* Top findings by impact: roll up the raw flags into systemic issues. */}
           {rollup.length > 0 && (
-            <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[#eef2f7]">
+            <details className="group bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
+              <summary className="flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-[#f8fafc]">
                 <div>
                   <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
                   <p className="text-[12px] text-[#64748b] mt-0.5">{systemicCount} systemic {systemicCount === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(totalExposure)} estimated exposure</p>
                 </div>
-                {rollup.length > 10 && <span className="text-[11px] text-[#94a3b8]">Top 10 shown</span>}
-              </div>
-              <table className="w-full text-[13px]">
+                <span className="flex items-center gap-1.5 text-[11px] text-[#94a3b8] shrink-0">Top {Math.min(10, rollup.length)} shown <ChevronDown size={14} className="transition-transform group-open:rotate-180" /></span>
+              </summary>
+              <table className="w-full text-[13px] border-t border-[#eef2f7]">
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#f1f5f9]">
                     <th className="px-5 py-2 w-8">#</th><th className="px-3 py-2">Issue category</th>
@@ -369,7 +369,7 @@ export default async function FindingsPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </details>
           )}
 
           {/* Pending EHR Sync: approved in a prior review, still not in the EHR. */}
