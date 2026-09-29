@@ -20,9 +20,17 @@ export default async function AdminUsersPage() {
   if (orgId) {
     const { data } = await db
       .from("users")
-      .select("id, full_name, email, app_role, department, is_active, is_platform_owner, last_seen_at")
+      .select("id, full_name, email, app_role, department, is_active, is_platform_owner")
       .eq("org_id", orgId)
       .order("full_name");
+
+    // last_seen_at is fetched separately and defensively: if the column hasn't
+    // been migrated yet, this no-ops instead of breaking the whole user list.
+    const seenById: Record<string, string> = {};
+    try {
+      const { data: seen } = await db.from("users").select("id, last_seen_at").eq("org_id", orgId);
+      for (const s of seen || []) if ((s as any).last_seen_at) seenById[(s as any).id] = (s as any).last_seen_at;
+    } catch { /* column not present yet */ }
 
     // Last sign-in comes from Supabase Auth, which stamps last_sign_in_at on
     // every successful login. Page through the auth users to build an id → time map.
@@ -43,7 +51,7 @@ export default async function AdminUsersPage() {
       const t = Math.max(ta, tb);
       return t ? new Date(t).toISOString() : null;
     };
-    users = (data || []).map((u: any) => ({ ...u, last_login: latest(lastLogin[u.id], u.last_seen_at) }));
+    users = (data || []).map((u: any) => ({ ...u, last_login: latest(lastLogin[u.id], seenById[u.id]) }));
   }
 
   return (
