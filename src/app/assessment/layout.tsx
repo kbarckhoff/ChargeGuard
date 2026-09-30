@@ -6,7 +6,7 @@ export default async function AssessmentLayout({ children }: { children: React.R
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#f4f6f8]">
+    <div className="flex flex-col h-screen overflow-hidden bg-white">
       <main className="flex-1 flex flex-col overflow-hidden min-h-0">{children}</main>
     </div>
   );

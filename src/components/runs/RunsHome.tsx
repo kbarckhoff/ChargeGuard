@@ -92,7 +92,7 @@ export function RunsHome({ runs, kpis, hospitalName }: {
   return (
     <div className="flex min-h-screen">
       <AppSidebar />
-      <main className="flex-1 min-w-0 bg-[#f4f6f8]">
+      <main className="flex-1 min-w-0 bg-white">
         {/* header */}
         <div className="bg-white border-b border-[#e6e9f2] px-8 py-5 flex items-end justify-between gap-4">
           <div>

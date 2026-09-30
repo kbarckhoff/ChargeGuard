@@ -16,7 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!me?.is_platform_owner) redirect("/runs");
 
   return (
-    <div className="flex h-screen bg-[#f4f6f8] overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       <AppSidebar />
       <main className="flex-1 flex flex-col overflow-hidden min-h-0">{children}</main>
     </div>

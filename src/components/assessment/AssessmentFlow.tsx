@@ -164,7 +164,7 @@ export function AssessmentFlow({
   return (
     <div className="flex min-h-screen">
       <AppSidebar />
-      <main className="flex-1 min-w-0 bg-[#f4f6f8] flex flex-col min-h-screen">
+      <main className="flex-1 min-w-0 bg-white flex flex-col min-h-screen">
         {/* header */}
         <div className="bg-white border-b border-[#e6e9f2] px-8 py-4">
           <h1 className="text-[18px] font-bold tracking-tight text-[#0f172a]">{auditName}</h1>

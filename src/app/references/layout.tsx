@@ -7,7 +7,7 @@ export default async function BenchmarksLayout({ children }: { children: React.R
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
   return (
-    <div className="flex h-screen bg-[#f4f6f8] overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       <AppSidebar />
       <main className="flex-1 flex flex-col overflow-hidden min-h-0">{children}</main>
     </div>
