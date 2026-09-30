@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, Check } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -46,14 +46,36 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a6cff] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <img src="/logo-login.png" alt="ChargeGuard" className="w-12 h-12 object-contain" />
-          <span className="text-xl font-bold text-white tracking-tight">ChargeGuard</span>
+    <div className="min-h-screen bg-white flex">
+      {/* Left — what ChargeGuard is */}
+      <div className="hidden lg:flex flex-1 flex-col justify-center px-14 xl:px-20">
+        <div className="flex items-center gap-2 mb-10">
+          <img src="/logo-dark.png" alt="ChargeGuard" className="w-9 h-9 object-contain" />
+          <span className="text-[20px] font-bold text-[#1e2a3a] tracking-tight">ChargeGuard</span>
         </div>
+        <h1 className="text-[32px] font-bold text-[#0f172a] leading-[1.15] mb-4 max-w-lg">Catch charge integrity issues before they cost you.</h1>
+        <p className="text-[15px] text-[#475569] mb-8 max-w-md leading-relaxed">ChargeGuard audits your chargemaster against Medicare fee schedules, coding rules, and peer pricing — showing exactly what to fix and the revenue impact.</p>
+        <ul className="space-y-3.5 max-w-md">
+          {[
+            "Flag underpricing, coding gaps, and data-quality issues automatically.",
+            "Route each fix to your team and track it through to implemented.",
+            "Benchmark pricing against peer hospitals and CMS fee schedules.",
+          ].map((t) => (
+            <li key={t} className="flex items-start gap-2.5 text-[14px] text-[#334155]">
+              <Check size={18} className="text-[#0a6cff] shrink-0 mt-0.5" /> {t}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 shadow-xl">
+      {/* Right — sign in */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-[#f5f8fc]">
+        <div className="w-full max-w-sm">
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
+            <img src="/logo-dark.png" alt="ChargeGuard" className="w-9 h-9 object-contain" />
+            <span className="text-[18px] font-bold text-[#1e2a3a] tracking-tight">ChargeGuard</span>
+          </div>
+          <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 shadow-sm">
           {mode === "signin" ? (
             <>
               <h1 className="text-lg font-semibold text-[#0f172a] mb-1">Sign in</h1>
@@ -165,6 +187,7 @@ export default function LoginPage() {
               </button>
             </>
           )}
+          </div>
         </div>
       </div>
     </div>
