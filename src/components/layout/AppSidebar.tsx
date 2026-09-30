@@ -64,10 +64,10 @@ function ClientSwitcher({ info }: { info: OrgInfo | null }) {
   return (
     <div className="px-3 pt-2 pb-1 relative">
       <button onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 rounded-lg bg-white/10 hover:bg-white/15 px-3 py-2 text-left text-[12.5px] text-white">
-        <Building2 size={14} className="shrink-0 text-white/80" />
+        className="w-full flex items-center gap-2 rounded-lg bg-white border border-[#e5e7eb] hover:bg-[#f1f5f9] px-3 py-2 text-left text-[12.5px] text-[#111827]">
+        <Building2 size={14} className="shrink-0 text-[#64748b]" />
         <span className="flex-1 truncate">{busy ? "Switching…" : activeName}</span>
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} className="text-white/70" />}
+        {busy ? <Loader2 size={13} className="animate-spin text-[#64748b]" /> : <ChevronDown size={13} className="text-[#94a3b8]" />}
       </button>
       {open && (
         <>
@@ -112,10 +112,10 @@ export function AppSidebar() {
     router.refresh();
   };
   return (
-    <aside className="w-[224px] shrink-0 bg-[#1e293b] text-white flex flex-col min-h-screen">
+    <aside className="w-[224px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
       <div className="flex items-center gap-1.5 px-5 h-14">
-        <img src="/logo-white.png" alt="ChargeGuard" className="w-[30px] h-[30px] object-contain" />
-        <span className="font-bold text-[15px] tracking-tight">ChargeGuard</span>
+        <img src="/logo-dark.png" alt="ChargeGuard" className="w-[28px] h-[28px] object-contain" />
+        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">ChargeGuard</span>
       </div>
       <ClientSwitcher info={info} />
       <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">
@@ -123,18 +123,18 @@ export function AppSidebar() {
           const active = pathname === n.href || (n.href === "/runs" && pathname === "/");
           const Icon = n.icon;
           return (
-            <Link key={n.href} href={n.href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${active ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+            <Link key={n.href} href={n.href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${active ? "bg-[#e9ebef] text-[#0f172a]" : "text-[#475569] hover:bg-[#eef1f5] hover:text-[#0f172a]"}`}>
               <Icon size={17} /> {n.label}
             </Link>
           );
         })}
         {isOwner && (
-          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}>
+          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-[#e9ebef] text-[#0f172a]" : "text-[#475569] hover:bg-[#eef1f5] hover:text-[#0f172a]"}`}>
             <Building2 size={17} /> Admin
           </Link>
         )}
       </nav>
-      <button onClick={logout} className="flex items-center gap-2.5 px-5 py-4 text-[13px] text-white/80 hover:text-white border-t border-white/15">
+      <button onClick={logout} className="flex items-center gap-2.5 px-5 py-4 text-[13px] text-[#475569] hover:text-[#0f172a] border-t border-[#e5e7eb]">
         <LogOut size={16} /> Sign out
       </button>
     </aside>

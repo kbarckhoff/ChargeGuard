@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #f4f6f8;   /* cool corporate app background */
+  --background: #ffffff;   /* bright white app background (Vanta-style) */
   --foreground: #0f172a;   /* slate-900 primary text */
   --navy: #1e3a8a;         /* nav / header / dark surfaces */
   --navy-hover: #163a5f;
