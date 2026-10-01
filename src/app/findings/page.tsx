@@ -115,11 +115,30 @@ export default async function FindingsPage({
     }
     const todos = allTodos.map((g: any) => ({ grp_key: g.grp_key, category: g.category, code: g.code || "", line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0, impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null }));
     const { data: laggingFindings } = await supabaseAdmin.from("findings").select("id, title, category, resolution_note, charge_items(procedure_number, hcpcs_cpt_code)").eq("audit_id", auditId).eq("ehr_lagging", true).order("category");
+
+    // Per-CDM-line rollup: issues-per-line, max-per-line impact (dedup), dominant
+    // category + code/description for the line cards and the issue-distribution band.
+    const lineRows: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await supabaseAdmin.rpc("findings_line_rollup", { p_audit: auditId }).range(off, off + 999);
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      lineRows.push(...data);
+      if (data.length < 1000) break;
+    }
+    const lineRollup = lineRows.map((l: any) => ({
+      id: l.charge_item_id, n: Number(l.issue_count) || 0, max: Number(l.max_impact) || 0,
+      category: l.dominant_category || "Uncategorized", proc: l.proc || null, hcpcs: l.hcpcs || null,
+      desc: l.description || null, gross: l.gross != null ? Number(l.gross) : null,
+    }));
+    // Total CDM line universe (for the "clean lines" bucket in the distribution).
+    const { count: totalLines } = await supabaseAdmin
+      .from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId);
+
     return (
       <>
         {headerEl}
         <div className="flex-1 overflow-y-auto p-6">
-          <FindingsWorkspace auditId={auditId!} agg={agg} allTodos={todos} lagging={(laggingFindings as any) || []} canAssign={actor.canAssign} users={assignUsers} assigneeNames={assigneeNames} />
+          <FindingsWorkspace auditId={auditId!} agg={agg} allTodos={todos} lagging={(laggingFindings as any) || []} lineRollup={lineRollup} totalLines={totalLines || 0} canAssign={actor.canAssign} users={assignUsers} assigneeNames={assigneeNames} />
         </div>
       </>
     );
@@ -247,7 +266,7 @@ export default async function FindingsPage({
       const id = r.charge_item_id; if (!id) continue;
       const ci = r.charge_items || {};
       const e = map.get(id) || { id, rec: ci.source_row ?? null, proc: ci.procedure_number ?? null, hcpcs: ci.hcpcs_cpt_code ?? null, desc: ci.charge_description ?? null, count: 0, impact: 0, sev: 0, cats: new Set<string>() };
-      e.count += 1; e.impact += r.financial_impact || 0; e.sev = Math.max(e.sev, SEV_RANK[r.severity] || 0); if (r.category) e.cats.add(r.category);
+      e.count += 1; e.impact = Math.max(e.impact, r.financial_impact || 0); e.sev = Math.max(e.sev, SEV_RANK[r.severity] || 0); if (r.category) e.cats.add(r.category);
       map.set(id, e);
     }
     let arr = [...map.values()];

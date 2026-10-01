@@ -3,9 +3,69 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { bucketForCategory, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
 import { classForCategory, CLASS_LABELS } from "@/lib/finding-class";
+import * as XLSX from "xlsx-js-style";
 
-// Export findings as CSV — one bucket (cdm | rvu | formulary | peer), or the
-// entire list when bucket=all.
+export const maxDuration = 60;
+
+// Export findings as an Excel workbook. bucket=all builds one sheet per findings-
+// page tab (CDM, RVU, Formulary, Peer Review); a single bucket builds that one
+// sheet. Mirrors the tabs the reviewer sees on the Findings page.
+const BUCKET_ORDER: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
+
+const thin = { style: "thin", color: { rgb: "BFBFBF" } };
+const BORDER = { top: thin, bottom: thin, left: thin, right: thin };
+const COLHEAD = { fill: { patternType: "solid", fgColor: { rgb: "44546A" } }, font: { bold: true, color: { rgb: "FFFFFF" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: BORDER };
+const MONEY = '"$"#,##0';
+
+const STATUS: Record<string, string> = { open: "Open", in_review: "Under Review", accepted: "Accepted", rejected: "Denied", na: "N/A", resolved: "Accepted" };
+const TIER: Record<number, string> = { 1: "1 - New", 2: "2 - Accepted before", 3: "3 - Denied before", 4: "4 - N/A before" };
+
+const HEADERS = ["Work type", "Tier", "Status", "Severity", "Category", "Finding", "Charge Code", "HCPCS/CPT", "Rev Code", "Description", "Price", "Est. Impact", "Detail", "Recommendation", "Reviewer Note"];
+const COLS = [{ wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 9 }, { wch: 26 }, { wch: 40 }, { wch: 12 }, { wch: 11 }, { wch: 9 }, { wch: 34 }, { wch: 11 }, { wch: 12 }, { wch: 50 }, { wch: 48 }, { wch: 28 }];
+
+function rowFor(r: any): any[] {
+  const ci = r.charge_items || {};
+  return [
+    CLASS_LABELS[classForCategory(r.category)],
+    TIER[r.tier] || (r.tier ?? ""),
+    STATUS[r.status] || r.status,
+    r.severity,
+    r.category,
+    r.title,
+    ci.procedure_number ?? "",
+    ci.hcpcs_cpt_code ?? "",
+    ci.revenue_code ?? "",
+    ci.charge_description ?? "",
+    ci.gross_charge ?? "",
+    r.financial_impact ?? "",
+    r.description ?? "",
+    r.recommendation ?? "",
+    r.resolution_note ?? "",
+  ];
+}
+
+function buildSheet(rows: any[]) {
+  const aoa = [HEADERS, ...rows.map(rowFor)];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = COLS;
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(1, aoa.length - 1), c: HEADERS.length - 1 } }) };
+  // Header styling
+  for (let c = 0; c < HEADERS.length; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[addr]) ws[addr].s = COLHEAD;
+  }
+  // Body: borders + money format on Price / Est. Impact
+  for (let i = 1; i < aoa.length; i++) {
+    for (let c = 0; c < HEADERS.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: i, c });
+      if (!ws[addr]) continue;
+      ws[addr].s = { ...(ws[addr].s || {}), border: BORDER, alignment: { vertical: "top", wrapText: c >= 9 } };
+      if (c === 10 || c === 11) { ws[addr].t = "n"; ws[addr].z = MONEY; ws[addr].s = { ...ws[addr].s, numFmt: MONEY }; }
+    }
+  }
+  return ws;
+}
+
 export async function GET(request: Request) {
   try {
     const sc = await createSessionClient();
@@ -18,9 +78,8 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const auditId = searchParams.get("auditId");
-    const bucketParam = searchParams.get("bucket") || "cdm";
+    const bucketParam = searchParams.get("bucket") || "all";
     const isAll = bucketParam === "all";
-    const bucket = bucketParam as FindingBucket;
     if (!auditId) return NextResponse.json({ error: "auditId is required" }, { status: 400 });
 
     // Page through all findings for the audit (Supabase caps at 1000/response).
@@ -39,40 +98,29 @@ export async function GET(request: Request) {
       if (data.length < 1000) break;
     }
 
-    const filtered = isAll ? rows : rows.filter((r) => bucketForCategory(r.category) === bucket);
-
-    const STATUS: Record<string, string> = { open: "Open", in_review: "Under Review", accepted: "Accepted", rejected: "Denied", na: "N/A", resolved: "Accepted" };
-    const TIER: Record<number, string> = { 1: "1 - New", 2: "2 - Accepted before", 3: "3 - Denied before", 4: "4 - N/A before" };
-    const esc = (v: any) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = ["Work type", "Tier", "Status", "Severity", "Category", "Finding", "Charge Code", "HCPCS/CPT", "Rev Code", "Description", "Price", "Est. Impact", "Detail", "Recommendation", "Reviewer Note"];
-    const lines = [header.join(",")];
-    for (const r of filtered) {
-      const ci = r.charge_items || {};
-      lines.push([
-        CLASS_LABELS[classForCategory(r.category)],
-        TIER[r.tier] || (r.tier ?? ""),
-        STATUS[r.status] || r.status,
-        r.severity,
-        r.category,
-        r.title,
-        ci.procedure_number,
-        ci.hcpcs_cpt_code,
-        ci.revenue_code,
-        ci.charge_description,
-        ci.gross_charge,
-        r.financial_impact,
-        r.description,
-        r.recommendation,
-        r.resolution_note,
-      ].map(esc).join(","));
+    const wb = XLSX.utils.book_new();
+    const buckets = isAll ? BUCKET_ORDER : [bucketParam as FindingBucket];
+    let sheetsAdded = 0;
+    for (const b of buckets) {
+      const subset = rows.filter((r) => bucketForCategory(r.category) === b);
+      if (isAll && subset.length === 0) continue; // skip empty tabs when exporting all
+      const label = BUCKET_LABELS[b] || "Findings";
+      XLSX.utils.book_append_sheet(wb, buildSheet(subset), label.slice(0, 31));
+      sheetsAdded++;
     }
-    const csv = lines.join("\n") + "\n";
-    const fname = isAll ? "all-findings.csv" : `${BUCKET_LABELS[bucket].replace(/\s+/g, "-").toLowerCase()}.csv`;
-    return new NextResponse(csv, {
-      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${fname}"` },
+    if (sheetsAdded === 0) {
+      // Nothing matched — still return a (possibly empty) sheet so the file opens.
+      const b = (isAll ? "cdm" : bucketParam) as FindingBucket;
+      XLSX.utils.book_append_sheet(wb, buildSheet([]), (BUCKET_LABELS[b] || "Findings").slice(0, 31));
+    }
+
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const fname = isAll ? "all-findings.xlsx" : `${BUCKET_LABELS[bucketParam as FindingBucket]?.replace(/\s+/g, "-").toLowerCase() || "findings"}.xlsx`;
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${fname}"`,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });

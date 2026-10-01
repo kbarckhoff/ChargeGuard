@@ -13,12 +13,13 @@ export const VALID_STATUSES = ["open", "in_review", "accepted", "rejected", "na"
 export async function applyDisposition(
   admin: Admin,
   userId: string,
-  args: { findingId: string; status: string; note?: string; action_taken?: string; effective_date?: string; new_value?: string }
+  args: { findingId: string; status: string; note?: string; action_taken?: string; effective_date?: string; new_value?: string; due_date?: string | null }
 ): Promise<{ error?: string }> {
-  const { findingId, status, note, action_taken, effective_date } = args;
+  const { findingId, status, note, action_taken, effective_date, due_date } = args;
 
   const updates: Record<string, unknown> = { status };
   if (typeof note === "string") updates.resolution_note = note;
+  if (due_date !== undefined) updates.due_date = due_date || null;
   if (status === "resolved") {
     updates.resolved_at = new Date().toISOString();
     updates.resolved_by = userId;

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, SeverityDot } from "@/components/ui/shared";
 import { Loader2, Check, ChevronDown, Search } from "lucide-react";
-import { changeFieldForCategory } from "@/lib/change-log";
 
 type Row = {
   id: string; title: string; description: string; category: string; severity: string; status: string;
@@ -109,15 +108,9 @@ function ActionPanel({ row }: { row: Row }) {
   const router = useRouter();
   const [note, setNote] = useState(row.resolution_note || "");
   const [actionTaken, setActionTaken] = useState("");
-  const [effDate, setEffDate] = useState("");
-  const [newValue, setNewValue] = useState("");
   const [busy, setBusy] = useState<string>("");
   const [err, setErr] = useState("");
   const [done, setDone] = useState("");
-
-  const changeField = changeFieldForCategory(row.category);
-  const needsValue = changeField !== "review";
-  const valueLabel = changeField === "price" ? "Corrected price" : changeField === "description" ? "Corrected description" : changeField === "revenue_code" ? "Corrected revenue code" : changeField === "modifier" ? "Corrected modifier" : changeField === "hcpcs" ? "Corrected HCPCS / CPT" : "Corrected value";
 
   // The assignee's job: this finding was already accepted and routed to them to
   // key into the live CDM/EHR. Once done, they mark it implemented.
@@ -126,12 +119,11 @@ function ActionPanel({ row }: { row: Row }) {
 
   const submit = async (status: string) => {
     if (!note.trim()) { setErr("A note is required."); return; }
-    if (status === "accepted" && needsValue && !newValue.trim()) { setErr(`Enter the ${valueLabel.toLowerCase()} before accepting.`); return; }
     setBusy(status); setErr("");
     try {
       const res = await fetch("/api/findings/update", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: row.id, status, note, action_taken: actionTaken, effective_date: effDate, new_value: status === "accepted" ? newValue : undefined }),
+        body: JSON.stringify({ findingId: row.id, status, note, action_taken: actionTaken }),
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || "Could not save"); setBusy(""); return; }
@@ -190,23 +182,9 @@ function ActionPanel({ row }: { row: Row }) {
       ) : (
         // Not yet dispositioned: reviewer decision on an assigned finding.
         <>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-medium text-[#475569] mb-1">Note / rationale <span className="text-[#b45309]">*</span></label>
-              <textarea className={inp} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why you're accepting or denying this." />
-            </div>
-            <div className="space-y-3">
-              {needsValue && (
-                <div>
-                  <label className="block text-[12px] font-medium text-[#475569] mb-1">{valueLabel} <span className="text-[#b45309]">*</span></label>
-                  <input className={inp} value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={changeField === "price" ? "e.g. 148.00" : "corrected value"} />
-                </div>
-              )}
-              <div>
-                <label className="block text-[12px] font-medium text-[#475569] mb-1">Effective date</label>
-                <input type="date" className={inp} value={effDate} onChange={(e) => setEffDate(e.target.value)} />
-              </div>
-            </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[#475569] mb-1">Note / rationale <span className="text-[#b45309]">*</span></label>
+            <textarea className={inp} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why you're accepting or denying this." />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => submit("accepted")} disabled={!!busy} className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-[#067647] text-white hover:bg-[#055c37] disabled:opacity-50 inline-flex items-center gap-1.5">{busy === "accepted" && <Loader2 size={13} className="animate-spin" />} Accept</button>

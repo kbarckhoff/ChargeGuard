@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, SeverityDot, SEVERITY_CONFIG } from "@/components/ui/shared";
 import { Search, X, ChevronRight, Loader2 } from "lucide-react";
-import { changeFieldForCategory } from "@/lib/change-log";
 
 export interface FindingRow {
   id: string;
@@ -24,6 +23,7 @@ export interface FindingRow {
   is_carried?: boolean | null;
   tier?: number | null;
   assigned_to?: string | null;
+  due_date?: string | null;
   charge_items: {
     procedure_number: string;
     charge_description: string;
@@ -260,16 +260,9 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
   const [note, setNote] = useState(finding.resolution_note || "");
   const [assignee, setAssignee] = useState(finding.assigned_to || "");
   const [assigning, setAssigning] = useState(false);
-  const [newValue, setNewValue] = useState(finding.applied_new || "");
-  const [effDate, setEffDate] = useState("");
+  const [dueDate, setDueDate] = useState(finding.due_date || "");
   const [err, setErr] = useState("");
   const router = useRouter();
-
-  // Does this finding correspond to a concrete CDM field the reviewer should
-  // supply a corrected value for? "review" categories (informational) don't.
-  const changeField = changeFieldForCategory(finding.category);
-  const needsValue = changeField !== "review";
-  const valueLabel = changeField === "price" ? "Corrected price" : changeField === "description" ? "Corrected description" : changeField === "revenue_code" ? "Corrected revenue code" : changeField === "modifier" ? "Corrected modifier" : changeField === "hcpcs" ? "Corrected HCPCS / CPT" : "Corrected value";
 
   const assign = async (uid: string) => {
     setAssignee(uid); setAssigning(true);
@@ -285,10 +278,6 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
   const updateStatus = async (newStatus: string) => {
     setErr("");
     if (newStatus === "accepted") {
-      if (needsValue && !newValue.trim()) {
-        setErr(`Enter the ${valueLabel.toLowerCase()} before accepting — it's recorded as the fix in the audit log.`);
-        return;
-      }
       // Accepting a finding must route it to someone who will implement the fix.
       if (canAssign && !assignee) {
         setErr("Assign this finding to someone before accepting — they'll mark it implemented once the CDM is updated.");
@@ -300,7 +289,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
       const res = await fetch("/api/findings/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: finding.id, status: newStatus, note, new_value: newStatus === "accepted" ? newValue : undefined, effective_date: effDate }),
+        body: JSON.stringify({ findingId: finding.id, status: newStatus, note, due_date: dueDate || null }),
       });
       if (res.ok) { setCurrentStatus(newStatus); router.refresh(); onClose(); }
       else { const d = await res.json().catch(() => ({})); setErr(d.error || "Could not save."); }
@@ -429,16 +418,10 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
               <div className="text-sm text-[#334155]">{finding.assigned_to ? (assigneeNames[finding.assigned_to] || "Assigned") : "Unassigned"}</div>
             )}
           </div>
-          {needsValue && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-[#64748b] mb-1">{valueLabel} <span className="text-[#b45309]">*</span></label>
-                <input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={changeField === "price" ? "e.g. 148.00" : "corrected value"} className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#64748b] mb-1">Effective date</label>
-                <input type="date" value={effDate} onChange={(e) => setEffDate(e.target.value)} className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
-              </div>
+          {canAssign && (
+            <div>
+              <label className="block text-xs font-medium text-[#64748b] mb-1">Due date <span className="text-[#94a3b8] font-normal">(optional)</span></label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
             </div>
           )}
           {err && <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-700">{err}</div>}
@@ -453,7 +436,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
               ))}
               {updating && <Loader2 size={14} className="animate-spin text-[#94a3b8] self-center ml-1" />}
             </div>
-            <p className="text-[11px] text-[#94a3b8] mt-1.5">Accepting stages this as a pending change in the audit log. Assign it so the owner can mark it implemented once the CDM is updated.</p>
+            <p className="text-[11px] text-[#94a3b8] mt-1.5">Accepting stages this as a pending change in the audit log and routes it to the assignee, who marks it implemented once the CDM is updated.</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[#64748b] mb-1">Reviewer note (saved with the disposition)</label>

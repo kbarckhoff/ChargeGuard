@@ -6,11 +6,16 @@ import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucke
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { FindingDrawer, type FindingRow } from "@/components/audit/FindingsTable";
-import { Search, ChevronRight, ChevronDown, Loader2, Check, X, MinusCircle, AlertTriangle } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Loader2, Check, X, MinusCircle, AlertTriangle, LayoutGrid, List } from "lucide-react";
 
 type Agg = { category: string | null; status: string | null; cnt: number; impact: number };
 type TodoGroup = { grp_key: string; category: string; code: string; line_count: number; open_count: number; impact: number; sample_title: string; sample_proc: string | null };
 type Lagging = { id: string; title: string; category: string; resolution_note: string | null; charge_items: { procedure_number: string; hcpcs_cpt_code: string } | null };
+type LineRow = { id: string; n: number; max: number; category: string; proc: string | null; hcpcs: string | null; desc: string | null; gross: number | null };
+
+// Issue-count buckets for the per-line distribution band.
+type LineBucket = "1-2" | "3-4" | "5+";
+const inLineBucket = (n: number, b: LineBucket) => b === "1-2" ? n <= 2 : b === "3-4" ? n >= 3 && n <= 4 : n >= 5;
 
 const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
 const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality", "informational"];
@@ -20,12 +25,14 @@ const STATUS_LABEL: Record<string, string> = { open: "Open", in_review: "Under R
 const statusVariant = (s: string): any => s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "in_review" ? "purple" : s === "na" ? "default" : "default";
 
 export function FindingsWorkspace({
-  auditId, agg, allTodos, lagging, canAssign = false, users = [], assigneeNames = {},
+  auditId, agg, allTodos, lagging, lineRollup = [], totalLines = 0, canAssign = false, users = [], assigneeNames = {},
 }: {
   auditId: string;
   agg: Agg[];
   allTodos: TodoGroup[];
   lagging: Lagging[];
+  lineRollup?: LineRow[];
+  totalLines?: number;
   canAssign?: boolean;
   users?: { id: string; full_name: string; email: string; department: string | null }[];
   assigneeNames?: Record<string, string>;
@@ -35,6 +42,12 @@ export function FindingsWorkspace({
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  // Per-line card view (vs the grouped to-do table) + issue-count bucket filter.
+  const [lineView, setLineView] = useState(false);
+  const [lineBucket, setLineBucket] = useState<LineBucket | null>(null);
+  const [openLine, setOpenLine] = useState<string | null>(null);
+  const [lineFindings, setLineFindings] = useState<Record<string, FindingRow[]>>({});
+  const [loadingLine, setLoadingLine] = useState<string | null>(null);
 
   // Group disposition (applied locally so the list updates without a reload).
   const [disp, setDisp] = useState<Record<string, string>>({});
@@ -45,7 +58,7 @@ export function FindingsWorkspace({
   const [drawer, setDrawer] = useState<FindingRow | null>(null);
   const [rollupOpen, setRollupOpen] = useState(false); // Top-findings roll-up starts collapsed.
 
-  const reset = (t: FindingBucket) => { setTab(t); setActiveClass(null); setSelectedCats([]); setSearch(""); setPage(1); };
+  const reset = (t: FindingBucket) => { setTab(t); setActiveClass(null); setSelectedCats([]); setSearch(""); setPage(1); setLineBucket(null); };
 
   // Everything derives from the two aggregates in memory — no server round-trips.
   const categories = useMemo(() => [...new Set(agg.map((a) => a.category).filter((c): c is string => !!c))].sort(), [agg]);
@@ -59,7 +72,50 @@ export function FindingsWorkspace({
     return c;
   }, [allTodos, tab]);
 
-  const totalImpact = useMemo(() => agg.filter((a) => bucketForCategory(a.category) === tab).reduce((s, a) => s + a.impact, 0), [agg, tab]);
+  // Impact, deduped to max-per-line: each CDM line contributes only its single
+  // largest finding's dollar impact, so a line flagged by several rules is not
+  // double-counted. Lines are bucketed by their dominant (largest) finding's
+  // category. `tabDedupImpact` is the tab total; `dedupImpact` also honours the
+  // active class + category filters (what the Est. Impact card reflects).
+  // When the per-line rollup RPC isn't available yet (migration not run), fall
+  // back to the old summed aggregate so impact never shows $0.
+  const hasLineData = lineRollup.length > 0;
+  const tabLines = useMemo(() => lineRollup.filter((l) => bucketForCategory(l.category) === tab), [lineRollup, tab]);
+  const summedTabImpact = useMemo(() => agg.filter((a) => bucketForCategory(a.category) === tab).reduce((s, a) => s + a.impact, 0), [agg, tab]);
+  const tabDedupImpact = useMemo(() => hasLineData ? tabLines.reduce((s, l) => s + (l.max || 0), 0) : summedTabImpact, [hasLineData, tabLines, summedTabImpact]);
+  const dedupImpact = useMemo(() => {
+    if (!hasLineData) return summedTabImpact;
+    const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
+    return tabLines
+      .filter((l) => !classCats || classCats.includes(l.category))
+      .filter((l) => selectedCats.length === 0 || selectedCats.includes(l.category))
+      .reduce((s, l) => s + (l.max || 0), 0);
+  }, [hasLineData, summedTabImpact, tabLines, activeClass, categories, selectedCats]);
+  const totalImpact = dedupImpact;
+
+  // Issue-count distribution across ALL CDM lines in the review (not tab-scoped),
+  // so the reviewer sees how concentrated the problems are: clean lines vs lines
+  // carrying 1-2, 3-4, or 5+ separate issues.
+  const dist = useMemo(() => {
+    let oneTwo = 0, threeFour = 0, fivePlus = 0;
+    for (const l of lineRollup) { if (l.n <= 2) oneTwo++; else if (l.n <= 4) threeFour++; else fivePlus++; }
+    const flagged = lineRollup.length;
+    const clean = Math.max(0, totalLines - flagged);
+    return { clean, oneTwo, threeFour, fivePlus, flagged };
+  }, [lineRollup, totalLines]);
+
+  // Lines for the card grid: review-wide, filtered by class/category/search and
+  // the selected issue-count bucket. Sorted by dollar impact, then issue count.
+  const filteredLines = useMemo(() => {
+    const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
+    const q = search.trim().toLowerCase();
+    return lineRollup
+      .filter((l) => !classCats || classCats.includes(l.category))
+      .filter((l) => selectedCats.length === 0 || selectedCats.includes(l.category))
+      .filter((l) => !lineBucket || inLineBucket(l.n, lineBucket))
+      .filter((l) => !q || (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q))
+      .sort((a, b) => (b.max - a.max) || (b.n - a.n));
+  }, [lineRollup, activeClass, categories, selectedCats, lineBucket, search]);
 
   // Roll-up (actionable categories by impact) for the active tab.
   const rollup = useMemo(() => {
@@ -115,6 +171,25 @@ export function FindingsWorkspace({
     }
   };
 
+  // Expand a line card to list its individual findings (scoped to the active tab's
+  // categories), each opening the detail drawer.
+  const toggleLine = async (l: LineRow) => {
+    if (openLine === l.id) { setOpenLine(null); return; }
+    setOpenLine(l.id);
+    if (!lineFindings[l.id]) {
+      setLoadingLine(l.id);
+      try {
+        const r = await fetch(`/api/findings/by-line?lineId=${encodeURIComponent(l.id)}`);
+        const d = await r.json();
+        setLineFindings((p) => ({ ...p, [l.id]: d.lines || [] }));
+      } catch { /* ignore */ } finally { setLoadingLine(null); }
+    }
+  };
+  const pickBucket = (b: LineBucket) => { setLineBucket((cur) => cur === b ? null : b); setLineView(true); setPage(1); };
+
+  const linePages = Math.max(1, Math.ceil(filteredLines.length / PAGE_SIZE));
+  const pageLines = filteredLines.slice((page - 1) * PAGE_SIZE, (page - 1) * PAGE_SIZE + PAGE_SIZE);
+
   const qs = (view: string) => `/findings?auditId=${auditId}&tab=${tab}${activeClass ? `&class=${activeClass}` : ""}&view=${view}`;
 
   return (
@@ -135,7 +210,7 @@ export function FindingsWorkspace({
             <button onClick={() => setRollupOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-[#f8fafc]">
               <div>
                 <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(rollup.reduce((s, r) => s + r.impact, 0))} estimated exposure</p>
+                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(tabDedupImpact)} estimated exposure{hasLineData && <span className="text-[#b9c0ca]"> (deduped per line)</span>}</p>
               </div>
               <span className="flex items-center gap-1.5 text-[11px] text-[#94a3b8] shrink-0">Top {Math.min(10, rollup.length)} shown <ChevronDown size={14} className={`transition-transform ${rollupOpen ? "rotate-180" : ""}`} /></span>
             </button>
@@ -194,15 +269,44 @@ export function FindingsWorkspace({
           <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
             <div className="text-xs text-[#64748b] mb-1">Est. Impact</div>
             <div className="text-xl font-semibold text-[#0f172a]">{formatImpact(totalImpact)}</div>
-            {activeClass && <div className="text-[11px] text-[#94a3b8] mt-0.5">Filtered: {CLASS_LABELS[activeClass]}</div>}
+            <div className="text-[11px] text-[#94a3b8] mt-0.5">{activeClass ? `Filtered: ${CLASS_LABELS[activeClass]}` : hasLineData ? "Deduped per line" : "Total"}</div>
           </div>
         </div>
+
+        {/* Issue distribution across CDM lines (click a band to see those lines) */}
+        {hasLineData && totalLines > 0 && (
+          <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Lines by issue count</h3>
+              <span className="text-[11px] text-[#94a3b8]">{totalLines.toLocaleString()} CDM lines · {dist.flagged.toLocaleString()} with issues</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {([
+                ["Clean (0 issues)", dist.clean, "#16a34a", null],
+                ["1–2 issues", dist.oneTwo, "#0a6cff", "1-2"],
+                ["3–4 issues", dist.threeFour, "#d97706", "3-4"],
+                ["5+ issues", dist.fivePlus, "#dc2626", "5+"],
+              ] as [string, number, string, LineBucket | null][]).map(([label, val, color, b]) => {
+                const on = b !== null && lineBucket === b;
+                const clickable = b !== null && val > 0;
+                return (
+                  <button key={label} disabled={!clickable} onClick={() => b && pickBucket(b)}
+                    className={`text-left rounded-xl border p-3 transition-colors ${on ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#eef2f7]"} ${clickable ? "hover:border-[#cbd5e1] cursor-pointer" : "cursor-default"}`}>
+                    <div className="flex items-center gap-2 mb-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="text-[11.5px] font-medium text-[#475569]">{label}</span></div>
+                    <div className="text-xl font-semibold text-[#0f172a] tabular-nums">{val.toLocaleString()}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* View toggle */}
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[#64748b]">View:</span>
-          <button className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border bg-[#1e293b] text-white border-[#1e293b]">Grouped to-dos</button>
-          <a href={qs("record")} className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]">By CDM line</a>
+          <button onClick={() => { setLineView(false); setPage(1); }} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border ${!lineView ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]"}`}><List size={14} /> Grouped to-dos</button>
+          <button onClick={() => { setLineView(true); setPage(1); }} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border ${lineView ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]"}`}><LayoutGrid size={14} /> Line cards</button>
+          <a href={qs("record")} className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]">By CDM line (table)</a>
           <a href={qs("lines")} className="ml-auto text-[12px] text-[#64748b] hover:underline">Show all lines</a>
         </div>
 
@@ -215,7 +319,71 @@ export function FindingsWorkspace({
           <CategoryFilter categories={bucketCats} selected={selectedCats} onChange={(v) => { setSelectedCats(v); setPage(1); }} />
         </div>
 
+        {/* Line cards: one card per CDM line, showing how many issues it carries */}
+        {lineView && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {pageLines.map((l) => {
+                const isOpen = openLine === l.id;
+                const tone = l.n >= 5 ? "#dc2626" : l.n >= 3 ? "#d97706" : "#0a6cff";
+                return (
+                  <div key={l.id} className={`bg-white rounded-xl border overflow-hidden ${isOpen ? "border-[#1e293b]" : "border-[#e2e8f0]"}`}>
+                    <button onClick={() => toggleLine(l)} className="w-full text-left px-4 py-3 hover:bg-[#f8fafc]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[13px] text-[#0f172a]">{l.proc || l.hcpcs || "—"}</span>
+                            <Badge>{l.category}</Badge>
+                          </div>
+                          <div className="text-[12.5px] text-[#475569] truncate mt-0.5">{l.desc || "—"}</div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-[11px] text-[#94a3b8]">Est. impact</div>
+                            <div className="text-[13px] font-semibold text-[#0f172a] tabular-nums">{l.max ? formatImpact(l.max) : "—"}</div>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white" style={{ backgroundColor: tone }}>{l.n} {l.n === 1 ? "issue" : "issues"}</span>
+                          <ChevronDown size={15} className={`text-[#94a3b8] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </div>
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-[#eef2f7] bg-[#fbfcfe]">
+                        {loadingLine === l.id ? (
+                          <div className="flex items-center gap-2 text-[12px] text-[#94a3b8] px-4 py-3"><Loader2 size={13} className="animate-spin" /> Loading issues…</div>
+                        ) : (
+                          <div className="divide-y divide-[#f1f5f9]">
+                            {(lineFindings[l.id] || []).map((f) => (
+                              <button key={f.id} onClick={() => setDrawer(f)} className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-[#f4f6f8]">
+                                <Badge>{f.category}</Badge>
+                                <span className="flex-1 text-[12.5px] text-[#334155] truncate">{f.title}</span>
+                                <span className="text-[12px] text-[#64748b] tabular-nums shrink-0">{f.financial_impact ? formatImpact(f.financial_impact) : ""}</span>
+                                <Badge variant={statusVariant(f.status)}>{STATUS_LABEL[f.status] || f.status}</Badge>
+                                <ChevronRight size={13} className="text-[#c5c5c0] shrink-0" />
+                              </button>
+                            ))}
+                            {(lineFindings[l.id] || []).length === 0 && <div className="px-4 py-2 text-[12px] text-[#94a3b8]">No issues on this line in scope.</div>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {pageLines.length === 0 && <div className="lg:col-span-2 py-12 text-center text-[#94a3b8] text-sm bg-white rounded-xl border border-[#e2e8f0]">No CDM lines match the current filters.</div>}
+            </div>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs text-[#94a3b8]">{filteredLines.length.toLocaleString()} lines • Page {page} of {linePages}</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg bg-white hover:bg-[#f6f7f9] disabled:opacity-40">Prev</button>
+                <button onClick={() => setPage((p) => Math.min(linePages, p + 1))} disabled={page >= linePages} className="px-3 py-1 text-xs border border-[#e2e8f0] rounded-lg bg-white hover:bg-[#f6f7f9] disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Grouped table */}
+        {!lineView && (
         <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -284,6 +452,7 @@ export function FindingsWorkspace({
             </div>
           </div>
         </div>
+        )}
       </>)}
 
       {drawer && <FindingDrawer finding={drawer} onClose={() => setDrawer(null)} canAssign={canAssign} users={users} assigneeNames={assigneeNames} />}
