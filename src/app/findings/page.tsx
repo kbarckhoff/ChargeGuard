@@ -92,7 +92,7 @@ export default async function FindingsPage({
       </div>
       <div className="flex items-center gap-3 text-sm">
         <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
-        <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
+        <a href={`/api/export?auditId=${auditId}&format=xlsx`} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]"><Download size={13} /> Download report</a>
         <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
       </div>
     </header>
@@ -343,7 +343,7 @@ export default async function FindingsPage({
         </div>
         <div className="flex items-center gap-3 text-sm">
           <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
-          <a href={`/reports?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]">Report &amp; export</a>
+          <a href={`/api/export?auditId=${auditId}&format=xlsx`} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]"><Download size={13} /> Download report</a>
           <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
         </div>
       </header>
