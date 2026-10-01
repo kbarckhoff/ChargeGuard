@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Badge, formatImpact } from "@/components/ui/shared";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
-import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
+import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { FindingDrawer, type FindingRow } from "@/components/audit/FindingsTable";
 import { Search, ChevronRight, ChevronDown, Loader2, Check, X, MinusCircle, AlertTriangle, LayoutGrid, List } from "lucide-react";
@@ -254,69 +254,56 @@ export function FindingsWorkspace({
           </div>
         )}
 
-        {/* Cards (instant filter) */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          {CLASSES.map((cls) => {
-            const on = activeClass === cls;
-            return (
-              <button key={cls} onClick={() => { setActiveClass(on ? null : cls); setPage(1); }} className={`text-left bg-white rounded-xl border p-4 transition-colors ${on ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#e2e8f0] hover:border-[#cbd5e1]"}`}>
-                <div className="flex items-center gap-2 mb-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR[cls] }} /><span className="text-xs font-medium text-[#334155]">{CLASS_LABELS[cls]}</span></div>
-                <div className="text-xl font-semibold text-[#0f172a]">{classCounts[cls].toLocaleString()}</div>
-                <div className="text-[11px] text-[#94a3b8] mt-0.5">{CLASS_BLURB[cls]}</div>
-              </button>
-            );
-          })}
-          <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
-            <div className="text-xs text-[#64748b] mb-1">Est. Impact</div>
-            <div className="text-xl font-semibold text-[#0f172a]">{formatImpact(totalImpact)}</div>
-            <div className="text-[11px] text-[#94a3b8] mt-0.5">{activeClass ? `Filtered: ${CLASS_LABELS[activeClass]}` : hasLineData ? "Deduped per line" : "Total"}</div>
+        {/* Top cards = CDM lines bucketed by how many issues each carries.
+            (Class and issue filtering live in the dropdowns below.) Click a band
+            to jump into the line cards filtered to that bucket. */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Lines by issue count</h3>
+            <span className="text-[11px] text-[#94a3b8]">{hasLineData ? `${totalLines.toLocaleString()} CDM lines · ${dist.flagged.toLocaleString()} with issues` : ""}</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {([
+              ["Clean (0 issues)", dist.clean, "#16a34a", null],
+              ["1–2 issues", dist.oneTwo, "#0a6cff", "1-2"],
+              ["3–4 issues", dist.threeFour, "#d97706", "3-4"],
+              ["5+ issues", dist.fivePlus, "#dc2626", "5+"],
+            ] as [string, number, string, LineBucket | null][]).map(([label, val, color, b]) => {
+              const on = b !== null && lineBucket === b;
+              const clickable = b !== null && val > 0;
+              return (
+                <button key={label} disabled={!clickable} onClick={() => b && pickBucket(b)}
+                  className={`text-left bg-white rounded-xl border p-4 transition-colors ${on ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#e2e8f0]"} ${clickable ? "hover:border-[#cbd5e1] cursor-pointer" : "cursor-default"}`}>
+                  <div className="flex items-center gap-2 mb-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="text-xs font-medium text-[#334155]">{label}</span></div>
+                  <div className="text-xl font-semibold text-[#0f172a] tabular-nums">{val.toLocaleString()}</div>
+                  <div className="text-[11px] text-[#94a3b8] mt-0.5">{b ? "View these lines" : "No issues flagged"}</div>
+                </button>
+              );
+            })}
+            <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
+              <div className="text-xs text-[#64748b] mb-1">Est. Impact</div>
+              <div className="text-xl font-semibold text-[#0f172a]">{formatImpact(totalImpact)}</div>
+              <div className="text-[11px] text-[#94a3b8] mt-0.5">{activeClass ? `Filtered: ${CLASS_LABELS[activeClass]}` : hasLineData ? "Deduped per line" : "Total"}</div>
+            </div>
           </div>
         </div>
-
-        {/* Issue distribution across CDM lines (click a band to see those lines) */}
-        {hasLineData && totalLines > 0 && (
-          <div className="bg-white rounded-xl border border-[#e2e8f0] p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Lines by issue count</h3>
-              <span className="text-[11px] text-[#94a3b8]">{totalLines.toLocaleString()} CDM lines · {dist.flagged.toLocaleString()} with issues</span>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {([
-                ["Clean (0 issues)", dist.clean, "#16a34a", null],
-                ["1–2 issues", dist.oneTwo, "#0a6cff", "1-2"],
-                ["3–4 issues", dist.threeFour, "#d97706", "3-4"],
-                ["5+ issues", dist.fivePlus, "#dc2626", "5+"],
-              ] as [string, number, string, LineBucket | null][]).map(([label, val, color, b]) => {
-                const on = b !== null && lineBucket === b;
-                const clickable = b !== null && val > 0;
-                return (
-                  <button key={label} disabled={!clickable} onClick={() => b && pickBucket(b)}
-                    className={`text-left rounded-xl border p-3 transition-colors ${on ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#eef2f7]"} ${clickable ? "hover:border-[#cbd5e1] cursor-pointer" : "cursor-default"}`}>
-                    <div className="flex items-center gap-2 mb-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="text-[11.5px] font-medium text-[#475569]">{label}</span></div>
-                    <div className="text-xl font-semibold text-[#0f172a] tabular-nums">{val.toLocaleString()}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* View toggle */}
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[#64748b]">View:</span>
           <button onClick={() => { setLineView(false); setPage(1); }} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border ${!lineView ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]"}`}><List size={14} /> Grouped to-dos</button>
           <button onClick={() => { setLineView(true); setPage(1); }} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border ${lineView ? "bg-[#1e293b] text-white border-[#1e293b]" : "bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]"}`}><LayoutGrid size={14} /> Line cards</button>
-          <a href={qs("record")} className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold border bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f6f7f9]">By CDM line (table)</a>
-          <a href={qs("lines")} className="ml-auto text-[12px] text-[#64748b] hover:underline">Show all lines</a>
+          <a href={qs("lines")} className="ml-auto text-[12px] text-[#64748b] hover:underline">Show all lines (table)</a>
         </div>
 
-        {/* Filters (instant) */}
+        {/* Filters (instant): free-text search + Category (class) + Issue (type) */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex-1 min-w-[200px] relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
-            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search to-dos by code or description…" className="w-full pl-9 pr-4 py-2 text-sm border border-[#e2e8f0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10" />
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search by code or description…" className="w-full pl-9 pr-4 py-2 text-sm border border-[#e2e8f0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#0f172a]/10" />
           </div>
-          <CategoryFilter categories={bucketCats} selected={selectedCats} onChange={(v) => { setSelectedCats(v); setPage(1); }} />
+          <ClassFilter value={activeClass} counts={classCounts} onChange={(v) => { setActiveClass(v); setPage(1); }} />
+          <CategoryFilter categories={bucketCats} selected={selectedCats} onChange={(v) => { setSelectedCats(v); setPage(1); }} allLabel="All issues" />
         </div>
 
         {/* Line cards: one card per CDM line, showing how many issues it carries */}
@@ -460,10 +447,37 @@ export function FindingsWorkspace({
   );
 }
 
-function CategoryFilter({ categories, selected, onChange }: { categories: string[]; selected: string[]; onChange: (v: string[]) => void }) {
+// Category (class) single-select dropdown — Code Validity / Pricing / Data
+// Quality / Informational. Replaces the old class cards as the primary filter.
+function ClassFilter({ value, counts, onChange }: { value: FindingClass | null; counts: Record<FindingClass, number>; onChange: (v: FindingClass | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const label = value ? CLASS_LABELS[value] : "All categories";
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white flex items-center gap-2 min-w-[170px] justify-between">
+        <span className="flex items-center gap-2 truncate">{value && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CLASS_COLOR[value] }} />}<span className="truncate">{label}</span></span>
+        <ChevronDown size={14} className={`text-[#94a3b8] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (<>
+        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+        <div className="absolute z-20 mt-1 w-60 bg-white border border-[#e2e8f0] rounded-lg shadow-lg py-1">
+          <button onClick={() => { onChange(null); setOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[#f1f5f9] ${!value ? "font-semibold text-[#1e293b]" : "text-[#334155]"}`}>All categories</button>
+          {CLASSES.map((cls) => (
+            <button key={cls} onClick={() => { onChange(cls); setOpen(false); }} className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-[#f1f5f9] ${value === cls ? "font-semibold text-[#1e293b]" : "text-[#334155]"}`}>
+              <span className="flex items-center gap-2 truncate"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CLASS_COLOR[cls] }} /><span className="truncate">{CLASS_LABELS[cls]}</span></span>
+              <span className="text-[11px] text-[#94a3b8] tabular-nums shrink-0">{counts[cls].toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+function CategoryFilter({ categories, selected, onChange, allLabel = "All Categories" }: { categories: string[]; selected: string[]; onChange: (v: string[]) => void; allLabel?: string }) {
   const [open, setOpen] = useState(false);
   const toggle = (c: string) => onChange(selected.includes(c) ? selected.filter((x) => x !== c) : [...selected, c]);
-  const label = selected.length === 0 ? "All Categories" : selected.length === 1 ? selected[0] : `${selected.length} categories`;
+  const label = selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} issues`;
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white flex items-center gap-2 min-w-[160px] justify-between">
