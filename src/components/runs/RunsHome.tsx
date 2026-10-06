@@ -158,7 +158,8 @@ export function RunsHome({ runs, kpis, hospitalName }: {
                 <span className="text-[13px] font-semibold text-[#0f172a]">Reviews</span>
                 <span className="text-[12px] text-[#94a3b8] ml-2">· {runs.length} {runs.length === 1 ? "run" : "runs"}</span>
               </div>
-              <table className="w-full text-[13px]">
+              <div className="overflow-x-auto">
+              <table className="w-full text-[13px] whitespace-nowrap">
                 <thead>
                   <tr className="bg-[#fbfcfe] text-[#9aa2af]">
                     {["Name", "Status", "Lines", "Open", "Critical", "$ impact", "Last scanned", ""].map((h) => (
@@ -194,6 +195,7 @@ export function RunsHome({ runs, kpis, hospitalName }: {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

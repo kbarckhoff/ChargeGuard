@@ -117,13 +117,18 @@ export function FindingsWorkspace({
   const toggleLine = async (l: LineRow) => {
     if (openLine === l.id) { setOpenLine(null); return; }
     setOpenLine(l.id);
-    if (!lineFindings[l.id]) {
+    // Every line in the rollup has ≥1 finding, so an empty/failed response is a
+    // transient error — don't cache it, so reopening the row retries instead of
+    // showing a permanent "no issues" state.
+    if (!(lineFindings[l.id] && lineFindings[l.id].length)) {
       setLoadingLine(l.id);
       try {
         const r = await fetch(`/api/findings/by-line?lineId=${encodeURIComponent(l.id)}`);
-        const d = await r.json();
-        setLineFindings((p) => ({ ...p, [l.id]: d.lines || [] }));
-      } catch { /* ignore */ } finally { setLoadingLine(null); }
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && Array.isArray(d.lines) && d.lines.length) {
+          setLineFindings((p) => ({ ...p, [l.id]: d.lines }));
+        }
+      } catch { /* leave uncached so the next open retries */ } finally { setLoadingLine(null); }
     }
   };
   const pickBucket = (b: LineBucket) => { setLineBucket((cur) => cur === b ? null : b); setPage(1); setOpenLine(null); };
@@ -238,9 +243,11 @@ export function FindingsWorkspace({
           <a href={allLinesHref} className="text-[12px] text-[#64748b] hover:underline">Show all findings (table)</a>
         </div>
 
-        {/* By CDM line table — one row per line, expand to see its issues */}
-        <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
-          <table className="w-full text-sm">
+        {/* By CDM line table — one row per line, expand to see its issues.
+            whitespace-nowrap + overflow-x-auto = rows never wrap; narrow screens
+            scroll/cut off on the right (Vanta style) instead of wrapping. */}
+        <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-x-auto">
+          <table className="w-full text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-[#f4f6f8] border-b border-[#e2e8f0] text-left text-xs text-[#475569]">
                 <th className="px-3 py-2.5 w-6" />
@@ -273,10 +280,11 @@ export function FindingsWorkspace({
                           {loadingLine === l.id ? (
                             <div className="flex items-center gap-2 text-[12px] text-[#94a3b8] py-2"><Loader2 size={13} className="animate-spin" /> Loading issues…</div>
                           ) : (
+                            (lineFindings[l.id] && lineFindings[l.id].length) ? (
                             <div className="rounded-lg border border-[#eef2f7] bg-white overflow-hidden">
-                              <div className="px-3 py-1.5 text-[11px] text-[#94a3b8] bg-[#f8fafc] border-b border-[#eef2f7]">{(lineFindings[l.id] || []).length} issue(s) on this line — click one to review and disposition it.</div>
+                              <div className="px-3 py-1.5 text-[11px] text-[#94a3b8] bg-[#f8fafc] border-b border-[#eef2f7]">{lineFindings[l.id].length} issue(s) on this line — click one to review and disposition it.</div>
                               <div className="divide-y divide-[#f1f5f9]">
-                                {(lineFindings[l.id] || []).map((f) => (
+                                {lineFindings[l.id].map((f) => (
                                   <button key={f.id} onClick={(e) => { e.stopPropagation(); setDrawer(f); }} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[#f4f6f8]">
                                     <Badge>{f.category}</Badge>
                                     <span className="flex-1 text-[12.5px] text-[#334155] truncate">{f.title}</span>
@@ -285,9 +293,11 @@ export function FindingsWorkspace({
                                     <ChevronRight size={13} className="text-[#c5c5c0] shrink-0" />
                                   </button>
                                 ))}
-                                {(lineFindings[l.id] || []).length === 0 && <div className="px-3 py-2 text-[12px] text-[#94a3b8]">No issues on this line in scope.</div>}
                               </div>
                             </div>
+                            ) : (
+                              <div className="px-1 py-2 text-[12px] text-[#94a3b8]">Couldn&apos;t load this line&apos;s issues — click the row again to retry.</div>
+                            )
                           )}
                         </td>
                       </tr>
