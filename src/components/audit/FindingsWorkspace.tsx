@@ -80,25 +80,37 @@ export function FindingsWorkspace({
       .reduce((s, l) => s + (l.max || 0), 0);
   }, [hasLineData, summedTabImpact, tabLines, activeClass, categories, selectedCats, lineBucket]);
 
-  // Issue-count distribution across all CDM lines in the review (not tab-scoped).
-  const dist = useMemo(() => {
-    let oneTwo = 0, threeFour = 0, fivePlus = 0;
-    for (const l of lineRollup) { if (l.n <= 2) oneTwo++; else if (l.n <= 4) threeFour++; else fivePlus++; }
-    const flagged = lineRollup.length;
-    return { clean: Math.max(0, totalLines - flagged), oneTwo, threeFour, fivePlus, flagged };
-  }, [lineRollup, totalLines]);
-
-  // The By-CDM-line table rows, filtered by class + issue + search + issue-count card.
-  const filteredLines = useMemo(() => {
+  // Lines in the current tab matching the Category + Issue dropdowns + search,
+  // BUT not yet narrowed by the issue-count card — this is the scope the cards
+  // describe, so the Clean/1-2/3-4/5+ counts reflect the active filter.
+  const filterActive = !!(activeClass || selectedCats.length || search.trim());
+  const scopeLines = useMemo(() => {
     const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
     const q = search.trim().toLowerCase();
     return tabLines
       .filter((l) => !classCats || classCats.includes(l.category))
       .filter((l) => selectedCats.length === 0 || selectedCats.includes(l.category))
+      .filter((l) => !q || (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q));
+  }, [tabLines, activeClass, categories, selectedCats, search]);
+
+  // Issue-count distribution over the filtered scope. Clean (0 issues) only makes
+  // sense with no category/issue filter (a clean line has no category), so it's
+  // null when a filter is active.
+  const dist = useMemo(() => {
+    let oneTwo = 0, threeFour = 0, fivePlus = 0;
+    for (const l of scopeLines) { if (l.n <= 2) oneTwo++; else if (l.n <= 4) threeFour++; else fivePlus++; }
+    const flagged = scopeLines.length;
+    const clean = filterActive ? null : Math.max(0, totalLines - lineRollup.length);
+    return { clean, oneTwo, threeFour, fivePlus, flagged };
+  }, [scopeLines, filterActive, totalLines, lineRollup.length]);
+
+  // The By-CDM-line table rows: the scope narrowed by the selected issue-count card.
+  const filteredLines = useMemo(() => {
+    return scopeLines
       .filter((l) => !lineBucket || inLineBucket(l.n, lineBucket))
-      .filter((l) => !q || (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q))
+      .slice()
       .sort((a, b) => (b.max - a.max) || (b.n - a.n));
-  }, [tabLines, activeClass, categories, selectedCats, lineBucket, search]);
+  }, [scopeLines, lineBucket]);
 
   // Roll-up (actionable categories by impact) for the active tab.
   const rollup = useMemo(() => {
@@ -204,7 +216,7 @@ export function FindingsWorkspace({
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Lines by issue count</h3>
-            <span className="text-[11px] text-[#94a3b8]">{hasLineData ? `${totalLines.toLocaleString()} CDM lines · ${dist.flagged.toLocaleString()} with issues` : ""}</span>
+            <span className="text-[11px] text-[#94a3b8]">{hasLineData ? (filterActive ? `${dist.flagged.toLocaleString()} lines match the filter` : `${totalLines.toLocaleString()} CDM lines · ${dist.flagged.toLocaleString()} with issues`) : ""}</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {([
@@ -212,15 +224,18 @@ export function FindingsWorkspace({
               ["1–2 issues", dist.oneTwo, "#0a6cff", "1-2"],
               ["3–4 issues", dist.threeFour, "#d97706", "3-4"],
               ["5+ issues", dist.fivePlus, "#dc2626", "5+"],
-            ] as [string, number, string, LineBucket | null][]).map(([label, val, color, b]) => {
+            ] as [string, number | null, string, LineBucket | null][]).map(([label, val, color, b]) => {
               const on = b !== null && lineBucket === b;
-              const clickable = b !== null && val > 0;
+              const clickable = b !== null && (val ?? 0) > 0;
+              const sub = b === null
+                ? (filterActive ? "n/a with filter" : "No issues flagged")
+                : on ? "Filtering · click to clear" : "Filter the table";
               return (
                 <button key={label} disabled={!clickable} onClick={() => b && pickBucket(b)}
                   className={`text-left bg-white rounded-xl border p-4 transition-colors ${on ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#e2e8f0]"} ${clickable ? "hover:border-[#cbd5e1] cursor-pointer" : "cursor-default"}`}>
                   <div className="flex items-center gap-2 mb-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="text-xs font-medium text-[#334155]">{label}</span></div>
-                  <div className="text-xl font-semibold text-[#0f172a] tabular-nums">{val.toLocaleString()}</div>
-                  <div className="text-[11px] text-[#94a3b8] mt-0.5">{on ? "Filtering · click to clear" : b ? "Filter the table" : "No issues flagged"}</div>
+                  <div className="text-xl font-semibold text-[#0f172a] tabular-nums">{val === null ? "—" : val.toLocaleString()}</div>
+                  <div className="text-[11px] text-[#94a3b8] mt-0.5">{sub}</div>
                 </button>
               );
             })}
