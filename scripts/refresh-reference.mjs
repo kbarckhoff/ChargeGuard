@@ -103,11 +103,30 @@ async function scrapePage(pageUrl, include = [], exclude = []) {
   for (const u of pool) { try { const buf = await fetchBuf(u); if (buf) return { buf, url: u }; } catch { /* next */ } }
   return null;
 }
+// The CMS source file URL of the release the current source actually loaded —
+// recorded so the References page can show the real quarter + a link to verify.
+let lastResolvedUrl = null;
 async function resolveZip({ slugs = [], pages = [], include = [], exclude = [] }) {
   const direct = await tryDirect(slugs);
-  if (direct) return direct;
-  for (const p of pages) { const hit = await scrapePage(p, include, exclude); if (hit) return hit; }
+  if (direct) { lastResolvedUrl = direct.url; return direct; }
+  for (const p of pages) { const hit = await scrapePage(p, include, exclude); if (hit) { lastResolvedUrl = hit.url; return hit; } }
   throw new Error("no resolvable zip (tried direct slugs + page scrape; CMS layout/date may have shifted)");
+}
+
+// Derive a human release label ("October 2026", "July 2026") from a CMS file URL,
+// so "Loaded: …" shows the real quarter instead of just the year.
+function labelFromUrl(url) {
+  const u = String(url || "").toLowerCase();
+  const CAP = (s) => s[0].toUpperCase() + s.slice(1);
+  const QBYNUM = { 1: "January", 2: "April", 3: "July", 4: "October" };
+  const QBYLET = { a: "January", b: "April", c: "July", d: "October" };
+  let m;
+  if ((m = u.match(/(january|april|july|october)-?(20\d\d)/))) return `${CAP(m[1])} ${m[2]}`;
+  if ((m = u.match(/(20\d\d)-(january|april|july|october)/))) return `${CAP(m[2])} ${m[1]}`;
+  if ((m = u.match(/rvu(\d\d)([a-d])/))) return `${QBYLET[m[2]]} 20${m[1]}`;
+  if ((m = u.match(/(\d\d)clabq(\d)/))) return `${QBYNUM[m[2]]} 20${m[1]}`;
+  if ((m = u.match(/20\d\d/))) return m[0];
+  return "";
 }
 
 // ── Spreadsheet extraction ──
@@ -181,13 +200,9 @@ const SOURCES = {
   clfs: {
     cadence: "quarterly", effective: "2026-01-01", owned: ["clfs"], minRows: 800,
     refresh: async () => {
-      const q = quarterCandidates();
-      const slugs = q.flatMap((c) => [`${String(c.y).slice(2)}clabq${c.qn}.zip`, `${String(c.y).slice(2)}clab.zip`]);
-      const { buf } = await resolveZip({ slugs, pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
-      // The CLFS PUF release ships csv/xlsx/txt that all carry a multi-row
-      // title + AMA-copyright preamble BEFORE the real header row. Parse the CSV
-      // text directly (quote-aware): find the header line containing HCPCS, then
-      // read the HCPCS column and the payment-rate column.
+      // CLFS ships csv/xlsx/txt with a multi-row title + AMA preamble before the
+      // real header. Parse one buffer → [{hcpcs, clfs}]. Handles both the raw CSV
+      // text and (fallback) any xlsx/txt sheet in the zip.
       const splitCsv = (line) => {
         const o = []; let cur = "", q = false;
         for (let i = 0; i < line.length; i++) {
@@ -198,44 +213,61 @@ const SOURCES = {
         }
         o.push(cur); return o;
       };
-      const csv = rawTextFromZip(buf, /\.csv$/i) || rawTextFromZip(buf, /\.txt$/i);
-      const lines = csv.split(/\r?\n/);
-      // The preamble is prose that can itself mention "HCPCS codes ...", so the
-      // header row is the first one with a cell that IS the HCPCS header (a short
-      // "hcpcs"/"hcpcs code(s)" cell), not merely a line containing the word.
-      const norml = (h) => h.replace(/"/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-      let hi = -1, headers = null;
-      for (let i = 0; i < Math.min(lines.length, 80); i++) {
-        const cells = splitCsv(lines[i]).map(norml);
-        if (cells.some((h) => /^hcpcs( code)?s?$/.test(h))) { hi = i; headers = cells; break; }
-      }
-      const out = [];
-      let chosenHdr = null;
-      if (hi >= 0) {
-        const hc = headers.findIndex((h) => /^hcpcs( code)?s?$/.test(h));
-        // Payment column: a rate/payment/fee/amount header (not a date, mod, or
-        // the code column). Take the first such match.
-        const pay = headers.findIndex((h) => /(payment|rate|fee|amount|price)/.test(h) && !/date|effective|hcpcs|mod/.test(h));
-        chosenHdr = pay >= 0 ? headers[pay] : null;
-        console.log(`    clfs headers (row ${hi}): ${JSON.stringify(headers)}`);
-        if (hc >= 0 && pay >= 0) {
-          for (const l of lines.slice(hi + 1)) {
-            if (!l.trim()) continue;
-            const cols = splitCsv(l);
-            const code = norm((cols[hc] || "").replace(/"/g, ""));
-            if (!/^[A-Z0-9]{5}$/.test(code)) continue;
-            const amt = num((cols[pay] || "").replace(/"/g, ""));
-            if (!(amt > 0)) continue;
-            out.push({ hcpcs: code, clfs: amt.toFixed(2) });
-          }
+      const norml = (h) => String(h ?? "").replace(/"/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+      const rowsFromLines = (lines) => {
+        let hi = -1, headers = null;
+        for (let i = 0; i < Math.min(lines.length, 80); i++) {
+          const cells = splitCsv(lines[i]).map(norml);
+          if (cells.some((h) => /^hcpcs( code)?s?$/.test(h))) { hi = i; headers = cells; break; }
         }
-      } else {
-        // No header found — dump the first lines so the true layout is visible.
-        console.log("    clfs: no HCPCS header; first lines: " + JSON.stringify(lines.slice(0, 12)));
+        if (hi < 0) return [];
+        const hc = headers.findIndex((h) => /^hcpcs( code)?s?$/.test(h));
+        const pay = headers.findIndex((h) => /(payment|rate|fee|amount|price)/.test(h) && !/date|effective|hcpcs|mod/.test(h));
+        if (hc < 0 || pay < 0) return [];
+        const out = [];
+        for (const l of lines.slice(hi + 1)) {
+          if (!l.trim()) continue;
+          const cols = splitCsv(l);
+          const code = norm((cols[hc] || "").replace(/"/g, ""));
+          if (!/^[A-Z0-9]{5}$/.test(code)) continue;
+          const amt = num((cols[pay] || "").replace(/"/g, ""));
+          if (!(amt > 0)) continue;
+          out.push({ hcpcs: code, clfs: amt.toFixed(2) });
+        }
+        return out;
+      };
+      const parseClfs = (buf) => {
+        // 1) raw CSV / TXT text
+        const text = rawTextFromZip(buf, /\.csv$/i) || rawTextFromZip(buf, /\.txt$/i);
+        let out = text ? rowsFromLines(text.split(/\r?\n/)) : [];
+        if (out.length) return out;
+        // 2) any xlsx/csv/txt sheet in the zip, turned into CSV-ish lines
+        for (const t of tablesFromZip(buf)) {
+          const lines = t.rows.map((r) => r.map((c) => String(c ?? "").replace(/,/g, " ")).join(","));
+          out = rowsFromLines(lines);
+          if (out.length) return out;
+        }
+        return []; // e.g. a PDF-only release — unparseable here
+      };
+
+      // Try each recent quarter, newest first, and use the first that actually
+      // parses — so a PDF-only Q4 falls back to the most recent spreadsheet
+      // quarter (CLFS is set annually, so the prior quarter is still accurate).
+      const q = quarterCandidates();
+      const candidates = q.map((c) => `https://www.cms.gov/files/zip/${String(c.y).slice(2)}clabq${c.qn}.zip`);
+      for (const url of candidates) {
+        let buf = null; try { buf = await fetchBuf(url); } catch { buf = null; }
+        if (!buf) continue;
+        const out = parseClfs(buf);
+        console.log(`    clfs: ${out.length} rows from ${url}`);
+        if (out.length >= 100) { lastResolvedUrl = url; return { rows: out, url }; }
+        if (out.length === 0) console.log(`    clfs: ${url} not parseable (likely PDF-only) — trying older quarter`);
       }
-      console.log(`    clfs: ${out.length} rows${chosenHdr ? ` [pay col: "${chosenHdr}"]` : ""}`);
-      if (out.length) console.log("    clfs sample: " + out.slice(0, 6).map((r) => `${r.hcpcs}=>${r.clfs}`).join(", "));
-      return out;
+      // Last resort: scrape the CLFS files page for any clab zip.
+      const { buf, url } = await resolveZip({ slugs: [], pages: ["https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files"], include: ["clab"] });
+      const out = parseClfs(buf);
+      console.log(`    clfs: ${out.length} rows from scraped ${url}`);
+      return { rows: out, url };
     },
   },
   addendum_b: {
@@ -329,7 +361,8 @@ function validate(rows, minRows) {
   return null;
 }
 
-async function persist(key, owned, rows, vintage) {
+async function persist(key, owned, rows, url) {
+  const vintage = labelFromUrl(url) || String(new Date().getUTCFullYear());
   // A HCPCS can appear more than once in a CMS file; collapse to one row (last
   // wins) so the batch upsert doesn't hit "ON CONFLICT ... cannot affect row a
   // second time".
@@ -343,7 +376,8 @@ async function persist(key, owned, rows, vintage) {
     if (error) throw new Error(error.message);
     written += batch.length;
   }
-  await db.from("cms_reference_sources").upsert({ key, vintage, status: "ok", row_count: written, last_refreshed: new Date().toISOString(), last_error: null }, { onConflict: "key" });
+  await db.from("cms_reference_sources").upsert({ key, vintage, source_url: url || null, status: "ok", row_count: written, last_refreshed: new Date().toISOString(), last_checked: new Date().toISOString(), last_error: null }, { onConflict: "key" });
+  console.log(`    persisted ${key}: vintage="${vintage}" from ${url || "(unknown url)"}`);
   return written;
 }
 
@@ -355,10 +389,13 @@ console.log(`Refreshing: ${targets.map(([k]) => k).join(", ") || "(nothing due)"
 let failures = 0;
 for (const [key, s] of targets) {
   try {
-    const rows = await s.refresh(s);
+    lastResolvedUrl = null;
+    const res = await s.refresh(s);
+    const rows = Array.isArray(res) ? res : (res?.rows || []);
+    const url = (res && !Array.isArray(res) && res.url) || lastResolvedUrl;
     const bad = validate(rows, s.minRows);
     if (bad) throw new Error(bad);
-    const n = await persist(key, s.owned, rows, String(new Date().getUTCFullYear()));
+    const n = await persist(key, s.owned, rows, url);
     console.log(`  ${key}: refreshed ${n} rows`);
   } catch (e) {
     failures++;

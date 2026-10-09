@@ -1,7 +1,7 @@
 import { referenceCoverage } from "@/lib/cms-reference";
 import { allSourceStatus, nextRelease, type SourceStatus } from "@/lib/reference-sources";
 import { createClient } from "@supabase/supabase-js";
-import { Database, Layers, Stethoscope, FlaskConical, Pill, Archive, ShieldCheck, CalendarClock, Syringe, FileText, AlertTriangle, CheckCircle2, Lock } from "lucide-react";
+import { Database, Layers, Stethoscope, FlaskConical, Pill, Archive, ShieldCheck, CalendarClock, Syringe, FileText, AlertTriangle, CheckCircle2, Lock, ExternalLink, XCircle } from "lucide-react";
 
 const ICONS: Record<string, any> = {
   addendum_b: Layers, addendum_a: Database, mpfs: Stethoscope, clfs: FlaskConical,
@@ -24,6 +24,27 @@ function fmtDate(d: Date | null): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+// Rank a "Month YYYY" / "YYYY QN" vintage label so we can compare the loaded
+// release to the current quarter (a real "is it the newest?" check, not a guess
+// off the calendar). Returns year*10 + quarter(1-4), or null if unparseable.
+function quarterRank(label: string | undefined): number | null {
+  if (!label) return null;
+  const s = label.toLowerCase();
+  const mName: Record<string, number> = { january: 1, jan: 1, february: 1, march: 1, april: 2, apr: 2, may: 2, june: 2, july: 3, jul: 3, august: 3, september: 3, october: 4, oct: 4, november: 4, december: 4 };
+  let m;
+  if ((m = s.match(/q([1-4]).*?(20\d\d)/)) || (m = s.match(/(20\d\d).*?q([1-4])/))) {
+    const q = Number(m[1].length === 1 ? m[1] : m[2]); const y = Number(m[1].length === 4 ? m[1] : m[2]);
+    return y * 10 + q;
+  }
+  if ((m = s.match(/([a-z]+)\s+(20\d\d)/)) && mName[m[1]]) return Number(m[2]) * 10 + mName[m[1]];
+  if ((m = s.match(/20\d\d/))) return Number(m[0]) * 10 + 1; // year-only → treat as Q1
+  return null;
+}
+function currentQuarterRank(now = new Date()): number {
+  const q = Math.floor(now.getUTCMonth() / 3) + 1;
+  return now.getUTCFullYear() * 10 + q;
+}
+
 // Benchmarks = the public CMS reference data ChargeGuard prices every CDM line
 // against, with each source's update cadence and whether a newer release is due.
 export default async function BenchmarksPage() {
@@ -33,16 +54,25 @@ export default async function BenchmarksPage() {
     asp: cov.asp, hcpcs: cov.retired, vaccine: null, cpt: null,
   };
   const sources = allSourceStatus();
-  const overdueCount = sources.filter((s) => s.overdue).length;
 
   // Live refresh status from the metadata table the refresh job writes to.
-  type RefreshMeta = { status?: string; last_refreshed?: string; last_error?: string | null; row_count?: number; vintage?: string };
+  type RefreshMeta = { status?: string; last_refreshed?: string; last_checked?: string; last_error?: string | null; row_count?: number; vintage?: string; source_url?: string | null };
   const refreshByKey: Record<string, RefreshMeta> = {};
   try {
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data } = await db.from("cms_reference_sources").select("key, status, last_refreshed, last_error, row_count, vintage");
+    const { data } = await db.from("cms_reference_sources").select("key, status, last_refreshed, last_checked, last_error, row_count, vintage, source_url");
     for (const r of data || []) refreshByKey[r.key as string] = r;
   } catch { /* table may not exist yet — page still renders from the static registry */ }
+  const curQ = currentQuarterRank();
+  // How many sources are behind the current release (real quarter comparison,
+  // falling back to the calendar heuristic when the vintage isn't parseable).
+  const staleCount = sources.filter((s) => {
+    if (s.cadence === "manual") return false;
+    const meta = refreshByKey[s.key] || (s.key === "addendum_a" ? refreshByKey["addendum_b"] : undefined);
+    const loadedRank = quarterRank(meta?.vintage) ?? quarterRank(s.vintage);
+    if (loadedRank == null) return s.overdue;
+    return s.cadence === "annual" ? Math.floor(loadedRank / 10) < Math.floor(curQ / 10) : loadedRank < curQ;
+  }).length;
 
   return (
     <>
@@ -57,7 +87,7 @@ export default async function BenchmarksPage() {
             <div>
               <h2 className="text-sm font-semibold text-[#0f172a]">CMS reference data</h2>
               <p className="text-[13px] text-[#64748b] mt-1">
-                Every priced CDM line is benchmarked against these public CMS fee schedules. {overdueCount > 0 ? `${overdueCount} ${overdueCount === 1 ? "source has" : "sources have"} a newer release available.` : "All sources are current."}
+                Every priced CDM line is benchmarked against these public CMS fee schedules. {staleCount > 0 ? `${staleCount} ${staleCount === 1 ? "source is" : "sources are"} behind the current release.` : "All sources are current."}
               </p>
             </div>
           </div>
@@ -78,7 +108,14 @@ export default async function BenchmarksPage() {
                 nextDue = nextRelease(s.cadence, eff);
                 overdue = nextDue != null && Date.now() >= nextDue.getTime();
                 if (meta.vintage) vintage = meta.vintage;
+                // Real check: if the loaded release's quarter is behind the current
+                // quarter, flag it as behind regardless of when the job last ran.
+                const loadedRank = quarterRank(meta.vintage);
+                if (loadedRank != null) overdue = s.cadence === "annual" ? Math.floor(loadedRank / 10) < Math.floor(curQ / 10) : loadedRank < curQ;
               }
+              const lastRefreshed = meta?.last_refreshed ? new Date(meta.last_refreshed) : null;
+              const failed = meta?.status === "error";
+              const srcUrl = meta?.source_url || s.cmsUrl;
               return (
                 <div key={s.key} className="bg-white rounded-xl border border-[#e2e8f0] p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -107,12 +144,27 @@ export default async function BenchmarksPage() {
                     <span className="text-[11px] text-[#94a3b8]">Loaded: {vintage}</span>
                     {s.cadence !== "manual" && (
                       overdue ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#b42318] bg-[#fdeceb] px-2 py-0.5 rounded"><AlertTriangle size={11} /> Update due ({fmtDate(nextDue)})</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#b42318] bg-[#fdeceb] px-2 py-0.5 rounded"><AlertTriangle size={11} /> Newer release available</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#067647] bg-[#e7f7ef] px-2 py-0.5 rounded"><CheckCircle2 size={11} /> Current · next {fmtDate(nextDue)}</span>
                       )
                     )}
                   </div>
+
+                  {/* Provenance: when the live job last refreshed this source, a link
+                      to verify the CMS file, and a warning if the last run failed. */}
+                  <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-[#94a3b8]">
+                    {lastRefreshed && <span>Refreshed {fmtDate(lastRefreshed)}{meta?.row_count != null ? ` · ${meta.row_count.toLocaleString()} codes` : ""}</span>}
+                    <a href={srcUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#1e293b] hover:underline">
+                      <ExternalLink size={10} /> {meta?.source_url ? "Source file" : "CMS source"}
+                    </a>
+                  </div>
+                  {failed && (
+                    <div className="mt-2 flex items-start gap-1.5 text-[11px] text-[#b42318] bg-[#fdeceb] border border-[#f7cfcb] rounded px-2 py-1.5">
+                      <XCircle size={12} className="mt-px shrink-0" />
+                      <span>Last refresh failed{meta?.last_checked ? ` (${fmtDate(new Date(meta.last_checked))})` : ""}{meta?.last_error ? `: ${meta.last_error}` : ""}. Still serving the last good data.</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
