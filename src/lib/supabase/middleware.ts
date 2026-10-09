@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { OTP_COOKIE, verifyOtpValue } from "@/lib/otp-cookie";
+import { stampLastSeen } from "@/lib/last-seen";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -91,11 +92,7 @@ export async function updateSession(request: NextRequest) {
     const seen = Number(request.cookies.get("cg_seen")?.value || 0);
     if (!seen || Date.now() - seen > THROTTLE_MS) {
       supabaseResponse.cookies.set("cg_seen", String(Date.now()), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
-        method: "PATCH",
-        headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
-      }).catch(() => {});
+      await stampLastSeen(user.id);
     }
   } catch { /* non-fatal */ }
 

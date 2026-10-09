@@ -4,6 +4,7 @@ import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { hashCode } from "@/lib/otp";
 import { OTP_COOKIE, signOtpValue } from "@/lib/otp-cookie";
+import { stampLastSeen } from "@/lib/last-seen";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     // OTP step (valid session, expired OTP cookie) — so a successful OTP entry is
     // the real "logged in" moment. last_seen_at feeds the Admin "Last login"
     // column, so this keeps it accurate even when the login screen is skipped.
-    try { await db.from("users").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id); } catch { /* best-effort */ }
+    await stampLastSeen(user.id);
 
     const exp = Date.now() + OTP_SESSION_TTL_MS;
     const value = await signOtpValue(user.id, exp, process.env.SUPABASE_SERVICE_ROLE_KEY!);
