@@ -25,33 +25,39 @@ export default async function AdminUsersPage() {
       .order("full_name");
 
     // last_seen_at is fetched separately and defensively: if the column hasn't
-    // been migrated yet, this no-ops instead of breaking the whole user list.
+    // been migrated yet, supabase-js returns an error (it doesn't throw), so
+    // this simply leaves the map empty instead of breaking the user list.
     const seenById: Record<string, string> = {};
     try {
       const { data: seen } = await db.from("users").select("id, last_seen_at").eq("org_id", orgId);
       for (const s of seen || []) if ((s as any).last_seen_at) seenById[(s as any).id] = (s as any).last_seen_at;
     } catch { /* column not present yet */ }
 
-    // Last sign-in comes from Supabase Auth, which stamps last_sign_in_at on
-    // every successful login. Page through the auth users to build an id → time map.
+    // From Supabase Auth: last_sign_in_at (credential sign-ins only) and our
+    // app_metadata.last_seen_at activity stamp (see lib/last-seen.ts), which
+    // works with or without the users.last_seen_at migration.
     const lastLogin: Record<string, string> = {};
+    const authSeen: Record<string, string> = {};
     try {
       for (let page = 1; page <= 25; page += 1) {
         const { data: al } = await db.auth.admin.listUsers({ page, perPage: 200 });
         const list = al?.users || [];
-        for (const au of list) if (au.last_sign_in_at) lastLogin[au.id] = au.last_sign_in_at;
+        for (const au of list) {
+          if (au.last_sign_in_at) lastLogin[au.id] = au.last_sign_in_at;
+          const s = (au.app_metadata as any)?.last_seen_at;
+          if (typeof s === "string") authSeen[au.id] = s;
+        }
         if (list.length < 200) break;
       }
     } catch { /* best-effort; column just shows "—" if unavailable */ }
 
-    // Show the most recent of the auth sign-in and our activity stamp, so an
+    // Show the most recent of the auth sign-in and both activity stamps, so an
     // actively-logged-in user (long-lived session) reads as recent, not stale.
-    const latest = (a?: string | null, b?: string | null) => {
-      const ta = a ? Date.parse(a) : 0, tb = b ? Date.parse(b) : 0;
-      const t = Math.max(ta, tb);
+    const latest = (...vals: (string | null | undefined)[]) => {
+      const t = Math.max(0, ...vals.map((v) => (v ? Date.parse(v) || 0 : 0)));
       return t ? new Date(t).toISOString() : null;
     };
-    users = (data || []).map((u: any) => ({ ...u, last_login: latest(lastLogin[u.id], seenById[u.id]) }));
+    users = (data || []).map((u: any) => ({ ...u, last_login: latest(lastLogin[u.id], seenById[u.id], authSeen[u.id]) }));
   }
 
   return (
