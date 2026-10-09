@@ -48,6 +48,13 @@ export async function POST(request: Request) {
 
     await db.from("login_otps").update({ consumed: true }).eq("id", row.id);
 
+    // Stamp the login time. Supabase's auth.last_sign_in_at only updates on a
+    // fresh password sign-in, but a returning user often lands straight on the
+    // OTP step (valid session, expired OTP cookie) — so a successful OTP entry is
+    // the real "logged in" moment. last_seen_at feeds the Admin "Last login"
+    // column, so this keeps it accurate even when the login screen is skipped.
+    try { await db.from("users").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id); } catch { /* best-effort */ }
+
     const exp = Date.now() + OTP_SESSION_TTL_MS;
     const value = await signOtpValue(user.id, exp, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     (await cookies()).set(OTP_COOKIE, value, {
