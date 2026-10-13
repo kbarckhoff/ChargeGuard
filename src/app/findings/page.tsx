@@ -10,7 +10,7 @@ import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
-import { AlertTriangle, Download, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, Table, FileDown, SlidersHorizontal } from "lucide-react";
 
 export default async function FindingsPage({
   searchParams,
@@ -85,15 +85,15 @@ export default async function FindingsPage({
 
   // Header shared by all modes.
   const headerEl = (
-    <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-      <div className="flex items-center gap-3">
-        <h1 className="text-base font-semibold text-[#0f172a]">Findings &amp; Analysis</h1>
-        <ReviewPicker runs={runList} auditId={auditId!} />
+    <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between gap-3 flex-shrink-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <h1 className="text-base font-semibold text-[#0f172a] whitespace-nowrap">Findings &amp; Analysis</h1>
+        <div className="min-w-0"><ReviewPicker runs={runList} auditId={auditId!} /></div>
       </div>
-      <div className="flex items-center gap-3 text-sm">
-        <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
-        <a href={`/api/export?auditId=${auditId}&format=xlsx`} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]"><Download size={13} /> Download report</a>
-        <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
+      <div className="flex items-center gap-2 text-sm flex-shrink-0">
+        <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} title="Download all findings" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9] whitespace-nowrap"><Table size={13} /> <span className="hidden xl:inline">Download all findings</span></a>
+        <a href={`/api/export?auditId=${auditId}&format=xlsx`} download title="Download report" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a] whitespace-nowrap"><FileDown size={13} /> <span className="hidden xl:inline">Download report</span></a>
+        <a href={`/assessment?auditId=${auditId}`} title="Open review setup" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9] whitespace-nowrap"><SlidersHorizontal size={13} /> <span className="hidden xl:inline">Open review setup</span></a>
       </div>
     </header>
   );
@@ -336,15 +336,15 @@ export default async function FindingsPage({
 
   return (
     <>
-      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold text-[#0f172a]">Findings &amp; Analysis</h1>
-          <ReviewPicker runs={runList} auditId={auditId!} />
+      <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-base font-semibold text-[#0f172a] whitespace-nowrap">Findings &amp; Analysis</h1>
+          <div className="min-w-0"><ReviewPicker runs={runList} auditId={auditId!} /></div>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]"><Download size={13} /> Download all findings</a>
-          <a href={`/api/export?auditId=${auditId}&format=xlsx`} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a]"><Download size={13} /> Download report</a>
-          <a href={`/assessment?auditId=${auditId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9]">Open review setup</a>
+        <div className="flex items-center gap-2 text-sm flex-shrink-0">
+          <a href={`/api/findings/export?auditId=${auditId}&bucket=all`} title="Download all findings" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9] whitespace-nowrap"><Table size={13} /> <span className="hidden xl:inline">Download all findings</span></a>
+          <a href={`/api/export?auditId=${auditId}&format=xlsx`} download title="Download report" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e293b] text-white text-xs font-semibold hover:bg-[#0f172a] whitespace-nowrap"><FileDown size={13} /> <span className="hidden xl:inline">Download report</span></a>
+          <a href={`/assessment?auditId=${auditId}`} title="Open review setup" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-[#374151] text-xs font-semibold hover:bg-[#f6f7f9] whitespace-nowrap"><SlidersHorizontal size={13} /> <span className="hidden xl:inline">Open review setup</span></a>
         </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
