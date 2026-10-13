@@ -20,6 +20,19 @@ export interface PeerPrice { hcpcs: string; gross_charge: number | null; competi
 const PC_LOW = 0.75;  // below this fraction of the competitor average = underpriced
 const PC_HIGH = 1.5;  // above this multiple of the competitor average = over-market
 
+// OPPS status indicators that mean the service is packaged/bundled into another
+// service's payment rather than paid on its own. A standalone gross-charge
+// comparison across hospitals is NOT apples-to-apples for these: whether a peer
+// bills the code separately or folds it into a parent service varies by hospital,
+// so a big gap is usually a bundling difference, not a real price outlier.
+//   N  = always packaged (no separate payment)
+//   Q1 = STVX-packaged (packaged when billed with a S/T/V/X service same day)
+//   Q2 = T-packaged (packaged when billed with a T service same day)
+//   Q3 = paid through a composite APC (bundled into a composite)
+//   J1 = comprehensive APC — everything else on the claim is packaged into it
+//   J2 = comprehensive observation — hospital outpatient services packaged
+const PACKAGED_SI = new Set(["N", "Q1", "Q2", "Q3", "J1", "J2"]);
+
 const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[], formularyCodes?: Set<string> | null): RuleResult[] {
@@ -66,6 +79,23 @@ export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[], form
       const procNum = item.procedure_number || item.id;
       const ratio = price / m.avg;
       const pct = Math.round(ratio * 100);
+
+      // Bundling guard: if the code is normally packaged, a gross-charge gap
+      // versus peers is not comparable apples-to-apples — peers may bundle it
+      // into a parent service. Report it as a caveat, not a hard $ outlier.
+      const si = (getReference(code)?.si || "").trim().toUpperCase();
+      if (PACKAGED_SI.has(si) && (ratio < PC_LOW || ratio > PC_HIGH)) {
+        const dir = ratio > PC_HIGH ? "above" : "below";
+        out.push({
+          rule_id: "PC.packaged", charge_item_id: item.id,
+          title: `Packaging may differ — ${code} at ${pct}% of peer average - ${procNum}`,
+          description: `"${item.charge_description}" (${code}) is priced ${money(price)}, ${pct}% of the ${peer} average across ${src} — ${dir} market on paper. But ${code} carries OPPS status indicator ${si}, so it is normally packaged into another service's payment rather than billed on its own. Peer hospitals may bundle it differently, so this gross-charge gap is not a clean apples-to-apples comparison and should not be treated as a straight price outlier.`,
+          severity: "low",
+          category: "Peer Pricing (Named Competitors)",
+          recommendation: `Confirm whether ${code} is billed separately or packaged at the peer facilities before repricing it off the peer average.`,
+        });
+        continue;
+      }
 
       if (ratio < PC_LOW) {
         out.push({
