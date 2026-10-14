@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Badge, formatImpact } from "@/components/ui/shared";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
@@ -11,7 +11,7 @@ import { Search, ChevronRight, ChevronDown, Loader2, AlertTriangle } from "lucid
 type Agg = { category: string | null; status: string | null; cnt: number; impact: number };
 type TodoGroup = { grp_key: string; category: string; code: string; line_count: number; open_count: number; impact: number; sample_title: string; sample_proc: string | null };
 type Lagging = { id: string; title: string; category: string; resolution_note: string | null; charge_items: { procedure_number: string; hcpcs_cpt_code: string } | null };
-type LineRow = { id: string; n: number; max: number; category: string; proc: string | null; hcpcs: string | null; desc: string | null; gross: number | null };
+type LineRow = { id: string; n: number; max: number; category: string; categories: string[]; byCat: Record<string, { c: number; m: number }>; proc: string | null; hcpcs: string | null; desc: string | null; gross: number | null };
 
 // Issue-count buckets for the per-line distribution cards.
 type LineBucket = "1-2" | "3-4" | "5+";
@@ -67,50 +67,77 @@ export function FindingsWorkspace({
   // double-counted. Falls back to the old summed aggregate if the per-line rollup
   // RPC isn't available yet (migration not run), so impact never shows $0.
   const hasLineData = lineRollup.length > 0;
+  // A line belongs to the active tab if its dominant category is in that bucket.
   const tabLines = useMemo(() => lineRollup.filter((l) => bucketForCategory(l.category) === tab), [lineRollup, tab]);
   const summedTabImpact = useMemo(() => agg.filter((a) => bucketForCategory(a.category) === tab).reduce((s, a) => s + a.impact, 0), [agg, tab]);
   const tabDedupImpact = useMemo(() => hasLineData ? tabLines.reduce((s, l) => s + (l.max || 0), 0) : summedTabImpact, [hasLineData, tabLines, summedTabImpact]);
+
+  // Effective category restriction from the active filters (fix-type class +
+  // category multiselect). null = no restriction, so lines show their totals.
+  // When a restriction is active, a line matches if it has ANY issue in that set
+  // — NOT just if its dominant category is in it — and the count/impact shown are
+  // scoped to that set, so e.g. a "Medicare Markup" line with one "Multi Rev
+  // Code" issue appears under the Multi Rev Code filter with 1 issue and that
+  // issue's dollars, not its unrelated markup impact.
+  const effSet = useMemo<string[] | null>(() => {
+    const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
+    const sel = selectedCats.length ? selectedCats : null;
+    if (classCats && sel) return sel.filter((c) => classCats.includes(c));
+    return classCats ?? sel;
+  }, [activeClass, categories, selectedCats]);
+
+  const matchesCat = useCallback((l: LineRow) => !effSet || l.categories.some((c) => effSet.includes(c)), [effSet]);
+  // Issue count on a line within the active category set (total when unrestricted
+  // or when a pre-upgrade row lacks the per-category map).
+  const effN = useCallback((l: LineRow) => {
+    if (!effSet || Object.keys(l.byCat).length === 0) return l.n;
+    return l.categories.reduce((s, c) => s + (effSet.includes(c) ? (l.byCat[c]?.c || 0) : 0), 0);
+  }, [effSet]);
+  // Max-per-line impact within the active category set (keeps dedup semantics:
+  // the line's single largest finding among the filtered categories).
+  const effImpact = useCallback((l: LineRow) => {
+    if (!effSet || Object.keys(l.byCat).length === 0) return l.max;
+    let m = 0; for (const c of l.categories) if (effSet.includes(c)) m = Math.max(m, l.byCat[c]?.m || 0);
+    return m;
+  }, [effSet]);
+
   const dedupImpact = useMemo(() => {
     if (!hasLineData) return summedTabImpact;
-    const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
     return tabLines
-      .filter((l) => !classCats || classCats.includes(l.category))
-      .filter((l) => selectedCats.length === 0 || selectedCats.includes(l.category))
-      .filter((l) => !lineBucket || inLineBucket(l.n, lineBucket))
-      .reduce((s, l) => s + (l.max || 0), 0);
-  }, [hasLineData, summedTabImpact, tabLines, activeClass, categories, selectedCats, lineBucket]);
+      .filter(matchesCat)
+      .filter((l) => !lineBucket || inLineBucket(effN(l), lineBucket))
+      .reduce((s, l) => s + effImpact(l), 0);
+  }, [hasLineData, summedTabImpact, tabLines, matchesCat, effN, effImpact, lineBucket]);
 
   // Lines in the current tab matching the Category + Issue dropdowns + search,
   // BUT not yet narrowed by the issue-count card — this is the scope the cards
   // describe, so the Clean/1-2/3-4/5+ counts reflect the active filter.
   const filterActive = !!(activeClass || selectedCats.length || search.trim());
   const scopeLines = useMemo(() => {
-    const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
     const q = search.trim().toLowerCase();
     return tabLines
-      .filter((l) => !classCats || classCats.includes(l.category))
-      .filter((l) => selectedCats.length === 0 || selectedCats.includes(l.category))
+      .filter(matchesCat)
       .filter((l) => !q || (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q));
-  }, [tabLines, activeClass, categories, selectedCats, search]);
+  }, [tabLines, matchesCat, search]);
 
-  // Issue-count distribution over the filtered scope. Clean (0 issues) only makes
-  // sense with no category/issue filter (a clean line has no category), so it's
-  // null when a filter is active.
+  // Issue-count distribution over the filtered scope, counting each line by its
+  // issues within the active category set. Clean (0 issues) only makes sense with
+  // no filter (a clean line has no category), so it's null when a filter is active.
   const dist = useMemo(() => {
     let oneTwo = 0, threeFour = 0, fivePlus = 0;
-    for (const l of scopeLines) { if (l.n <= 2) oneTwo++; else if (l.n <= 4) threeFour++; else fivePlus++; }
+    for (const l of scopeLines) { const n = effN(l); if (n <= 2) oneTwo++; else if (n <= 4) threeFour++; else fivePlus++; }
     const flagged = scopeLines.length;
     const clean = filterActive ? null : Math.max(0, totalLines - lineRollup.length);
     return { clean, oneTwo, threeFour, fivePlus, flagged };
-  }, [scopeLines, filterActive, totalLines, lineRollup.length]);
+  }, [scopeLines, effN, filterActive, totalLines, lineRollup.length]);
 
   // The By-CDM-line table rows: the scope narrowed by the selected issue-count card.
   const filteredLines = useMemo(() => {
     return scopeLines
-      .filter((l) => !lineBucket || inLineBucket(l.n, lineBucket))
+      .filter((l) => !lineBucket || inLineBucket(effN(l), lineBucket))
       .slice()
-      .sort((a, b) => (b.max - a.max) || (b.n - a.n));
-  }, [scopeLines, lineBucket]);
+      .sort((a, b) => (effImpact(b) - effImpact(a)) || (effN(b) - effN(a)));
+  }, [scopeLines, lineBucket, effN, effImpact]);
 
   // Roll-up (actionable categories by impact) for the active tab.
   const rollup = useMemo(() => {
@@ -276,7 +303,9 @@ export function FindingsWorkspace({
             <tbody>
               {pageLines.map((l) => {
                 const isOpen = openLine === l.id;
-                const tone = l.n >= 5 ? "#dc2626" : l.n >= 3 ? "#d97706" : "#0a6cff";
+                const n = effN(l);
+                const impact = effImpact(l);
+                const tone = n >= 5 ? "#dc2626" : n >= 3 ? "#d97706" : "#0a6cff";
                 return (
                   <>
                     <tr key={l.id} className="border-b border-[#f1f5f9] hover:bg-[#f9fafb] cursor-pointer" onClick={() => toggleLine(l)}>
@@ -285,9 +314,9 @@ export function FindingsWorkspace({
                       <td className="px-3 py-2.5 text-[#334155] max-w-[420px] truncate">{l.desc || "—"}</td>
                       <td className="px-3 py-2.5"><Badge>{l.category}</Badge></td>
                       <td className="px-3 py-2.5 text-right">
-                        <span className="inline-flex items-center justify-center min-w-[44px] px-2 py-1 rounded-lg text-[12px] font-semibold text-white" style={{ backgroundColor: tone }}>{l.n}</span>
+                        <span className="inline-flex items-center justify-center min-w-[44px] px-2 py-1 rounded-lg text-[12px] font-semibold text-white" style={{ backgroundColor: tone }}>{n}</span>
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#0f172a]">{l.max ? formatImpact(l.max) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#0f172a]">{impact ? formatImpact(impact) : "—"}</td>
                     </tr>
                     {isOpen && (
                       <tr key={l.id + "-x"} className="bg-[#fbfcfe] border-b border-[#f1f5f9]">

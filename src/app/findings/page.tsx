@@ -125,11 +125,27 @@ export default async function FindingsPage({
       lineRows.push(...data);
       if (data.length < 1000) break;
     }
-    const lineRollup = lineRows.map((l: any) => ({
-      id: l.charge_item_id, n: Number(l.issue_count) || 0, max: Number(l.max_impact) || 0,
-      category: l.dominant_category || "Uncategorized", proc: l.proc || null, hcpcs: l.hcpcs || null,
-      desc: l.description || null, gross: l.gross != null ? Number(l.gross) : null,
-    }));
+    const lineRollup = lineRows.map((l: any) => {
+      // Full category set on the line (so filters can match ANY issue, not just
+      // the dominant one) + per-category {count, maxImpact} so a category filter
+      // shows that category's numbers. Fall back to the dominant category when a
+      // pre-upgrade RPC doesn't return these, so filtering still works.
+      const cats: string[] = Array.isArray(l.categories) && l.categories.length
+        ? l.categories.filter(Boolean)
+        : (l.dominant_category ? [l.dominant_category] : []);
+      const byCat: Record<string, { c: number; m: number }> = {};
+      if (l.by_category && typeof l.by_category === "object") {
+        for (const [k, v] of Object.entries(l.by_category as Record<string, any>)) {
+          byCat[k] = { c: Number((v as any)?.c) || 0, m: Number((v as any)?.m) || 0 };
+        }
+      }
+      return {
+        id: l.charge_item_id, n: Number(l.issue_count) || 0, max: Number(l.max_impact) || 0,
+        category: l.dominant_category || "Uncategorized", categories: cats, byCat,
+        proc: l.proc || null, hcpcs: l.hcpcs || null,
+        desc: l.description || null, gross: l.gross != null ? Number(l.gross) : null,
+      };
+    });
     // Total CDM line universe (for the "clean lines" bucket in the distribution).
     const { count: totalLines } = await supabaseAdmin
       .from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId);
