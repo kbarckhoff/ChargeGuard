@@ -32,7 +32,7 @@ const FEEREF: Record<string, string> = {
   "Device-Procedure Crosswalk": "OPPS I/OCE Device Edit", "Self-Admin Drugs (Rev 637)": "Rev 637 / MBPM Ch.15",
   "Price Transparency (Shoppable Services)": "45 CFR 180", "Vaccine Admin Coding": "CMS Vaccine Admin FS",
   "Billing Unit / Multiplier": "ASP / NDC billing unit", "Multi Rev Code": "R&U Detail", "Bilateral Pricing": "MC Fee Schedule",
-  "Pricing - Outlier": "Rev-family median", "Consistency": "MC Fee Schedule", "Revenue Code": "UB-04 Rev Code",
+  "Pricing - Outlier": "Rev-family median", "Pricing Consistency": "MC Fee Schedule", "Consistency": "MC Fee Schedule", "Revenue Code": "UB-04 Rev Code",
 };
 const PRIO: Record<string, any> = {
   CRITICAL: { fill: { patternType: "solid", fgColor: { rgb: "C00000" } }, font: { bold: true, color: { rgb: "FFFFFF" } }, alignment: { horizontal: "center" }, border: BORDER },

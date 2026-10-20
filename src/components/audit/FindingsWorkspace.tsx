@@ -129,9 +129,12 @@ export function FindingsWorkspace({
     let oneTwo = 0, threeFour = 0, fivePlus = 0;
     for (const l of scopeLines) { const n = effN(l); if (n <= 2) oneTwo++; else if (n <= 4) threeFour++; else fivePlus++; }
     const flagged = scopeLines.length;
-    const clean = filterActive ? null : Math.max(0, totalLines - lineRollup.length);
+    // Clean = lines with no issue IN THIS TAB, so Clean + 1-2 + 3-4 + 5+ == total
+    // CDM lines (uses tabLines, the tab's flagged set, not the all-bucket rollup —
+    // that mismatch is what left ~1,200 lines unaccounted for).
+    const clean = filterActive ? null : Math.max(0, totalLines - tabLines.length);
     return { clean, oneTwo, threeFour, fivePlus, flagged };
-  }, [scopeLines, effN, filterActive, totalLines, lineRollup.length]);
+  }, [scopeLines, effN, filterActive, totalLines, tabLines.length]);
 
   // The By-CDM-line table rows: the scope narrowed by the selected issue-count card.
   const filteredLines = useMemo(() => {

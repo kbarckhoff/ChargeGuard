@@ -582,8 +582,10 @@ function runRules(items: any[]): RuleResult[] {
                 rule_id: "3.2", charge_item_id: item.id,
                 title: `Price variance for ${code} - $${minP.toFixed(2)} to $${maxP.toFixed(2)}`,
                 description: `Code ${code} with revenue code ${rev} has ${group.length} entries with prices ranging from $${minP.toFixed(2)} to $${maxP.toFixed(2)} (${((maxP / minP - 1) * 100).toFixed(0)}% variance).`,
-                severity: "low", category: "Consistency",
-                financial_impact: maxP - minP,
+                severity: "low", category: "Pricing Consistency",
+                // A price SPREAD is a consistency defect, not a bankable dollar
+                // opportunity — keep it out of financial_impact so it doesn't inflate totals.
+                financial_impact: undefined,
                 recommendation: "Review whether different prices for the same code are intentional (e.g., different units) or a data error.",
               });
             }

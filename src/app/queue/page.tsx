@@ -14,26 +14,27 @@ export default async function QueuePage() {
   if (orgId) {
     const { data } = await db
       .from("findings")
-      .select("id, title, description, category, severity, status, financial_impact, recommendation, resolution_note, charge_items(procedure_number, hcpcs_cpt_code, charge_description, gross_charge)")
+      .select("id, title, description, category, severity, status, financial_impact, recommendation, resolution_note, charge_items(procedure_number, hcpcs_cpt_code, charge_description, gross_charge), audits(name, period_year, period_quarter)")
       .eq("org_id", orgId)
       .eq("assigned_to", user!.id)
-      // Everything assigned to you that's actionable or done: the queue shows
-      // "To review" (open/under-review/accepted) and "Implemented" (resolved).
-      // Denied / N-A drop off entirely.
+      // Everything assigned to you that's actionable or done. The queue separates
+      // "To review" (open/under-review), "To implement" (accepted — awaiting the
+      // CDM/EHR update), and "Implemented" (resolved). Denied / N-A drop off.
       .in("status", ["open", "in_review", "accepted", "resolved"])
       .order("status", { ascending: true })
       .order("severity", { ascending: true })
       .limit(500);
     rows = data || [];
   }
-  const toReview = rows.filter((r) => ["open", "in_review", "accepted"].includes(r.status)).length;
+  const toReview = rows.filter((r) => ["open", "in_review"].includes(r.status)).length;
+  const toImplement = rows.filter((r) => r.status === "accepted").length;
   const implemented = rows.filter((r) => r.status === "resolved").length;
 
   return (
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
         <h1 className="text-base font-semibold text-[#0f172a]">My Work Queue</h1>
-        <span className="text-sm text-[#94a3b8]">{toReview} to review · {implemented} implemented</span>
+        <span className="text-sm text-[#94a3b8]">{toReview} to review · {toImplement} to implement · {implemented} implemented</span>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">

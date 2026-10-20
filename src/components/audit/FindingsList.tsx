@@ -155,7 +155,7 @@ function NewFindingForm({
                 <option value="Compliance">Compliance</option>
                 <option value="Missing Charge">Missing Charge</option>
                 <option value="Pricing">Pricing</option>
-                <option value="Consistency">Consistency</option>
+                <option value="Pricing Consistency">Pricing Consistency</option>
                 <option value="Other">Other</option>
               </select>
             </div>

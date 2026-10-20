@@ -9,16 +9,31 @@ type Row = {
   id: string; title: string; description: string; category: string; severity: string; status: string;
   financial_impact: number | null; recommendation: string; resolution_note: string | null;
   charge_items: { procedure_number: string; hcpcs_cpt_code: string; charge_description: string; gross_charge: number } | null;
+  audits?: { name: string | null; period_year: number | null; period_quarter: number | null } | null;
 };
 
 const STATUS_LABEL: Record<string, string> = { open: "Open", in_review: "Under Review", accepted: "Accepted", rejected: "Denied", na: "N/A", resolved: "Accepted" };
 const variant = (s: string): any => s === "accepted" || s === "resolved" ? "success" : s === "rejected" ? "danger" : s === "na" ? "default" : "default";
 
-const REVIEW_STATUSES = ["open", "in_review", "accepted"];
+// Which run a finding belongs to, for the subtitle.
+function runLabel(r: Row): string {
+  const a = r.audits;
+  if (!a) return "";
+  if (a.name) return a.name;
+  if (a.period_year && a.period_quarter) return `Q${a.period_quarter} ${a.period_year}`;
+  return "";
+}
+
+type StatusTab = "review" | "implement" | "implemented";
+const TAB_STATUSES: Record<StatusTab, string[]> = {
+  review: ["open", "in_review"],       // awaiting your accept/deny decision
+  implement: ["accepted"],             // accepted — awaiting the CDM/EHR update
+  implemented: ["resolved"],           // done
+};
 
 export function QueueClient({ rows }: { rows: Row[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [statusTab, setStatusTab] = useState<"review" | "implemented">("review");
+  const [statusTab, setStatusTab] = useState<StatusTab>("review");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [typeOpen, setTypeOpen] = useState(false);
   const [typeSearch, setTypeSearch] = useState("");
@@ -34,9 +49,10 @@ export function QueueClient({ rows }: { rows: Row[] }) {
 
   // Distinct finding categories present, for the Vanta-style Type filter.
   const categories = Array.from(new Set(rows.map((r) => r.category).filter(Boolean))).sort();
-  const inStatus = (r: Row) => statusTab === "review" ? REVIEW_STATUSES.includes(r.status) : r.status === "resolved";
-  const reviewCount = rows.filter((r) => REVIEW_STATUSES.includes(r.status)).length;
-  const implementedCount = rows.filter((r) => r.status === "resolved").length;
+  const inStatus = (r: Row) => TAB_STATUSES[statusTab].includes(r.status);
+  const reviewCount = rows.filter((r) => TAB_STATUSES.review.includes(r.status)).length;
+  const implementCount = rows.filter((r) => TAB_STATUSES.implement.includes(r.status)).length;
+  const implementedCount = rows.filter((r) => TAB_STATUSES.implemented.includes(r.status)).length;
   const filtered = rows.filter((r) => inStatus(r) && (selectedTypes.length === 0 || selectedTypes.includes(r.category)));
 
   const tab = (key: typeof statusTab, label: string, n: number) => (
@@ -51,6 +67,7 @@ export function QueueClient({ rows }: { rows: Row[] }) {
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5">
           {tab("review", "To review", reviewCount)}
+          {tab("implement", "To implement", implementCount)}
           {tab("implemented", "Implemented", implementedCount)}
         </div>
         <div className="relative">
@@ -90,7 +107,7 @@ export function QueueClient({ rows }: { rows: Row[] }) {
             <div className="min-w-0 flex-1">
               <div className="text-[13.5px] font-medium text-[#0f172a] truncate">{r.title}</div>
               <div className="text-[12px] text-[#94a3b8] truncate">
-                {r.charge_items ? `${r.charge_items.procedure_number} · ${r.charge_items.hcpcs_cpt_code || "No CPT"} · ` : ""}{r.category}
+                {r.charge_items ? `${r.charge_items.procedure_number} · ${r.charge_items.hcpcs_cpt_code || "No CPT"} · ` : ""}{r.category}{runLabel(r) ? ` · ${runLabel(r)}` : ""}
               </div>
             </div>
             <Badge variant={variant(r.status)}>{STATUS_LABEL[r.status] || r.status}</Badge>
