@@ -301,7 +301,7 @@ export function FindingsWorkspace({
                 <th className="px-3 py-2.5 font-medium w-[140px]">CPT / Charge #</th>
                 <th className="px-3 py-2.5 font-medium">Description</th>
                 <th className="px-3 py-2.5 font-medium">Category</th>
-                <th className="px-3 py-2.5 font-medium text-right w-[90px]">Issues</th>
+                <th className="px-3 py-2.5 font-medium text-right w-[90px]">Findings</th>
                 <th className="px-3 py-2.5 font-medium text-right w-[110px]">Est. impact</th>
               </tr>
             </thead>
@@ -310,7 +310,6 @@ export function FindingsWorkspace({
                 const isOpen = openLine === l.id;
                 const n = effN(l);
                 const impact = effImpact(l);
-                const tone = n >= 5 ? "#dc2626" : n >= 3 ? "#d97706" : "#0a6cff";
                 return (
                   <>
                     <tr key={l.id} className="border-b border-[#f1f5f9] hover:bg-[#f9fafb] cursor-pointer" onClick={() => toggleLine(l)}>
@@ -320,10 +319,8 @@ export function FindingsWorkspace({
                         {l.proc && l.proc !== l.hcpcs && <span className="text-[11px] text-[#94a3b8] ml-1.5">#{l.proc}</span>}
                       </td>
                       <td className="px-3 py-2.5 text-[#334155] max-w-[420px] truncate">{l.desc || "—"}</td>
-                      <td className="px-3 py-2.5"><Badge>{l.category}</Badge></td>
-                      <td className="px-3 py-2.5 text-right">
-                        <span className="inline-flex items-center justify-center min-w-[44px] px-2 py-1 rounded-lg text-[12px] font-semibold text-white" style={{ backgroundColor: tone }}>{n}</span>
-                      </td>
+                      <td className="px-3 py-2.5 text-[#334155]">{l.category}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#334155]">{n}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[#0f172a]">{impact ? formatImpact(impact) : "—"}</td>
                     </tr>
                     {isOpen && (
