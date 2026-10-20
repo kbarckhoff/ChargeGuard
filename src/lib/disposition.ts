@@ -58,19 +58,48 @@ export async function applyDisposition(
     const category: string = ((f as any)?.category || "").toString().trim();
     if (f && lineKey && category) {
       if (status === "accepted") {
-        const action_type = changeActionForCategory(category);
-        const field = changeFieldForCategory(category);
-        const old_value = field === "price" ? (ci.gross_charge != null ? String(ci.gross_charge) : null)
+        let action_type = changeActionForCategory(category);
+        let field = changeFieldForCategory(category);
+        const recText = `${(f as any).recommendation || ""} ${(f as any).title || ""}`;
+        const reviewerValue = (typeof args.new_value === "string" && args.new_value.trim()) ? args.new_value.trim() : null;
+
+        // Resolve the NEW value by field/action.
+        let new_value: string | null = reviewerValue;
+        if (!new_value) {
+          if (field === "price") {
+            // Target price is the amount the recommendation says to reprice TO,
+            // which appears LAST (e.g. "Reprice toward the 2.5x floor ($217.50)").
+            // Taking the last $ avoids grabbing the current/fee-schedule figure
+            // mentioned earlier in the sentence.
+            const all = String((f as any).recommendation || "").replace(/,/g, "").match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/g);
+            if (all && all.length) new_value = all[all.length - 1].replace(/[^0-9.]/g, "");
+          } else if (field === "hcpcs") {
+            // The code to add/replace with: first G####/C####/5-char HCPCS that
+            // follows an action word (add/bill/use/replace/map), so we don't pick
+            // up the EXISTING code named earlier in the text.
+            const m = recText.match(/\b(?:add|bill|use|replace(?: with)?|map(?: to)?|to)\b[^.]*?\b([A-CEGJPQV]?\d{4})\b/i)
+              || recText.match(/\b([A-CEGJPQV]\d{4})\b/); // e.g. "G0463", "C1767"
+            if (m) new_value = m[1].toUpperCase();
+          }
+        }
+
+        // old_value: for an ADD, the existing line's code is NOT being changed —
+        // a new code/line is added — so old_value MUST stay null (this is the fix
+        // for the "90656 → —" code-blanking bug). For modify/deactivate, capture
+        // the current field value as the "from".
+        let old_value: string | null =
+          action_type === "add" ? null
+          : field === "price" ? (ci.gross_charge != null ? String(ci.gross_charge) : null)
           : field === "description" ? (ci.charge_description || null)
           : field === "revenue_code" ? (ci.revenue_code || null)
           : field === "modifier" ? (ci.modifier_1 || null)
           : field === "hcpcs" ? (ci.hcpcs_cpt_code || null) : null;
-        // Reviewer-entered corrected value takes precedence; fall back to parsing
-        // the recommendation (used by bulk group-accept, which has no single value).
-        let new_value: string | null = (typeof args.new_value === "string" && args.new_value.trim()) ? args.new_value.trim() : null;
-        if (!new_value) {
-          const rec = String((f as any).recommendation || "");
-          if (field === "price") { const m = rec.replace(/,/g, "").match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/); if (m) new_value = m[1]; }
+
+        // Safety net: never stage a destructive code overwrite we can't fill. If a
+        // HCPCS MODIFY has no resolved replacement, don't blank the existing code —
+        // record a documentation-only "review" change instead.
+        if (field === "hcpcs" && action_type === "modify" && !new_value) {
+          field = "review"; action_type = "modify"; old_value = null;
         }
         const rationale = (f as any).recommendation || (f as any).title || null;
 

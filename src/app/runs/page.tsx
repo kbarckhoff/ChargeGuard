@@ -53,10 +53,13 @@ export default async function RunsPage() {
     };
   });
 
-  // KPIs for this hospital's reviews.
+  // KPIs for this hospital's reviews. Opportunity + captured reflect the LATEST
+  // run only — every run re-scans the same ~8k-line CDM, so summing impact across
+  // runs triple-counts the same opportunity. `runs` is sorted newest-first.
+  const latest = runs[0];
   const kpis = {
-    opportunityFound: runs.reduce((s, r) => s + r.impact, 0),
-    captured: runs.reduce((s, r) => s + r.captured, 0),
+    opportunityFound: latest?.impact ?? 0,
+    captured: latest?.captured ?? 0,
     runCount: runs.length,
   };
 

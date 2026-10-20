@@ -141,8 +141,8 @@ export function RunsHome({ runs, kpis, hospitalName }: {
 
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {kpi("$ opportunity found", money(kpis.opportunityFound), DollarSign, "#059669", "#e7f7ef")}
-            {kpi("$ captured", money(kpis.captured), CheckCircle2, "#1e293b", "#eff4ff")}
+            {kpi("$ gross-charge impact (latest run)", money(kpis.opportunityFound), DollarSign, "#059669", "#e7f7ef")}
+            {kpi("$ captured (latest run)", money(kpis.captured), CheckCircle2, "#1e293b", "#eff4ff")}
             {kpi("CDM runs", kpis.runCount.toLocaleString(), ClipboardList, "#7c3aed", "#f3effe")}
           </div>
 

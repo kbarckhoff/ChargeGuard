@@ -42,7 +42,8 @@ const EXPLICIT: Record<string, FindingClass> = {
   //    High-volume by nature (Q/B status blanket a large share of outpatient
   //    codes); kept out of the fix-it counts so the real work is visible. ──
   "Conditional Packaging (SI=Q1-Q4)": "informational",
-  "Bundled (SI=B)": "informational",
+  "Bundled (SI=B)": "informational", // legacy label (kept for historical findings)
+  "Not Recognized Under OPPS (SI=B)": "informational",
   "Pass-Through & New Technology": "informational",
   "RVU / Low Volume": "informational", // review/retire candidates, not CDM edits
 
@@ -70,6 +71,7 @@ const EXPLICIT: Record<string, FindingClass> = {
 
   // ── Code validity: coding correctness + fee-schedule compliance ──
   "Add-On - Missing Primary": "code_validity",
+  "Clinic Visit → G0463 (SI=B)": "code_validity",
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",
   "Claim Unit Outlier (Claims)": "code_validity",

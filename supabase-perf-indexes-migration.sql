@@ -36,8 +36,24 @@ returns table (
     (select count(*) from findings f where f.audit_id = a.id and f.status = 'open'),
     (select count(*) from findings f where f.audit_id = a.id and f.status = 'resolved'),
     (select count(*) from findings f where f.audit_id = a.id and f.status = 'open' and f.severity = 'critical'),
-    coalesce((select sum(f.financial_impact) from findings f where f.audit_id = a.id and f.status = 'open'), 0),
-    coalesce((select sum(f.financial_impact) from findings f where f.audit_id = a.id and f.status = 'resolved'), 0),
+    -- Impact is deduped MAX-PER-LINE (same basis as the Findings page): a line
+    -- flagged by several rules contributes only its single largest finding, so the
+    -- dashboard total equals the review's total instead of double-counting. Lagging
+    -- (already-approved, pending-EHR) findings are excluded to match the Findings
+    -- page scope. Code-less findings (null charge_item_id) each count once (grouped
+    -- by their own id).
+    coalesce((select sum(mx) from (
+      select coalesce(max(f.financial_impact), 0) as mx
+      from findings f
+      where f.audit_id = a.id and f.status = 'open' and f.ehr_lagging = false
+      group by coalesce(f.charge_item_id::text, f.id::text)
+    ) t), 0),
+    coalesce((select sum(mx) from (
+      select coalesce(max(f.financial_impact), 0) as mx
+      from findings f
+      where f.audit_id = a.id and f.status = 'resolved' and f.ehr_lagging = false
+      group by coalesce(f.charge_item_id::text, f.id::text)
+    ) t), 0),
     (select count(*) from peer_prices p where p.audit_id = a.id),
     (select max(f.created_at) from findings f where f.audit_id = a.id)
   from audits a

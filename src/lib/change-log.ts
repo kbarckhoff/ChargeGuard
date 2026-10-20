@@ -18,7 +18,10 @@ export function changeFieldForCategory(category: string | null | undefined): Cha
 export function changeActionForCategory(category: string | null | undefined): ChangeAction {
   const cat = (category || "").toLowerCase();
   if (/retired|inactive|deactivat|self-admin/.test(cat)) return "deactivate";
-  if (/missing code|new .*code|recommended code|add-on|missing primary/.test(cat)) return "add";
+  // "add" = the fix adds a NEW code/line (admin G-code, device C-code, a missing
+  // code), leaving the existing line's code intact. These must NOT overwrite the
+  // current HCPCS — see disposition.ts (old_value stays null for an add).
+  if (/missing code|new .*code|recommended code|add-on|missing primary|vaccine|device|crosswalk/.test(cat)) return "add";
   return "modify";
 }
 

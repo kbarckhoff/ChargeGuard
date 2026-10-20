@@ -46,6 +46,18 @@ function num(v: any): number {
   return isNaN(n) ? 0 : n;
 }
 
+// Office/outpatient E/M visit codes that a hospital outpatient department must
+// bill as G0463 (OPPS clinic visit) rather than 992xx — the common SI=B remap.
+const CLINIC_VISIT_EM = new Set(["99201", "99202", "99203", "99204", "99205", "99211", "99212", "99213", "99214", "99215"]);
+
+// Anesthesia codes (00100–01999) are paid on base units + time units, not a flat
+// fee, so comparing their gross charge to a flat MPFS/benchmark amount is
+// meaningless. normalizeHcpcs zero-pads, so these land as "00100".."01999".
+function isAnesthesiaCode(rawHcpcs: string | null | undefined): boolean {
+  const n = parseInt(normalizeHcpcs(rawHcpcs), 10);
+  return Number.isFinite(n) && n >= 100 && n <= 1999;
+}
+
 
 export function runReferenceRules(items: any[], usageByCode?: Map<string, any>): RuleResult[] {
   const out: RuleResult[] = [];
@@ -98,16 +110,29 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
       });
     }
 
-    // ── Step 8: SI=B Bundled ────────────────────────────────
+    // ── Step 8: SI=B Not recognized under OPPS ──────────────
+    // SI=B does NOT mean "packaged" (that is SI=N). It means the code is NOT
+    // recognized by OPPS on an outpatient hospital Part B claim (12x/13x/14x), so
+    // it is not paid under OPPS and an OPPS-recognized alternate code may apply.
+    // The most common remap: the 99201–99215 clinic-visit E/M codes, which a
+    // hospital outpatient department must bill as G0463 (eff. 1/1/2014).
     if (si === "B") {
+      const nCode = normalizeHcpcs(code);
+      const isClinicVisit = CLINIC_VISIT_EM.has(nCode);
       out.push({
         rule_id: "8.B", charge_item_id: item.id,
-        title: `Bundled code (SI=B) ${code} - ${procNum}`,
-        description: `"${item.charge_description}" (${code}) carries OPPS Status Indicator B — Medicare bundles its payment into the related procedure's APC and never pays it separately on outpatient claims.`,
-        severity: "info", category: "Bundled (SI=B)",
-        // Gross in scope, not opportunity (payment is bundled into the APC).
+        title: isClinicVisit
+          ? `Clinic visit ${code} should bill G0463 (SI=B) - ${procNum}`
+          : `Not recognized under OPPS (SI=B) ${code} - ${procNum}`,
+        description: isClinicVisit
+          ? `"${item.charge_description}" (${code}) carries OPPS Status Indicator B — it is not recognized by OPPS on a hospital outpatient (12x/13x/14x) claim. Medicare replaced the 99201–99215 clinic-visit codes with G0463 for hospital outpatient clinic visits (eff. 1/1/2014), so billing ${code} as-is leaves this visit unpaid under OPPS.`
+          : `"${item.charge_description}" (${code}) carries OPPS Status Indicator B — it is not recognized by OPPS when billed on a hospital outpatient (12x/13x/14x) claim, so it is not paid under OPPS. An OPPS-recognized alternate code may be available.`,
+        severity: isClinicVisit ? "medium" : "low",
+        category: isClinicVisit ? "Clinic Visit → G0463 (SI=B)" : "Not Recognized Under OPPS (SI=B)",
         financial_impact: undefined,
-        recommendation: "Confirm this line is not billed expecting separate payment. Keep for charge capture/cost tracking only; its reimbursement is included in the primary procedure's APC.",
+        recommendation: isClinicVisit
+          ? `Bill the hospital outpatient clinic visit as G0463 on the facility (UB-04) claim instead of ${code}. The physician still bills the 992xx E/M for the professional service.`
+          : `Confirm the OPPS-recognized alternate code (or correct bill type) for ${code}; do not expect OPPS payment on ${code} as billed.`,
       });
     }
 
@@ -209,13 +234,16 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
             : `Confirm SI=A pricing basis; Medicare pays the fee schedule, the CDM price drives commercial/self-pay.`,
         });
       }
-    } else {
-      // ── Markup over the MC Fee Schedule (MPFS) vs the 2.5x-3.0x band ──
-      // The methodology defines the 2.5x-3.0x self-pay/commercial band strictly
-      // over the MC Fee Schedule (MPFS facility rate), and only on lines that
-      // carry an MPFS value. OPPS/APC-only lines are out of scope for this band,
-      // so we key on mc_fee alone (not APC payment) to match his process.
-      const rate = refNum(ref.mc_fee);
+    } else if (!CLINIC_VISIT_EM.has(normalizeHcpcs(code))) {
+      // ── Markup over the Medicare Fee Schedule vs the 2.5x-3.0x band ──
+      // The 2.5x-3.0x self-pay/commercial band is measured over the Medicare fee
+      // schedule. For a hospital outpatient (facility) setting the FACILITY rate is
+      // the correct basis, so prefer pf_fee (MPFS facility) and fall back to the
+      // non-facility rate only when a facility rate isn't on file. Clinic-visit E/M
+      // (99201–99215) is excluded entirely — it's paid under OPPS as G0463, not the
+      // MPFS, and is handled by the SI=B / G0463 rule above.
+      const facilityRate = refNum(ref.pf_fee);
+      const rate = facilityRate > 0 ? facilityRate : refNum(ref.mc_fee);
       // Professional-component (modifier 26) and technical-component (TC) lines
       // are priced against only a slice of the global fee schedule, so comparing
       // their price to the GLOBAL MC Fee Schedule wrongly reads them as
@@ -225,7 +253,9 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
       const cdmMods = [item.modifier_1, item.modifier_2, item.modifier_3]
         .map((m) => (m || "").toString().trim().toUpperCase());
       const isComponentLine = cdmMods.includes("26") || cdmMods.includes("TC");
-      if (rate > 0 && price > 0 && !isComponentLine) {
+      // Anesthesia (00100–01999) is paid on base + time units, not a flat fee, so
+      // the flat MPFS markup band doesn't apply.
+      if (rate > 0 && price > 0 && !isComponentLine && !isAnesthesiaCode(code)) {
         const markup = price / rate;
         // Repricing opportunity is volume-weighted (report methodology): a line
         // that was never billed carries $0 opportunity, so only flag below-band
@@ -327,28 +357,34 @@ export function runDeviceCrosswalkRules(items: any[]): RuleResult[] {
   return out;
 }
 
+// Default bilateral charge ratio: CMS pays bilateral surgery (indicator 1) at the
+// lesser of charges or 150% of the fee schedule, so the bilateral CHARGE should
+// sit near 150% of the unilateral charge. This is a pricing POLICY the review can
+// override, not a hard CMS charge rule.
+export const DEFAULT_BILATERAL_MULTIPLIER = 1.5;
+
 /**
- * Bilateral / same-HCPCS price-ratio analysis (Formula Library Step 10).
- * Method mirrors the reference report: for each HCPCS with 2+ priced CDM lines,
- * the lowest-priced line is the unilateral BASE, and every other priced line is
- * compared to it. A bilateral line should sit at 1.75x the base, not 2.0x.
- * Bands (match the report's Section A):
- *   • 1.95x – 2.05x  → priced at ~2.0x, reprice down to 1.75x (overpriced)
- *   • 1.00x – 1.688x → below the 1.75x target (underpriced opportunity)
- *   • 1.688x – 1.95x → treated as correct (~1.75x), not flagged
- *   • > 2.05x        → left to the Pricing Consistency rule (extreme variance)
- * Surgical-range codes (<=69999) are excluded. Section B flags a bilateral
- * (mod-50 / "bilateral") line with no RT/LT counterpart in the CDM.
+ * Bilateral pricing check. CMS pays bilateral surgery with indicator 1 at 150% of
+ * the fee schedule (modifier 50, one unit), NOT 2.0x and NOT the 1.75x figure from
+ * an earlier methodology. We do not carry the per-code bilateral indicator, so
+ * rather than pairing arbitrary same-code lines (which produced false positives on
+ * E/M visits, lab panels, etc.) this ONLY evaluates a code that actually has a
+ * bilateral line — modifier 50 or a "bilateral" description — AND a unilateral
+ * counterpart to compare it against. Codes that cannot be bilateral (anesthesia,
+ * path/lab, E/M visits) are excluded outright. The expected bilateral-to-unilateral
+ * ratio is a configurable pricing policy (`multiplier`, default 150%).
  */
-function runBilateralRules(items: any[]): RuleResult[] {
+function runBilateralRules(items: any[], multiplier: number = DEFAULT_BILATERAL_MULTIPLIER): RuleResult[] {
   const out: RuleResult[] = [];
   const byCode = new Map<string, any[]>();
 
   for (const item of items) {
     const code = (item.hcpcs_cpt_code || "").trim();
     if (!code) continue;
+    // Never-bilateral ranges: anesthesia (00100–01999), path/lab (80000–89999),
+    // and E/M office/outpatient/other visits (99201–99499).
     const n = parseInt(normalizeHcpcs(code), 10);
-    if (!isNaN(n) && n <= 69999) continue; // exclude surgical range
+    if (Number.isFinite(n) && ((n >= 100 && n <= 1999) || (n >= 80000 && n <= 89999) || (n >= 99201 && n <= 99499))) continue;
     if (!byCode.has(code)) byCode.set(code, []);
     byCode.get(code)!.push(item);
   }
@@ -357,59 +393,67 @@ function runBilateralRules(items: any[]): RuleResult[] {
     [it.modifier_1, it.modifier_2, it.modifier_3]
       .map((m) => (m || "").trim().toUpperCase())
       .filter(Boolean);
-  // Bilateral / RT / LT detection from the modifier columns or the description.
   const isBilat = (it: any) => modsOf(it).includes("50") || /\bBILAT(ERAL)?\b/i.test(it.charge_description || "");
   const isRT = (it: any) => modsOf(it).includes("RT") || /\b(RIGHT|RT)\b/i.test(it.charge_description || "");
   const isLT = (it: any) => modsOf(it).includes("LT") || /\b(LEFT|LT)\b/i.test(it.charge_description || "");
+  const pct = Math.round(multiplier * 100);
 
   for (const [code, group] of byCode) {
-    const priced = group.filter((it) => num(it.gross_charge) > 0);
-    if (priced.length < 2) continue; // need 2+ CDM lines to compare a ratio
+    // Core guard: only codes actually billed bilaterally are in scope. A code with
+    // no modifier-50/"bilateral" line is NOT a bilateral situation — two same-code
+    // lines at different prices are the Pricing Consistency rule's job, not this.
+    const bilatLines = group.filter(isBilat);
+    if (bilatLines.length === 0) continue;
 
-    // Base = the lowest-priced line for this HCPCS (the unilateral rate).
-    let baseItem = priced[0];
-    for (const it of priced) if (num(it.gross_charge) < num(baseItem.gross_charge)) baseItem = it;
-    const basePrice = num(baseItem.gross_charge);
-    if (basePrice <= 0) continue;
-    const expected = basePrice * 1.75;
+    // Unilateral base: prefer an RT/LT line; else any non-bilateral priced line.
+    const unilateral = group.filter((it) => !isBilat(it) && num(it.gross_charge) > 0);
+    const rtlt = unilateral.filter((it) => isRT(it) || isLT(it));
+    const basePool = rtlt.length ? rtlt : unilateral;
 
-    // Section B: a bilateral line exists but no RT/LT counterpart anywhere.
-    const fifty = group.filter((it) => isBilat(it));
-    const hasRT = group.some((it) => isRT(it));
-    const hasLT = group.some((it) => isLT(it));
-    if (fifty.length > 0 && !hasRT && !hasLT) {
+    // Section B: bilateral line with no unilateral counterpart to validate against.
+    if (basePool.length === 0) {
+      const b = bilatLines[0];
       out.push({
-        rule_id: "10.B", charge_item_id: fifty[0].id,
-        title: `Mod-50 line for ${code} has no RT/LT counterpart - ${fifty[0].procedure_number || fifty[0].id}`,
-        description: `Code ${code} has a bilateral (modifier 50) line but no RT or LT unilateral line in the CDM, so its price cannot be validated against the 1.75x rule.`,
-        severity: "medium", category: "Bilateral Pricing",
+        rule_id: "10.B", charge_item_id: b.id,
+        title: `Bilateral line for ${code} has no unilateral counterpart - ${b.procedure_number || b.id}`,
+        description: `Code ${code} has a bilateral (modifier 50 / "bilateral") line but no RT/LT or unilateral line in the CDM, so its price can't be validated against the ${pct}% bilateral rule.`,
+        severity: "low", category: "Bilateral Pricing",
         recommendation: "Add the unilateral RT/LT line, or confirm this is a legitimately bilateral-only procedure (e.g., orbits, mastoids).",
       });
+      continue;
     }
 
-    // Section A: compare every non-base priced line to the base against 1.75x.
-    for (const it of priced) {
-      if (it === baseItem) continue;
+    let baseItem = basePool[0];
+    for (const it of basePool) if (num(it.gross_charge) < num(baseItem.gross_charge)) baseItem = it;
+    const basePrice = num(baseItem.gross_charge);
+    if (basePrice <= 0) continue;
+    const expected = basePrice * multiplier;
+
+    for (const it of bilatLines) {
       const p = num(it.gross_charge);
+      if (p <= 0) continue;
       const ratio = p / basePrice;
       const procNum = it.procedure_number || it.id;
-      if (ratio >= 1.95 && ratio <= 2.05) {
+      if (ratio > multiplier * 1.15) {
+        // Overpriced (e.g. charged at 2x — the "double the unilateral" error).
+        // Repricing DOWN is a risk to correct, NOT a positive revenue opportunity,
+        // so it carries no financial_impact.
         out.push({
           rule_id: "10", charge_item_id: it.id,
-          title: `Bilateral priced ${ratio.toFixed(2)}x base (should be 1.75x) - ${procNum}`,
-          description: `Code ${code}: this line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the base $${basePrice.toFixed(2)}. OPPS bilateral methodology pays 1.75x, not 2.0x.`,
+          title: `Bilateral ${code} priced ${ratio.toFixed(2)}x unilateral (expected ${multiplier.toFixed(2)}x) - ${procNum}`,
+          description: `Code ${code}: the bilateral line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the unilateral base $${basePrice.toFixed(2)}. Medicare pays bilateral (indicator 1) at ${pct}% of the fee schedule, so a charge well above ${multiplier.toFixed(2)}x the unilateral rate is an overpricing/consistency risk.`,
           severity: "medium", category: "Bilateral Pricing",
-          financial_impact: p - expected,
-          recommendation: `Reprice to $${expected.toFixed(2)} (1.75x base).`,
+          financial_impact: undefined,
+          recommendation: `Confirm the bilateral charge for ${code}; the expected level is ~$${expected.toFixed(2)} (${pct}% of the unilateral rate).`,
         });
-      } else if (ratio >= 1.0 && ratio < 1.688) {
+      } else if (ratio < multiplier * 0.9) {
         out.push({
           rule_id: "10", charge_item_id: it.id,
-          title: `Bilateral priced ${ratio.toFixed(2)}x base (below 1.75x) - ${procNum}`,
-          description: `Code ${code}: this line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the base $${basePrice.toFixed(2)}, below the 1.75x bilateral target. Lost repricing opportunity.`,
+          title: `Bilateral ${code} priced ${ratio.toFixed(2)}x unilateral (below ${multiplier.toFixed(2)}x) - ${procNum}`,
+          description: `Code ${code}: the bilateral line is $${p.toFixed(2)} = ${ratio.toFixed(2)}x the unilateral base $${basePrice.toFixed(2)}, below the ${pct}% bilateral level. Potential underpricing.`,
           severity: "low", category: "Bilateral Pricing",
-          financial_impact: expected - p,
-          recommendation: `Consider repricing up to $${expected.toFixed(2)} (1.75x base).`,
+          financial_impact: expected - p > 0 ? expected - p : undefined,
+          recommendation: `Consider repricing the bilateral line toward ~$${expected.toFixed(2)} (${pct}% of the unilateral rate).`,
         });
       }
     }
@@ -425,7 +469,7 @@ function runBilateralRules(items: any[]): RuleResult[] {
  *  - New / recommended codes: 2026 MRI-safety codes (76014-76019) absent from CDM.
  *  - Multi rev code: the same HCPCS billed under more than one revenue code.
  */
-export function runCodingUpdateRules(items: any[]): RuleResult[] {
+export function runCodingUpdateRules(items: any[], usageByCode?: Map<string, any>): RuleResult[] {
   const out: RuleResult[] = [];
   const present = new Set<string>();
   const revsByCode = new Map<string, Set<string>>();
@@ -434,7 +478,7 @@ export function runCodingUpdateRules(items: any[]): RuleResult[] {
     const c = normalizeHcpcs(it.hcpcs_cpt_code);
     if (!c) continue;
     present.add(c);
-    if (["63650", "64561", "64590"].includes(c)) hasNeuroStim = true;
+    if (["63650", "63685", "64561", "64590"].includes(c)) hasNeuroStim = true;
     const rev3 = (it.revenue_code || "").replace(/\.0+$/, "").trim().substring(0, 3);
     if (rev3) {
       if (!revsByCode.has(c)) revsByCode.set(c, new Set());
@@ -448,12 +492,18 @@ export function runCodingUpdateRules(items: any[]): RuleResult[] {
     if (!code) continue;
     const v = getVaccine(code);
     if (v && v.requiresG && /^G\d{4}$/.test(v.gcode) && !present.has(normalizeHcpcs(v.gcode))) {
+      // Annualize the per-administration gap by actual volume. A line with no
+      // billed administrations has no revenue gap, so it carries no dollar impact
+      // (prevents a $0 / 0-unit vaccine line from showing a phantom ~$12 impact).
+      const uv = usageByCode?.get(String(item.procedure_number ?? "").trim());
+      const admins = uv ? num(uv.units) : 0;
+      const impact = usageByCode ? (admins > 0 ? v.gap * admins : undefined) : (v.gap || undefined);
       out.push({
         rule_id: "2b", charge_item_id: item.id,
         title: `Vaccine ${code} missing admin G-code ${v.gcode} - ${item.procedure_number || item.id}`,
-        description: `"${item.charge_description}" (${code}, ${v.vtype}) requires Medicare admin code ${v.gcode}, but ${v.gcode} is not in the CDM. 90471 pays without denying, so this is a silent ~$${v.gap.toFixed(2)}/administration revenue gap.`,
+        description: `"${item.charge_description}" (${code}, ${v.vtype}) requires Medicare admin code ${v.gcode}, but ${v.gcode} is not in the CDM. 90471 pays without denying, so this is a silent ~$${v.gap.toFixed(2)}/administration revenue gap.${usageByCode ? (admins > 0 ? ` Across ${Math.round(admins).toLocaleString()} administrations that is ≈ $${(v.gap * admins).toLocaleString(undefined, { maximumFractionDigits: 0 })}.` : " No administrations billed in the period, so no current dollar impact.") : ""}`,
         severity: "medium", category: "Vaccine Admin Coding",
-        financial_impact: v.gap || undefined,
+        financial_impact: impact,
         recommendation: `Add ${v.gcode} to the CDM and bill it (not 90471) for ${v.vtype} vaccine administrations.`,
       });
     }
@@ -591,7 +641,9 @@ export function runInternalPricingRules(items: any[]): RuleResult[] {
       title: `Same code ${code} priced ${distinct} different ways ($${minP.toFixed(2)}–$${maxP.toFixed(2)})`,
       description: `CPT/HCPCS ${code} appears on ${group.length} CDM lines at ${distinct} distinct prices, from $${minP.toFixed(2)} to $${maxP.toFixed(2)} (${((maxP / minP - 1) * 100).toFixed(0)}% spread). The same code should carry a consistent price across the chargemaster unless the units differ.`,
       severity: "medium", category: "Pricing Consistency",
-      financial_impact: maxP - minP,
+      // A price SPREAD is a consistency defect to resolve, not a dollar opportunity
+      // to bank — leaving it out of financial_impact keeps it from inflating totals.
+      financial_impact: undefined,
       recommendation: `Align the price for ${code} across all lines, or confirm the differences reflect legitimate unit/setting variation.`,
     });
   }
@@ -859,6 +911,8 @@ export function runBenchmarkRules(items: any[], state?: string | null, formulary
     if (isPharmacyLine(item, formularyCodes)) continue;
     const code = (item.hcpcs_cpt_code || "").trim();
     if (!code) continue;
+    // Anesthesia is base+time priced, not a flat gross comparable to peers.
+    if (isAnesthesiaCode(code)) continue;
 
     const bench = getBenchmark(code, state);
     if (!bench || bench.chg <= 0) continue;

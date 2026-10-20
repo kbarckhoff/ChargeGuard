@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, SeverityDot, SEVERITY_CONFIG } from "@/components/ui/shared";
 import { Search, X, ChevronRight, Loader2 } from "lucide-react";
@@ -264,6 +264,37 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
   const [err, setErr] = useState("");
   const router = useRouter();
 
+  // Close on Escape (dialog a11y).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Edit-before-accept: the reviewer can set the exact value that gets staged as
+  // the CDM change (a corrected price, or the code to add/replace with), instead of
+  // relying on parsing the recommendation. Prefilled with a best-guess from the
+  // recommendation text. "price" edits apply to price findings; "code" edits to
+  // coding/device/vaccine/SI=B findings.
+  const cat = finding.category || "";
+  const fieldKind: "price" | "code" | null =
+    /pric|markup|clfs|billing unit|multiplier|leakage|bilateral|benchmark|peer/i.test(cat) ? "price"
+    : /retired|missing code|coding|hcpcs|crosswalk|device|vaccine|g0463|clinic visit/i.test(cat) ? "code"
+    : null;
+  const suggestedValue = (() => {
+    const txt = `${finding.recommendation || ""} ${finding.title || ""}`;
+    if (fieldKind === "price") {
+      const all = String(finding.recommendation || "").replace(/,/g, "").match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)/g);
+      return all && all.length ? all[all.length - 1].replace(/[^0-9.]/g, "") : "";
+    }
+    if (fieldKind === "code") {
+      const m = txt.match(/\b(?:add|bill|use|replace(?: with)?|map(?: to)?)\b[^.]*?\b([A-CEGJPQV]?\d{4})\b/i) || txt.match(/\b([A-CEGJPQV]\d{4})\b/);
+      return m ? m[1].toUpperCase() : "";
+    }
+    return "";
+  })();
+  const [correctedValue, setCorrectedValue] = useState(suggestedValue);
+
   const assign = async (uid: string) => {
     setAssignee(uid); setAssigning(true);
     try {
@@ -289,7 +320,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
       const res = await fetch("/api/findings/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: finding.id, status: newStatus, note, due_date: dueDate || null }),
+        body: JSON.stringify({ findingId: finding.id, status: newStatus, note, due_date: dueDate || null, new_value: (newStatus === "accepted" && correctedValue.trim()) ? correctedValue.trim() : undefined }),
       });
       if (res.ok) { setCurrentStatus(newStatus); router.refresh(); onClose(); }
       else { const d = await res.json().catch(() => ({})); setErr(d.error || "Could not save."); }
@@ -307,7 +338,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden animate-slide-in">
+      <div role="dialog" aria-modal="true" aria-label="Finding details" className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden animate-slide-in">
         <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}.animate-slide-in{animation:slideIn .2s ease-out}`}</style>
 
         {/* Header */}
@@ -322,7 +353,7 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
             </Badge>
             <Badge variant={statusVariant(currentStatus)}>{statusLabel(currentStatus)}</Badge>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" title="Close (Esc)" className="p-1.5 hover:bg-[#f1f5f9] rounded-lg"><X size={18} /></button>
         </div>
 
         {/* Content */}
@@ -422,6 +453,23 @@ export function FindingDrawer({ finding, onClose, canAssign, users, assigneeName
             <div>
               <label className="block text-xs font-medium text-[#64748b] mb-1">Due date <span className="text-[#94a3b8] font-normal">(optional)</span></label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
+            </div>
+          )}
+          {fieldKind && (
+            <div>
+              <label className="block text-xs font-medium text-[#64748b] mb-1">
+                {fieldKind === "price" ? "Corrected price to apply" : "Code to add / replace with"} <span className="text-[#94a3b8] font-normal">(staged when you Accept)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                {fieldKind === "price" && <span className="text-sm text-[#64748b]">$</span>}
+                <input
+                  value={correctedValue}
+                  onChange={(e) => setCorrectedValue(e.target.value)}
+                  placeholder={fieldKind === "price" ? "e.g. 217.50" : "e.g. G0463"}
+                  className="flex-1 text-sm border border-[#e2e8f0] rounded-lg px-2.5 py-2 bg-white font-mono focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20"
+                />
+              </div>
+              <p className="text-[11px] text-[#94a3b8] mt-1">Edit before accepting — this exact value is staged in the audit log, so the change is never blank or wrong.</p>
             </div>
           )}
           {err && <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-700">{err}</div>}

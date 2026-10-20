@@ -321,11 +321,16 @@ function runRules(items: any[]): RuleResult[] {
     // ─── Rule S.4: Missing CPT/HCPCS ───────────────────
     if (!code && rev) {
       const requiresHcpcs = REV_CODES_REQUIRING_HCPCS.some((r) => rev3 === r || rev4.startsWith(r));
+      // Rev 0637 = "self-administered drugs." These are legitimately billed WITHOUT
+      // a HCPCS (they're non-covered/packaged self-admin meds, caught by the Rev-637
+      // self-admin rule instead), so they must NOT be flagged as missing-HCPCS. Rev
+      // 0636 (drugs requiring detailed coding) still requires a HCPCS and is kept.
+      const isSelfAdminDrug = rev4 === "0637";
       // Supply/implant lines (rev 027x) are their own reported category so the
       // "Supply: 0% HCPCS coverage" pattern is visible separately from generic
       // missing-code lines.
       const isSupply = rev3 === "027";
-      if (requiresHcpcs) {
+      if (requiresHcpcs && !isSelfAdminDrug) {
         results.push({
           rule_id: "S.4", charge_item_id: item.id,
           title: isSupply
@@ -762,7 +767,7 @@ export async function POST(request: Request) {
       ...runRules(allItems),
       ...runReferenceRules(allItems, usageByCode),
       ...runDeviceCrosswalkRules(allItems),
-      ...runCodingUpdateRules(allItems),
+      ...runCodingUpdateRules(allItems, usageByCode),
       ...runPriceTransparencyRules(allItems),
       ...runMultiplierRules(allItems),
       ...runFormularyRules(allItems, formularyByCode, usageByCode),

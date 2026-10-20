@@ -103,11 +103,13 @@ export function FindingsWorkspace({
 
   const dedupImpact = useMemo(() => {
     if (!hasLineData) return summedTabImpact;
+    const q = search.trim().toLowerCase();
     return tabLines
       .filter(matchesCat)
+      .filter((l) => !q || (l.proc || "").toLowerCase().includes(q) || (l.hcpcs || "").toLowerCase().includes(q) || (l.desc || "").toLowerCase().includes(q))
       .filter((l) => !lineBucket || inLineBucket(effN(l), lineBucket))
       .reduce((s, l) => s + effImpact(l), 0);
-  }, [hasLineData, summedTabImpact, tabLines, matchesCat, effN, effImpact, lineBucket]);
+  }, [hasLineData, summedTabImpact, tabLines, matchesCat, effN, effImpact, lineBucket, search]);
 
   // Lines in the current tab matching the Category + Issue dropdowns + search,
   // BUT not yet narrowed by the issue-count card — this is the scope the cards
@@ -194,7 +196,7 @@ export function FindingsWorkspace({
             <button onClick={() => setRollupOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-[#f8fafc]">
               <div>
                 <h3 className="text-[13.5px] font-semibold text-[#0f172a]">Top findings by impact</h3>
-                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(tabDedupImpact)} estimated exposure{hasLineData && <span className="text-[#b9c0ca]"> (deduped per line)</span>}</p>
+                <p className="text-[12px] text-[#64748b] mt-0.5">{rollup.length} systemic {rollup.length === 1 ? "issue" : "issues"} · {rollupTotal.toLocaleString()} flags to fix · {formatImpact(tabDedupImpact)} est. gross-charge impact{hasLineData && <span className="text-[#b9c0ca]"> (deduped per line)</span>}</p>
               </div>
               <span className="flex items-center gap-1.5 text-[11px] text-[#94a3b8] shrink-0">Top {Math.min(10, rollup.length)} shown <ChevronDown size={14} className={`transition-transform ${rollupOpen ? "rotate-180" : ""}`} /></span>
             </button>
@@ -293,7 +295,7 @@ export function FindingsWorkspace({
             <thead>
               <tr className="bg-[#f4f6f8] border-b border-[#e2e8f0] text-left text-xs text-[#475569]">
                 <th className="px-3 py-2.5 w-6" />
-                <th className="px-3 py-2.5 font-medium w-[120px]">Code</th>
+                <th className="px-3 py-2.5 font-medium w-[140px]">CPT / Charge #</th>
                 <th className="px-3 py-2.5 font-medium">Description</th>
                 <th className="px-3 py-2.5 font-medium">Category</th>
                 <th className="px-3 py-2.5 font-medium text-right w-[90px]">Issues</th>
@@ -310,7 +312,10 @@ export function FindingsWorkspace({
                   <>
                     <tr key={l.id} className="border-b border-[#f1f5f9] hover:bg-[#f9fafb] cursor-pointer" onClick={() => toggleLine(l)}>
                       <td className="px-3 py-2.5 align-top"><span className="text-[#94a3b8]">{isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</span></td>
-                      <td className="px-3 py-2.5 font-mono text-[12.5px] text-[#0f172a]">{l.proc || l.hcpcs || "—"}</td>
+                      <td className="px-3 py-2.5 font-mono text-[12.5px] text-[#0f172a]">
+                        <span className="font-semibold">{l.hcpcs || "—"}</span>
+                        {l.proc && l.proc !== l.hcpcs && <span className="text-[11px] text-[#94a3b8] ml-1.5">#{l.proc}</span>}
+                      </td>
                       <td className="px-3 py-2.5 text-[#334155] max-w-[420px] truncate">{l.desc || "—"}</td>
                       <td className="px-3 py-2.5"><Badge>{l.category}</Badge></td>
                       <td className="px-3 py-2.5 text-right">

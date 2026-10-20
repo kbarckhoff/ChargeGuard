@@ -49,7 +49,7 @@ export const RULE_CATALOG: RuleGroup[] = [
     group: "Coding & status indicators",
     items: [
       { key: "retired", name: "Retired code still active", desc: "The code was deleted from the current CPT/HCPCS list and will deny.", ids: ["12"] },
-      { key: "si_b", name: "Bundled code (SI=B)", desc: "Medicare never pays this separately; it's bundled into the procedure.", ids: ["8.B"], facilities: OPPS },
+      { key: "si_b", name: "Not recognized under OPPS (SI=B)", desc: "Status B isn't recognized by OPPS on a 12x/13x/14x claim, so it isn't paid under OPPS and an alternate code may apply (e.g. outpatient clinic visits bill G0463).", ids: ["8.B"], facilities: OPPS },
       { key: "si_q", name: "Conditionally packaged (SI=Q1–Q4)", desc: "Paid separately only in certain claim combinations.", ids: ["8.Q"], facilities: OPPS },
       { key: "passthrough", name: "Pass-through / new technology", desc: "Pass-through drug/device (SI=J/K); checks pricing vs ASP.", ids: ["15", "15.ASP"], facilities: OPPS },
       { key: "unlisted", name: "Unlisted procedure code", desc: "An unlisted code that may have a specific alternative.", ids: ["3.3"], facilities: OPPS },
