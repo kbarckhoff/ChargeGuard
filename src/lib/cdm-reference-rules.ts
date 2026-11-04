@@ -167,7 +167,7 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
 
       // Drug pass-through priced far above ASP limit
       const asp = refNum(ref.asp);
-      if (asp > 0 && price > 0 && price / asp > 3.0) {
+      if (asp > 0 && price > 0 && price / asp > 2.75) {
         out.push({
           rule_id: "15.ASP", charge_item_id: item.id,
           title: `Pass-through drug priced ${(price / asp).toFixed(1)}x ASP - ${procNum}`,
@@ -189,25 +189,25 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
     if (labScope) {
       if (price > 0) {
         const markup = price / clfsRate;
-        if (markup < 2.5) {
-          const floor = 2.5 * clfsRate;
+        if (markup < 3.0) {
+          const floor = 3.0 * clfsRate;
           out.push({
             rule_id: "L3.low", charge_item_id: item.id,
             title: `Lab priced below CLFS band — ${code} at ${markup.toFixed(1)}x CLFS - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x CLFS, so repricing to the 2.5x floor ($${floor.toFixed(2)}) is a revenue opportunity.`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)}. The target self-pay/commercial band is 3.0x to 3.5x CLFS, so repricing to the 3.0x floor ($${floor.toFixed(2)}) is a revenue opportunity.`,
             severity: markup < 1.0 ? "high" : "medium",
             category: "Laboratory Pricing (CLFS)",
             financial_impact: floor - price,
-            recommendation: `Reprice toward the 2.5x CLFS floor ($${floor.toFixed(2)}) per the facility's lab markup policy.`,
+            recommendation: `Reprice toward the 3.0x CLFS floor ($${floor.toFixed(2)}) per the facility's lab markup policy.`,
           });
-        } else if (markup > 5.0) {
+        } else if (markup > 4.5) {
           out.push({
             rule_id: "L3.high", charge_item_id: item.id,
-            title: `Lab priced ${markup.toFixed(1)}x CLFS (>5x) — ${code} - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)} — above the 5x lab review threshold. Lab overpricing draws payer and price-transparency scrutiny.`,
-            severity: markup > 10 ? "high" : "medium",
+            title: `Lab priced ${markup.toFixed(1)}x CLFS (>4.5x) — ${code} - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the Clinical Lab Fee Schedule rate of $${clfsRate.toFixed(2)} — above the 4.5x lab review threshold. Lab overpricing draws payer and price-transparency scrutiny.`,
+            severity: markup > 8 ? "high" : "medium",
             category: "Laboratory Pricing (CLFS)",
-            recommendation: `Confirm the charge for ${code} is defensible relative to CLFS; consider aligning toward the 2.5x-3.0x band unless there is a documented justification.`,
+            recommendation: `Confirm the charge for ${code} is defensible relative to CLFS; consider aligning toward the 3.0x-3.5x band unless there is a documented justification.`,
           });
         }
       }
@@ -235,8 +235,8 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         });
       }
     } else if (!CLINIC_VISIT_EM.has(normalizeHcpcs(code))) {
-      // ── Markup over the Medicare Fee Schedule vs the 2.5x-3.0x band ──
-      // The 2.5x-3.0x self-pay/commercial band is measured over the Medicare fee
+      // ── Markup over the Medicare Fee Schedule vs the 2.75x-3.25x band ──
+      // The 2.75x-3.25x self-pay/commercial band is measured over the Medicare fee
       // schedule. For a hospital outpatient (facility) setting the FACILITY rate is
       // the correct basis, so prefer pf_fee (MPFS facility) and fall back to the
       // non-facility rate only when a facility rate isn't on file. Clinic-visit E/M
@@ -264,28 +264,28 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         const cc = String(item.procedure_number ?? "").replace(/\.0+$/, "").trim();
         const uRow = usageByCode?.get(cc);
         const rawUnits = uRow ? (parseFloat(uRow.units) || 0) : 0;
-        if (markup < 2.5 && rawUnits > 0) {
-          const floor = 2.5 * rate;
+        if (markup < 2.75 && rawUnits > 0) {
+          const floor = 2.75 * rate;
           out.push({
             rule_id: "U", charge_item_id: item.id,
-            title: `Underpriced vs MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x (target 2.5-3.0x) - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.5x to 3.0x, so repricing to the 2.5x floor ($${floor.toFixed(2)}) across ${rawUnits.toLocaleString()} R&U units is a revenue opportunity.`,
+            title: `Underpriced vs MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x (target 2.75-3.25x) - ${procNum}`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.75x to 3.25x, so repricing to the 2.75x floor ($${floor.toFixed(2)}) across ${rawUnits.toLocaleString()} R&U units is a revenue opportunity.`,
             severity: markup < 1.0 ? "high" : "medium",
             category: "Medicare Markup (Underpriced)",
             financial_impact: (floor - price) * rawUnits,
-            recommendation: `Reprice toward the 2.5x floor ($${floor.toFixed(2)}) per the facility's markup policy.`,
+            recommendation: `Reprice toward the 2.75x floor ($${floor.toFixed(2)}) per the facility's markup policy.`,
           });
-        } else if (markup > 5.0) {
-          // Most lines sit above 3.0x already, so only flag extreme outliers
+        } else if (markup > 4.5) {
+          // Most lines sit above 3.25x already, so only flag extreme outliers
           // here; ordinary above-market pricing is covered by the peer/CMS
           // benchmark rules.
           out.push({
             rule_id: "MK.high", charge_item_id: item.id,
             title: `Far above MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}, well above the 3.0x top of the target band. Confirm the charge is defensible for transparency and patient-complaint risk.`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}, well above the 3.25x top of the target band. Confirm the charge is defensible for transparency and patient-complaint risk.`,
             severity: "medium",
             category: "Medicare Markup (Above Target)",
-            recommendation: `Review whether ${code} should be repriced toward the 2.5x-3.0x band.`,
+            recommendation: `Review whether ${code} should be repriced toward the 2.75x-3.25x band.`,
           });
         }
       }
@@ -542,7 +542,7 @@ export function runCodingUpdateRules(items: any[], usageByCode?: Map<string, any
 
 // Known HCPCS billing-unit / multiplier traps (Formula Library Step 7). These
 // codes are billed per a sub-unit, so the CDM HCPCS multiplier must be set or the
-// line is massively under-billed. the reference methodology flagged A9585 and J1885 specifically.
+// line is massively under-billed. A9585 and J1885 are the common offenders.
 const MULTIPLIER_CODES: Record<string, { mult: string; note: string }> = {
   A9585: { mult: "10", note: "Gadobutrol/Gadavist is billed per 0.1 mL — multiplier must be 10 (e.g., 1 mL = 10 units). Multiplier of 1 under-bills ~90% per scan." },
   J1885: { mult: "per 15 mg", note: "Ketorolac is billed per 15 mg — a 60 mg dose = 4 units. Multiplier of 1 under-bills 75%." },
@@ -633,7 +633,7 @@ export function runInternalPricingRules(items: any[]): RuleResult[] {
     const minP = Math.min(...prices);
     const maxP = Math.max(...prices);
     // Ignore trivial rounding differences; flag a real spread (>5%).
-    if (minP <= 0 || maxP / minP - 1 <= 0.05) continue;
+    if (minP <= 0 || maxP / minP - 1 <= 0.08) continue;
     const distinct = new Set(prices.map((p) => p.toFixed(2))).size;
     const top = priced.reduce((a, b) => (b.price > a.price ? b : a));
     out.push({
@@ -802,11 +802,11 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
         const pkgBase = pkgAmt * pkgScale.factor;
         const unitsPerVial = buBase > 0 ? pkgBase / buBase : 0;
         const correctPerUnit = unitsPerVial > 0 ? price / unitsPerVial : 0;
-        // Flag every line priced >=10x the ASP limit (matches the report's
-        // "Price >10x ASP" screen). Real overbilling dollars are booked only when
+        // Flag every line priced >=8x the ASP limit (our pharmacy pricing-integrity
+        // threshold). Real overbilling dollars are booked only when
         // the CDM is priced per vial (units/vial > 1); a units/vial ~= 1 line at
         // high ratio is a per-unit markup question, so it flags at $0 impact.
-        if (ratio >= 10) {
+        if (ratio >= 8) {
           const perVial = unitsPerVial > 1;
           const estOver = perVial && billed > 0 ? Math.max(grossRU - billed * correctPerUnit, 0) : (perVial ? undefined : 0);
           out.push({
@@ -815,7 +815,7 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
             description: perVial
               ? `"${item.charge_description}" is priced $${price.toFixed(2)} vs an ASP limit of $${asp.toFixed(2)} per ${ref.dosage} (${ratio.toFixed(0)}x). The package is ${pkgAmt} ${fm.pkg_unit}${converted ? ` (unit-converted)` : ""} = ~${Math.round(unitsPerVial)} billing units/vial, so the correct price is ≈ $${correctPerUnit.toFixed(4)}/unit. The CDM looks priced per vial while Medicare reimburses per billing unit.${billed > 0 ? ` R&U ${Math.round(billed).toLocaleString()} units → est. overbilling $${(estOver || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}.` : " Import R&U to quantify overbilling."}`
               : `"${item.charge_description}" is priced $${price.toFixed(2)} = ${ratio.toFixed(0)}x the ASP limit of $${asp.toFixed(2)} per ${ref.dosage}. It bills per single unit (no per-vial error), but the markup over ASP is high — confirm the price is defensible.`,
-            severity: ratio > 50 ? "critical" : "high", category: "Pharmacy Billing Unit",
+            severity: ratio > 40 ? "critical" : "high", category: "Pharmacy Billing Unit",
             financial_impact: estOver,
             recommendation: perVial
               ? `Reprice to the per-billing-unit basis (~$${correctPerUnit.toFixed(4)}/unit).`
@@ -898,8 +898,8 @@ export function runPriceTransparencyRules(items: any[]): RuleResult[] {
 //   below  75% of peer avg  → revenue opportunity
 //   above 300% of peer avg  → over-market risk
 // Both are configurable here.
-const BM_LOW = 0.75;   // client charge below this fraction of peer avg = underpriced
-const BM_HIGH = 3.0;   // client charge above this multiple of peer avg = over-market
+const BM_LOW = 0.70;   // client charge below this fraction of peer avg = underpriced
+const BM_HIGH = 2.5;   // client charge above this multiple of peer avg = over-market
 
 export function runBenchmarkRules(items: any[], state?: string | null, formularyCodes?: Set<string> | null): RuleResult[] {
   const out: RuleResult[] = [];
