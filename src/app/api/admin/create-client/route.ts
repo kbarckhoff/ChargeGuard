@@ -31,17 +31,28 @@ export async function POST(request: Request) {
     const { data: me } = await db.from("users").select("is_platform_owner").eq("id", user.id).single();
     if (!me?.is_platform_owner) return NextResponse.json({ error: "Only the platform owner can add hospitals" }, { status: 403 });
 
-    const { hospital_name, admin_email, admin_name } = await request.json();
+    const { hospital_name, admin_email, admin_name, run_cadence, access_months } = await request.json();
     const name = String(hospital_name || "").trim();
     const email = String(admin_email || "").trim().toLowerCase();
     if (!name) return NextResponse.json({ error: "A hospital name is required" }, { status: 400 });
     if (!email || !/.+@.+\..+/.test(email)) return NextResponse.json({ error: "A valid admin email is required" }, { status: 400 });
 
+    // Client plan settings (stored in organizations.settings JSONB):
+    //   run_cadence  "quarterly" (one review per quarter) or "unlimited".
+    //   access_months  length of the client's access window; 0/blank = no expiry.
+    const cadence = run_cadence === "unlimited" ? "unlimited" : "quarterly";
+    const months = Number(access_months);
+    let accessExpiresAt: string | null = null;
+    if (Number.isFinite(months) && months > 0) {
+      const d = new Date(); d.setMonth(d.getMonth() + Math.round(months));
+      accessExpiresAt = d.toISOString();
+    }
+
     // 1) Create the org.
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
     const { data: org, error: orgErr } = await db
       .from("organizations")
-      .insert({ name, slug, contact_email: email })
+      .insert({ name, slug, contact_email: email, settings: { run_cadence: cadence, access_expires_at: accessExpiresAt } })
       .select("id, name")
       .single();
     if (orgErr || !org) return NextResponse.json({ error: orgErr?.message || "Could not create hospital" }, { status: 500 });

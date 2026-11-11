@@ -13,6 +13,8 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [cadence, setCadence] = useState<"quarterly" | "unlimited">("quarterly");
+  const [accessMonths, setAccessMonths] = useState("12");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState<{ text: string; temp?: string } | null>(null);
@@ -23,7 +25,7 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
     try {
       const res = await fetch("/api/admin/create-client", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hospital_name: name, admin_email: email, admin_name: adminName }),
+        body: JSON.stringify({ hospital_name: name, admin_email: email, admin_name: adminName, run_cadence: cadence, access_months: Number(accessMonths) || 0 }),
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || "Could not create hospital"); setBusy(false); return; }
@@ -85,6 +87,20 @@ export function AdminClients({ rows, activeOrgId }: { rows: Row[]; activeOrgId: 
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@hospital.org"
                 className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
               <p className="text-[12px] text-[#94a3b8] mt-1">They'll be emailed a temporary password and sign-in link, and set their own password on first login.</p>
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Review cadence</label>
+              <select value={cadence} onChange={(e) => setCadence(e.target.value as any)}
+                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20">
+                <option value="quarterly">Quarterly (one review per quarter)</option>
+                <option value="unlimited">Unlimited (run anytime)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-[#334155] block mb-1.5">Access length (months)</label>
+              <input value={accessMonths} onChange={(e) => setAccessMonths(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="12"
+                className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" />
+              <p className="text-[12px] text-[#94a3b8] mt-1">How long this client has access. Blank or 0 = no expiry. (e.g. 12 for a one-year engagement.)</p>
             </div>
           </div>
           <div className="mt-4">

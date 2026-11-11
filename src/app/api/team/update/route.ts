@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { data: me } = await db.from("users").select("org_id, is_platform_owner").eq("id", user.id).single();
     if (!me?.org_id) return NextResponse.json({ error: "No organization" }, { status: 404 });
 
-    const { user_id, department_ids, is_active, app_role, department } = await request.json();
+    const { user_id, department_ids, is_active, app_role, department, can_manage_peers } = await request.json();
     if (!user_id) return NextResponse.json({ error: "Missing user_id" }, { status: 400 });
 
     const { data: target } = await db.from("users").select("id, org_id").eq("id", user_id).single();
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     if (typeof is_active === "boolean") userUpdates.is_active = is_active;
     if (["super_user", "analyst", "member"].includes(app_role)) userUpdates.app_role = app_role;
     if (typeof department === "string") userUpdates.department = department.trim() || null;
+    if (typeof can_manage_peers === "boolean") userUpdates.can_manage_peers = can_manage_peers;
     if (Object.keys(userUpdates).length) {
       await db.from("users").update(userUpdates).eq("id", user_id);
     }

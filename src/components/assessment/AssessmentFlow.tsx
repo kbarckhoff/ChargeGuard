@@ -718,7 +718,22 @@ function Peer({ comps, setComps, saveComps, auditId, peerCounts, onBack }: any) 
         <div className="flex items-center gap-3">
           <h1 className="text-[22px] font-bold tracking-tight text-[#111827]">Peer Setup</h1>
         </div>
-        <p className="text-sm text-[#6b7280] mt-1.5">Load each competitor's price-transparency file.</p>
+        <p className="text-sm text-[#6b7280] mt-1.5">Add each competitor's price-transparency file yourself. Here's how to find them.</p>
+      </div>
+      <div className="mb-5 rounded-xl border border-[#dbe4f0] bg-[#f5f8fd] p-4">
+        <div className="text-[13px] font-semibold text-[#1e293b] mb-1.5">Where to find peer price-transparency files</div>
+        <p className="text-[12.5px] text-[#475569] leading-relaxed">
+          Every U.S. hospital is required to publish a machine-readable "standard charges" file. To find one, search
+          <span className="font-medium"> "[hospital name] standard charges machine readable"</span>, or check the hospital's own
+          website (usually a "Price Transparency" or "Pricing" link in the footer). Aggregators like Turquoise Health also list them.
+          Download the CSV or JSON and add it below.
+        </p>
+        <div className="text-[13px] font-semibold text-[#1e293b] mt-3 mb-1.5">Which hospitals to compare against</div>
+        <p className="text-[12.5px] text-[#475569] leading-relaxed">
+          Pick 3–5 hospitals that are genuinely comparable: in the same state or market, similar size (bed count) and type, offering
+          the same service lines, and ideally the client's actual local competitors. Apples-to-apples peers make the pricing
+          comparison credible; a large academic center is not a fair peer for a small community hospital.
+        </p>
       </div>
       <div className={CARD}>
         <h3 className="text-sm font-bold text-[#111827] mb-4">Competitor price-transparency files (from Intake)</h3>

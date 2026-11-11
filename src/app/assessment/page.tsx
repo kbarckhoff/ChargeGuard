@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
+import { getActor } from "@/lib/roles";
 import { AssessmentFlow } from "@/components/assessment/AssessmentFlow";
 import { EmptyState } from "@/components/ui/shared";
 import { ClipboardList } from "lucide-react";
@@ -61,11 +62,10 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
     if (data.length < 1000) break;
   }
 
-  // TEMP (testing): force the tool-owner view so the Peer Setup step is visible.
-  // For real role gating, replace with:
-  //   const ownerList = (process.env.OWNER_EMAILS || "kbarckhoff@gmail.com").split(",").map((s) => s.trim().toLowerCase());
-  //   const isOwner = ownerList.includes((user?.email || "").toLowerCase());
-  const isOwner = true;
+  // Peer Setup (adding competitor price-transparency files) is permissioned: super
+  // users and analysts can always, plus any user the admin granted the peer flag.
+  const actor = await getActor(admin, user!.id);
+  const isOwner = actor.canManagePeers;
 
   const stats = {
     critical: findings.filter((f) => f.severity === "critical").length,

@@ -16,6 +16,7 @@ export interface Actor {
   isSuper: boolean;   // super user (or platform owner)
   isAnalyst: boolean;
   canAssign: boolean; // may assign findings to others
+  canManagePeers: boolean; // may add peer / price-transparency files
   fullName: string;
   homeOrg: string | null;
 }
@@ -24,7 +25,7 @@ export interface Actor {
 export async function getActor(admin: any, userId: string): Promise<Actor> {
   const { data } = await admin
     .from("users")
-    .select("id, app_role, is_platform_owner, full_name, org_id")
+    .select("id, app_role, is_platform_owner, full_name, org_id, can_manage_peers")
     .eq("id", userId)
     .single();
   const isSuper = !!data?.is_platform_owner || data?.app_role === "super_user";
@@ -35,6 +36,9 @@ export async function getActor(admin: any, userId: string): Promise<Actor> {
     isSuper,
     isAnalyst,
     canAssign: isSuper || isAnalyst,
+    // Super users and analysts can always add peer files; the admin can also grant
+    // it to any other user via the can_manage_peers flag.
+    canManagePeers: isSuper || isAnalyst || !!data?.can_manage_peers,
     fullName: data?.full_name || "",
     homeOrg: data?.org_id || null,
   };

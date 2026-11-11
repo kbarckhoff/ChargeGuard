@@ -20,7 +20,7 @@ export default async function AdminUsersPage() {
   if (orgId) {
     const { data } = await db
       .from("users")
-      .select("id, full_name, email, app_role, department, is_active, is_platform_owner")
+      .select("id, full_name, email, app_role, department, is_active, is_platform_owner, can_manage_peers")
       .eq("org_id", orgId)
       .order("full_name");
 

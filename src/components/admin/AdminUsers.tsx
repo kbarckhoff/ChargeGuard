@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { UserPlus, Loader2, Copy, Check, X } from "lucide-react";
 import { APP_ROLE_LABEL, type AppRole } from "@/lib/roles";
 
-type U = { id: string; full_name: string; email: string; app_role: AppRole; department: string | null; is_active: boolean; is_platform_owner: boolean; last_login?: string | null };
+type U = { id: string; full_name: string; email: string; app_role: AppRole; department: string | null; is_active: boolean; is_platform_owner: boolean; can_manage_peers?: boolean; last_login?: string | null };
+
+// Whether a user can add peer / price-transparency files: super users and analysts
+// always can; anyone else needs the explicit grant.
+const peersAllowed = (u: U) => u.is_platform_owner || u.app_role === "super_user" || u.app_role === "analyst" || !!u.can_manage_peers;
+const roleGrantsPeers = (role: AppRole) => role === "super_user" || role === "analyst";
 
 const ROLES: AppRole[] = ["super_user", "analyst", "member"];
 
@@ -33,7 +38,7 @@ export function AdminUsers({ users }: { users: U[] }) {
   const [msg, setMsg] = useState<{ link?: string; text: string } | null>(null);
   const [err, setErr] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
-  const [edit, setEdit] = useState<{ app_role: AppRole; department: string }>({ app_role: "member", department: "" });
+  const [edit, setEdit] = useState<{ app_role: AppRole; department: string; can_manage_peers: boolean }>({ app_role: "member", department: "", can_manage_peers: false });
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -61,7 +66,7 @@ export function AdminUsers({ users }: { users: U[] }) {
     setSavingId(id);
     await fetch("/api/team/update", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: id, app_role: edit.app_role, department: edit.department }),
+      body: JSON.stringify({ user_id: id, app_role: edit.app_role, department: edit.department, can_manage_peers: edit.can_manage_peers }),
     });
     setSavingId(null); setEditId(null); router.refresh();
   };
@@ -112,7 +117,7 @@ export function AdminUsers({ users }: { users: U[] }) {
         <table className="w-full text-[13px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-[#94a3b8] border-b border-[#e2e8f0]">
-              <th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Department</th><th className="px-4 py-2.5">Last login</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5"></th>
+              <th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Department</th><th className="px-4 py-2.5">Peer files</th><th className="px-4 py-2.5">Last login</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
@@ -137,6 +142,15 @@ export function AdminUsers({ users }: { users: U[] }) {
                     {editing ? <input className={inp + " w-40"} value={edit.department} onChange={(e) => setEdit((p) => ({ ...p, department: e.target.value }))} placeholder="Department" />
                       : <span className="text-[#64748b]">{u.department || "—"}</span>}
                   </td>
+                  <td className="px-4 py-2.5">
+                    {editing ? (
+                      roleGrantsPeers(edit.app_role)
+                        ? <span className="text-[11px] text-[#94a3b8]">Always (role)</span>
+                        : <label className="inline-flex items-center gap-1.5 text-[12px] text-[#334155] cursor-pointer"><input type="checkbox" checked={edit.can_manage_peers} onChange={(e) => setEdit((p) => ({ ...p, can_manage_peers: e.target.checked }))} /> Allowed</label>
+                    ) : (
+                      peersAllowed(u) ? <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">Yes</span> : <span className="text-[#cbd5e1]">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 whitespace-nowrap text-[12px] text-[#64748b]">{formatLastLogin(u.last_login)}</td>
                   <td className="px-4 py-2.5">
                     {u.is_active ? <span className="text-[10px] font-semibold text-[#067647] bg-[#e7f7ef] px-1.5 py-0.5 rounded">Active</span>
@@ -150,7 +164,7 @@ export function AdminUsers({ users }: { users: U[] }) {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-3">
-                        <button onClick={() => { setEditId(u.id); setEdit({ app_role: u.app_role || "member", department: u.department || "" }); }} className="text-[12px] text-[#1e293b] hover:underline">Edit</button>
+                        <button onClick={() => { setEditId(u.id); setEdit({ app_role: u.app_role || "member", department: u.department || "", can_manage_peers: !!u.can_manage_peers }); }} className="text-[12px] text-[#1e293b] hover:underline">Edit</button>
                         {!u.is_platform_owner && <button onClick={() => setActive(u.id, !u.is_active)} disabled={savingId === u.id} className="text-[12px] text-[#64748b] hover:underline">{u.is_active ? "Deactivate" : "Reactivate"}</button>}
                       </span>
                     )}
