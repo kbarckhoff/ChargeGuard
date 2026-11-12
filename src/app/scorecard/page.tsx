@@ -24,9 +24,16 @@ export default async function ScorecardPage({ searchParams }: { searchParams: Pr
     audit = data?.[0];
   }
 
+  const deckHref = audit ? `/api/converge/decide-deck?auditId=${audit.id}` : "/api/converge/decide-deck";
   const header = (
     <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
       <h1 className="text-base font-semibold text-[#0f172a]">RC Health Scorecard</h1>
+      {audit && (
+        <a href={deckHref} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#4f46e5] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#4338ca] transition-colors">
+          Decide deck
+        </a>
+      )}
     </header>
   );
   if (!audit) {

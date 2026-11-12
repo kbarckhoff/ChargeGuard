@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
+import { applySetupGates } from "@/lib/setup-gates";
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
@@ -802,10 +803,26 @@ export async function POST(request: Request) {
     }
 
     // Drop findings the client deactivated and any line not yet effective this year.
-    const ruleResults = ruleResultsAll.filter(
+    const ruleResultsFiltered = ruleResultsAll.filter(
       (r) => !disabledRules.has(r.rule_id)
         && !(r.charge_item_id && notYetEffective.has(r.charge_item_id))
     );
+
+    // Setup-fact gating: block or caveat findings whose governing facility fact
+    // (340B status, MAC/locality, CLIA) hasn't been answered yet, so the engine
+    // never emits a confident-but-wrong number. Facts live on metadata.setup_facts.
+    let setupFacts: Record<string, any> | null = null;
+    try {
+      const { data: aFacts } = await supabaseAdmin.from("audits").select("metadata").eq("id", auditId).single();
+      setupFacts = (((aFacts?.metadata as any) || {}).setup_facts) || null;
+    } catch { /* no facts captured yet → gates treat all as missing */ }
+    const gate = applySetupGates(
+      ruleResultsFiltered,
+      setupFacts,
+      (r) => r.category,
+      (r, note) => ({ ...r, recommendation: `${r.recommendation || ""}${r.recommendation ? " " : ""}[${note}]` }),
+    );
+    const ruleResults = gate.results;
 
     // Get phases for mapping
     const { data: phases } = await supabaseAdmin
@@ -1005,11 +1022,27 @@ export async function POST(request: Request) {
       .update({ total_findings: count || 0 })
       .eq("id", auditId);
 
-    // Release the scan guard.
+    // Snapshot the reference vintage this run used, so the diagnostic is
+    // reproducible and a client can't argue the numbers moved because CMS data
+    // moved underneath them. Records each reference source's vintage/row count.
+    let referenceVintage: Record<string, any> | null = null;
+    try {
+      const { data: refRows } = await supabaseAdmin
+        .from("cms_reference_sources")
+        .select("key, vintage, last_refreshed, row_count");
+      if (refRows?.length) {
+        referenceVintage = { pinned_at: new Date().toISOString(), sources: {} as Record<string, any> };
+        for (const r of refRows as any[]) referenceVintage.sources[r.key] = { vintage: r.vintage, refreshed: r.last_refreshed, rows: r.row_count };
+      }
+    } catch { /* non-fatal */ }
+
+    // Release the scan guard + record the gate summary and reference vintage.
     try {
       const { data: aRow2 } = await supabaseAdmin.from("audits").select("metadata").eq("id", auditId).single();
       const meta2 = ((aRow2?.metadata as any) || {}) as Record<string, any>;
       delete meta2.scan_started_at;
+      meta2.setup_gate_summary = gate.summary;
+      if (referenceVintage) meta2.reference_vintage = referenceVintage;
       await supabaseAdmin.from("audits").update({ metadata: meta2 }).eq("id", auditId);
     } catch { /* the guard auto-expires after 5 min regardless */ }
 
