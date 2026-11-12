@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, TrendingUp, Gauge, ListChecks } from "lucide-react";
 import { PRODUCT } from "@/lib/product";
 
 type Org = { id: string; name: string };
@@ -92,8 +92,10 @@ function ClientSwitcher({ info }: { info: OrgInfo | null }) {
 // manual entries) across runs.
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
+  { label: "RC Scorecard", href: "/scorecard", icon: Gauge },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
   { label: "Opportunity", href: "/opportunity", icon: TrendingUp },
+  { label: "Setup", href: "/setup", icon: ListChecks },
   { label: "My Work Queue", href: "/queue", icon: Inbox },
   { label: "Audit Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },

@@ -18,21 +18,39 @@ standalone offline engine in `engine/` already depends on these same files.
 ## What CONVERGE adds vs ChargeGuard (phased, from the gap analysis)
 
 Phase A — finance layer + exec output (uses the CDM + R&U we already ingest):
-- [ ] Opportunity model: net-realizable (not gross), waterfall, cost-of-inaction,
-      recurring vs one-time, speed-to-cash → phase.  → `src/lib/opportunity.ts`
-- [ ] "Decide" exec narrative + deck output.
-- [ ] Setup questionnaire as real rule gates (340B, MAC/locality, CLIA, …).
+- [x] Opportunity model: net-realizable, waterfall, cost-of-inaction, recurring
+      vs one-time, speed-to-cash → phase.  `src/lib/opportunity.ts` + `/opportunity`
+- [x] RC Health Scorecard (overall grade + 8 functional-area scores from Greg's
+      template).  `src/lib/scorecard.ts` + `/scorecard`
+- [x] Setup questionnaire as fact gates (340B, MAC/locality, CLIA, …).
+      `src/lib/setup-questionnaire.ts` + `/setup`
+- [ ] "Decide" exec narrative + downloadable deck of the scorecard/opportunity.
+- [ ] Wire the setup-fact gates INTO the scan (block gated rules when a fact is
+      missing, instead of just displaying the gate).
 - [ ] Per-run reference-vintage pinning.
 
 Phase B — the claims layer (the actual "Converge"):
-- [ ] 835 + 837 X12 ingestion into a normalized claim/remit schema.
+- [ ] 835 + 837 X12 ingestion into a normalized claim/remit schema (an 837 parser
+      exists in `src/lib/claims-parser.ts`; add 835 remittance + the UI tiles).
 - [ ] The five cross-file joins, incl. the denial → claim → CDM root-cause trace.
+      Until this lands, the scorecard's claims-dependent areas show "pending".
 
 Phase C — presentation + deployment:
 - [ ] "Explore" dashboard; decouple the engine so the viz is a swappable skin.
 - [ ] Per-client, in-their-environment (under their BAA) deployment model.
+      (The offline `engine/` CLI is the start of this.)
 
-## Status
+## Status — done on this branch
 
-- Branding config: `src/lib/product.ts` (name = Converge on this branch).
-- Started Phase A: `src/lib/opportunity.ts` (net-realizable opportunity model).
+- Branding: `src/lib/product.ts` → "Converge" in the sidebar.
+- `/scorecard` — RC Health Scorecard (flagship), from the engine's findings.
+- `/opportunity` — net-realizable opportunity model + waterfall.
+- `/setup` — setup questionnaire with required-fact gating.
+- Nav updated; engine kept shared with ChargeGuard; all type-checks clean.
+
+## Status — not yet built (bigger lifts, next)
+
+- 835/837 ingestion + the 5 cross-file joins (Phase B).
+- The "Decide" exec deck export.
+- Wiring setup-fact gates into the scan, and per-run reference pinning.
+- In-client deployment packaging beyond the offline CLI.
