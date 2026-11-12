@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, TrendingUp } from "lucide-react";
+import { PRODUCT } from "@/lib/product";
 
 type Org = { id: string; name: string };
 type OrgInfo = { orgs: Org[]; activeOrgId: string | null; isPlatformOwner: boolean; isSuper: boolean; canAssign: boolean };
@@ -92,6 +93,7 @@ function ClientSwitcher({ info }: { info: OrgInfo | null }) {
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
+  { label: "Opportunity", href: "/opportunity", icon: TrendingUp },
   { label: "My Work Queue", href: "/queue", icon: Inbox },
   { label: "Audit Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },
@@ -114,8 +116,8 @@ export function AppSidebar() {
   return (
     <aside className="w-[224px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
       <div className="flex items-center gap-1.5 px-5 h-14">
-        <img src="/logo-dark.png" alt="ChargeGuard" className="w-[28px] h-[28px] object-contain" />
-        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">ChargeGuard</span>
+        <img src="/logo-dark.png" alt={PRODUCT.name} className="w-[28px] h-[28px] object-contain" />
+        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">{PRODUCT.name}</span>
       </div>
       <ClientSwitcher info={info} />
       <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">
