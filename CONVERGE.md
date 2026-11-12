@@ -30,10 +30,16 @@ Phase A — finance layer + exec output (uses the CDM + R&U we already ingest):
 - [ ] Per-run reference-vintage pinning.
 
 Phase B — the claims layer (the actual "Converge"):
-- [ ] 835 + 837 X12 ingestion into a normalized claim/remit schema (an 837 parser
-      exists in `src/lib/claims-parser.ts`; add 835 remittance + the UI tiles).
-- [ ] The five cross-file joins, incl. the denial → claim → CDM root-cause trace.
-      Until this lands, the scorecard's claims-dependent areas show "pending".
+- [x] 835 + 837 X12 ingestion into a normalized claim/remit schema. 837 parser
+      `src/lib/claims-parser.ts`; 835 parser `src/lib/remit-parser.ts`
+      (+ `remit_claims`/`remit_lines`, `/api/import-remit`, RemitImport tile).
+- [x] Cross-file joins + the denial → claim → CDM root-cause trace
+      (`src/lib/claims-joins.ts`): CARC→area map, first-pass yield / denial rate /
+      net collection yield, per-area denial buckets, and denial findings that link
+      back to the CDM line (enriched with any engine finding already on that code).
+      The four claims-dependent scorecard areas now score from these.
+- [ ] Setup-fact gates are wired (Phase A finish); 835 RARC remark-code detail and
+      payer-level denial trends are still open.
 
 Phase C — presentation + deployment:
 - [ ] "Explore" dashboard; decouple the engine so the viz is a swappable skin.

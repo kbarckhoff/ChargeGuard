@@ -75,6 +75,7 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",
   "Claim Unit Outlier (Claims)": "code_validity",
+  "Denial → CDM Root Cause (Claims)": "code_validity",
   "Coding Opportunity": "code_validity",
   "Compliance": "code_validity",
   "Device-Procedure Crosswalk": "code_validity",

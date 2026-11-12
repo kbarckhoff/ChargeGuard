@@ -44,9 +44,12 @@ export async function GET(request: Request) {
     if (data.length < 1000) break;
   }
   const { count: claimCount } = await db.from("claim_lines").select("id", { count: "exact", head: true }).eq("audit_id", audit.id);
-  const sc2 = buildScorecard(findings, { hasClaims: (claimCount || 0) > 0 });
-
   const md = (audit.metadata as any) || {};
+  const cm = md.claims_metrics || null;
+  const sc2 = buildScorecard(findings, {
+    hasClaims: (claimCount || 0) > 0 || !!cm,
+    claims: cm ? { firstPassYield: cm.firstPassYield ?? null, denialRate: cm.denialRate ?? null, netCollectionYield: cm.netCollectionYield ?? null, areaDenials: md.claims_area_denials || {} } : undefined,
+  });
   const html = buildDecideDeckHtml(sc2, {
     product: PRODUCT.name,
     facility: audit.hospital_name || "Hospital",

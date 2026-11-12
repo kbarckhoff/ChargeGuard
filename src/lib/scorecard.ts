@@ -70,15 +70,52 @@ export function gradeFor(score: number | null): { grade: Grade; band: Band } {
   return { grade: "F", band: "crit" };
 }
 
-export function buildScorecard(findings: OppFinding[], opts: { hasClaims?: boolean } = {}): Scorecard {
+// 835-derived inputs that let the back-end (claims-dependent) areas score.
+export interface ClaimsInput {
+  firstPassYield: number | null;
+  denialRate: number | null;
+  netCollectionYield: number | null;
+  // per-area denial buckets, keyed by the AREAS name (count + denied $).
+  areaDenials?: Record<string, { count: number; denied: number }>;
+}
+
+// Score a back-end area from denial dollars + a headline-metric penalty (0–100).
+function scoreClaimsArea(denied: number, metricPenalty: number): number {
+  const dollarPenalty = 42 * (denied / (denied + CUSHION));
+  return Math.max(35, Math.round(100 - dollarPenalty - metricPenalty));
+}
+
+export function buildScorecard(findings: OppFinding[], opts: { hasClaims?: boolean; claims?: ClaimsInput } = {}): Scorecard {
   const opp = buildOpportunityModel(findings);
-  const netByCat = new Map(opp.byCategory.map((c) => [c.category, c]));
+  const claims = opts.claims;
+  const hasClaims = opts.hasClaims || !!claims;
+
+  // Metric penalties (worse metric → bigger penalty), used by the back-end areas.
+  const fpyPenalty = claims?.firstPassYield != null ? Math.max(0, (95 - claims.firstPassYield)) * 0.8 : 0; // <95% clean hurts
+  const denPenalty = claims?.denialRate != null ? Math.min(30, claims.denialRate * 2.5) : 0;                // 5% denial ≈ 12.5
+  const ncyPenalty = claims?.netCollectionYield != null ? Math.max(0, (97 - claims.netCollectionYield)) * 1.2 : 0;
 
   const areas: AreaScore[] = AREAS.map((def) => {
-    if (def.requiresClaims && !opts.hasClaims) {
-      return { name: def.name, stage: def.stage, score: null, grade: "—", band: "pending", netOpp: 0, findings: 0, drivers: [], source: def.source, requiresClaims: true };
+    if (def.requiresClaims) {
+      if (!hasClaims) {
+        return { name: def.name, stage: def.stage, score: null, grade: "—", band: "pending", netOpp: 0, findings: 0, drivers: [], source: def.source, requiresClaims: true };
+      }
+      // Score from the 835 join: this area's denied dollars + the relevant metric.
+      const bucket = claims?.areaDenials?.[def.name] || { count: 0, denied: 0 };
+      const metricPenalty =
+        def.name === "Patient Financial Services" ? denPenalty + fpyPenalty * 0.5 :
+        def.name === "Underpayment & Yield" ? ncyPenalty :
+        def.name === "Patient Access" ? fpyPenalty * 0.4 :
+        def.name === "Case Management / UR" ? denPenalty * 0.4 : 0;
+      const score = scoreClaimsArea(bucket.denied, metricPenalty);
+      const { grade, band } = gradeFor(score);
+      const drivers: { label: string; net: number; count: number }[] = [];
+      if (bucket.count) drivers.push({ label: "Denials traced", net: bucket.denied, count: bucket.count });
+      if (def.name === "Patient Financial Services" && claims?.firstPassYield != null) drivers.push({ label: `First-pass ${claims.firstPassYield}%`, net: 0, count: 0 });
+      if (def.name === "Underpayment & Yield" && claims?.netCollectionYield != null) drivers.push({ label: `Net collection ${claims.netCollectionYield}%`, net: 0, count: 0 });
+      return { name: def.name, stage: def.stage, score, grade, band, netOpp: bucket.denied, findings: bucket.count, drivers, source: def.source, requiresClaims: true };
     }
-    // Attribute opportunity categories to this area.
+    // CDM-side areas: attribute opportunity categories to this area.
     const cats = opp.byCategory.filter((c) => def.match.test(c.category));
     const netOpp = cats.reduce((s, c) => s + c.net, 0);
     const findingsN = cats.reduce((s, c) => s + c.count, 0);
@@ -98,6 +135,8 @@ export function buildScorecard(findings: OppFinding[], opts: { hasClaims?: boole
   return {
     overall, overallGrade: og.grade, overallBand: og.band,
     areas, opportunity: opp,
-    firstPassYield: null, denialRate: null, netCollectionYield: null, // 835-derived; filled when remits land
+    firstPassYield: claims?.firstPassYield ?? null,
+    denialRate: claims?.denialRate ?? null,
+    netCollectionYield: claims?.netCollectionYield ?? null,
   };
 }

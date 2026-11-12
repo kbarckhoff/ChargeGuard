@@ -49,10 +49,18 @@ export default async function ScorecardPage({ searchParams }: { searchParams: Pr
   }
   // Have the claims/remittance files been ingested for this run?
   const { count: claimCount } = await db.from("claim_lines").select("id", { count: "exact", head: true }).eq("audit_id", audit.id);
-  const hasClaims = (claimCount || 0) > 0;
+  const md0 = (audit.metadata as any) || {};
+  const cm = md0.claims_metrics || null;
+  const hasClaims = (claimCount || 0) > 0 || !!cm;
+  const claims = cm ? {
+    firstPassYield: cm.firstPassYield ?? null,
+    denialRate: cm.denialRate ?? null,
+    netCollectionYield: cm.netCollectionYield ?? null,
+    areaDenials: md0.claims_area_denials || {},
+  } : undefined;
 
-  const sc = buildScorecard(findings, { hasClaims });
-  const period = (audit.metadata as any)?.review_period || "Current period";
+  const sc = buildScorecard(findings, { hasClaims, claims });
+  const period = md0.review_period || "Current period";
 
   return (
     <>

@@ -3,6 +3,7 @@ import { CDMTable } from "@/components/cdm/CDMTable";
 import { RUImport } from "@/components/cdm/RUImport";
 import { FormularyImport } from "@/components/cdm/FormularyImport";
 import { ClaimsImport } from "@/components/cdm/ClaimsImport";
+import { RemitImport } from "@/components/cdm/RemitImport";
 import { EmptyState } from "@/components/ui/shared";
 import { FileSpreadsheet } from "lucide-react";
 
@@ -73,6 +74,7 @@ export default async function ChargeMasterPage({
           <RUImport auditId={auditId} />
           <FormularyImport auditId={auditId} />
           <ClaimsImport auditId={auditId} />
+          <RemitImport auditId={auditId} />
         </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">

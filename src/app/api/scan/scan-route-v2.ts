@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { applySetupGates } from "@/lib/setup-gates";
+import { buildClaimsJoins, tracesToFindings } from "@/lib/claims-joins";
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
@@ -726,6 +727,22 @@ export async function POST(request: Request) {
       if (data.length < 1000) break;
     }
 
+    // Load imported 835 remittance (if any) for the Phase-B cross-file joins.
+    const remitClaims: any[] = [];
+    const remitLines: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("remit_claims").select("claim_id, status, total_charge, total_paid, patient_resp, adjustments").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      remitClaims.push(...data);
+      if (data.length < 1000) break;
+    }
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("remit_lines").select("claim_id, hcpcs, mod1, rev_code, line_charge, line_paid, units, adjustments").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      remitLines.push(...data);
+      if (data.length < 1000) break;
+    }
+
     // Load competitor peer prices (if any) for the named-competitor benchmark.
     const peerRows: any[] = [];
     for (let off = 0; ; off += 1000) {
@@ -822,7 +839,38 @@ export async function POST(request: Request) {
       (r) => r.category,
       (r, note) => ({ ...r, recommendation: `${r.recommendation || ""}${r.recommendation ? " " : ""}[${note}]` }),
     );
-    const ruleResults = gate.results;
+    let ruleResults = gate.results;
+
+    // ── Phase B: cross-file joins (CDM × 835) ──
+    // Trace denied dollars back to the CDM line that caused them, and compute the
+    // 835-derived headline metrics the scorecard's back-end areas need.
+    let claimsMetrics: any = null;
+    let claimsAreaDenials: Record<string, { count: number; denied: number }> = {};
+    if (remitClaims.length || remitLines.length) {
+      // hcpcs → engine categories already flagged on that code (enriches the trace).
+      const itemHcpcs = new Map<string, string>();
+      for (const it of allItems) itemHcpcs.set(it.id, (it.hcpcs_cpt_code || "").toString().trim());
+      const findingsByHcpcs = new Map<string, string[]>();
+      for (const r of ruleResults) {
+        const h = normalizeHcpcs(itemHcpcs.get(r.charge_item_id) || "");
+        if (!h) continue;
+        const arr = findingsByHcpcs.get(h) || [];
+        if (!arr.includes(r.category)) arr.push(r.category);
+        findingsByHcpcs.set(h, arr);
+      }
+      const join = buildClaimsJoins(
+        remitClaims as any, remitLines as any,
+        allItems.map((it: any) => ({ id: it.id, hcpcs: it.hcpcs_cpt_code })),
+        findingsByHcpcs,
+      );
+      claimsMetrics = join.metrics;
+      claimsAreaDenials = join.areaDenials;
+      const traceResults = tracesToFindings(join.traces).map((t) => ({
+        ...t, severity: t.severity as RuleResult["severity"],
+        financial_impact: t.financial_impact ?? undefined,
+      })) as RuleResult[];
+      ruleResults = ruleResults.concat(traceResults);
+    }
 
     // Get phases for mapping
     const { data: phases } = await supabaseAdmin
@@ -849,6 +897,8 @@ export async function POST(request: Request) {
         "PC": 6,
         // RVU / low-volume analysis
         "RVU": 6,
+        // Phase-B denial → CDM trace (back-end)
+        "DEN": 2,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;
@@ -1043,6 +1093,7 @@ export async function POST(request: Request) {
       delete meta2.scan_started_at;
       meta2.setup_gate_summary = gate.summary;
       if (referenceVintage) meta2.reference_vintage = referenceVintage;
+      if (claimsMetrics) { meta2.claims_metrics = claimsMetrics; meta2.claims_area_denials = claimsAreaDenials; }
       await supabaseAdmin.from("audits").update({ metadata: meta2 }).eq("id", auditId);
     } catch { /* the guard auto-expires after 5 min regardless */ }
 
