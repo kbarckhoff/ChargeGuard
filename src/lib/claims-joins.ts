@@ -10,6 +10,43 @@
 import type { RemitClaim, RemitLine, RemitAdjustment } from "./remit-parser";
 import { normalizeHcpcs } from "./cms-reference";
 
+// A de-identified claims-extract row (the preferred claims input that replaces
+// raw 835/837). Carries claim detail + adjudication in one row.
+export interface ClaimsExtractRow {
+  claim_id: string | null; hcpcs: string | null; rev_code: string | null; units: number | null;
+  billed_amount: number | null; allowed_amount: number | null; paid_amount: number | null;
+  denial_code: string | null; rarc_code?: string | null; cas_group: string | null;
+}
+
+/**
+ * Map the claims extract into the RemitClaim/RemitLine shape the join consumes,
+ * synthesizing CAS adjustments: a contractual CO-45 for (billed − allowed) so net
+ * collection yield is right, plus the stated denial CARC for the denied portion.
+ */
+export function claimsExtractToRemit(rows: ClaimsExtractRow[]): { claims: RemitClaim[]; lines: RemitLine[] } {
+  const lines: RemitLine[] = [];
+  const byClaim = new Map<string, { charge: number; paid: number; denied: boolean }>();
+  for (const r of rows) {
+    const billed = r.billed_amount ?? 0, paid = r.paid_amount ?? 0;
+    const allowed = r.allowed_amount;
+    const adjustments: RemitAdjustment[] = [];
+    if (allowed != null && billed > allowed) adjustments.push({ group: "CO", carc: "45", amount: billed - allowed });
+    const isDenial = !!r.denial_code;
+    if (isDenial) adjustments.push({ group: (r.cas_group || "CO").toUpperCase(), carc: String(r.denial_code), amount: (allowed != null ? allowed : billed) - paid });
+    lines.push({ claim_id: r.claim_id, hcpcs: r.hcpcs, mod1: null, rev_code: r.rev_code, line_charge: billed, line_paid: paid, units: r.units, adjustments });
+    const key = r.claim_id || `__${lines.length}`;
+    const agg = byClaim.get(key) || { charge: 0, paid: 0, denied: false };
+    agg.charge += billed; agg.paid += paid; agg.denied = agg.denied || (isDenial && paid === 0);
+    byClaim.set(key, agg);
+  }
+  const claims: RemitClaim[] = [...byClaim.entries()].map(([claim_id, a]) => ({
+    claim_id: claim_id.startsWith("__") ? null : claim_id,
+    status: a.denied && a.paid === 0 ? "4" : "1",
+    total_charge: a.charge, total_paid: a.paid, patient_resp: null, payer_control: null, adjustments: [],
+  }));
+  return { claims, lines };
+}
+
 // Scorecard area keys the denial buckets map to (must match AREAS names in scorecard.ts).
 export type AreaKey =
   | "Patient Access"

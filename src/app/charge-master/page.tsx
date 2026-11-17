@@ -2,8 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CDMTable } from "@/components/cdm/CDMTable";
 import { RUImport } from "@/components/cdm/RUImport";
 import { FormularyImport } from "@/components/cdm/FormularyImport";
-import { ClaimsImport } from "@/components/cdm/ClaimsImport";
-import { RemitImport } from "@/components/cdm/RemitImport";
+import { ConvergeInputImport } from "@/components/cdm/ConvergeInputImport";
 import { EmptyState } from "@/components/ui/shared";
 import { FileSpreadsheet } from "lucide-react";
 
@@ -73,8 +72,9 @@ export default async function ChargeMasterPage({
         <div className="flex items-start gap-3">
           <RUImport auditId={auditId} />
           <FormularyImport auditId={auditId} />
-          <ClaimsImport auditId={auditId} />
-          <RemitImport auditId={auditId} />
+          <ConvergeInputImport auditId={auditId} kind="claims-extract" />
+          <ConvergeInputImport auditId={auditId} kind="item-master" />
+          <ConvergeInputImport auditId={auditId} kind="gl" />
         </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">

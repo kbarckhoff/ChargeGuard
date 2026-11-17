@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { applySetupGates } from "@/lib/setup-gates";
-import { buildClaimsJoins, tracesToFindings } from "@/lib/claims-joins";
+import { buildClaimsJoins, tracesToFindings, claimsExtractToRemit } from "@/lib/claims-joins";
+import { runItemMasterRules } from "@/lib/item-master-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
@@ -727,19 +728,23 @@ export async function POST(request: Request) {
       if (data.length < 1000) break;
     }
 
-    // Load imported 835 remittance (if any) for the Phase-B cross-file joins.
-    const remitClaims: any[] = [];
-    const remitLines: any[] = [];
+    // Load the de-identified claims extract (the preferred claims input; replaces
+    // raw 835/837) and map it into the Phase-B cross-file join input shape.
+    const claimsExtract: any[] = [];
     for (let off = 0; ; off += 1000) {
-      const { data } = await supabaseAdmin.from("remit_claims").select("claim_id, status, total_charge, total_paid, patient_resp, adjustments").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, billed_amount, allowed_amount, paid_amount, denial_code, rarc_code, cas_group").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
-      remitClaims.push(...data);
+      claimsExtract.push(...data);
       if (data.length < 1000) break;
     }
+    const { claims: remitClaims, lines: remitLines } = claimsExtractToRemit(claimsExtract as any);
+
+    // Load the item master (if any) for the device / C-code / rev-code checks.
+    const itemMaster: any[] = [];
     for (let off = 0; ; off += 1000) {
-      const { data } = await supabaseAdmin.from("remit_lines").select("claim_id, hcpcs, mod1, rev_code, line_charge, line_paid, units, adjustments").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await supabaseAdmin.from("item_master").select("item_number, description, hcpcs, rev_code, c_code, is_device, charge_code, is_active").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
-      remitLines.push(...data);
+      itemMaster.push(...data);
       if (data.length < 1000) break;
     }
 
@@ -797,6 +802,7 @@ export async function POST(request: Request) {
       ...runBenchmarkRules(allItems, auditState, formularyCodes),
       ...runClaimsRules(allItems, claimLines),
       ...runPeerCompetitorRules(allItems, peerRows, formularyCodes),
+      ...runItemMasterRules(allItems, itemMaster),
     ];
     // Effective-date awareness: skip findings for CDM lines whose code/line is not
     // yet effective by the review date (e.g. a code effective 1/1/2026 in a 2025
@@ -899,6 +905,8 @@ export async function POST(request: Request) {
         "RVU": 6,
         // Phase-B denial → CDM trace (back-end)
         "DEN": 2,
+        // Item-master reconciliation
+        "IM": 1,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;
