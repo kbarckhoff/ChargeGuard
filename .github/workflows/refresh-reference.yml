@@ -37,3 +37,10 @@ jobs:
           ONLY: ${{ github.event.inputs.only }}
           FORCE: ${{ github.event.inputs.force }}
         run: node scripts/refresh-reference.mjs
+      - name: Refresh NCCI (PTP + MUE)
+        # NCCI PTP is ~1.7M pairs, so give Node extra heap. Runs every quarter
+        # with the fee schedules; a failure here still leaves the last good data.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node --max-old-space-size=4096 scripts/refresh-ncci.mjs

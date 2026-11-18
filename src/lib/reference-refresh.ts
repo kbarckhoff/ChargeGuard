@@ -164,9 +164,13 @@ async function readFirstTable(buf: ArrayBuffer): Promise<{ headers: string[]; gr
   const wb = XLSX.read(entry.getData(), { type: "buffer", raw: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const grid: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-  // Header row = first row with a SHORT cell that names a code column.
-  const isHeaderCell = (c: any) => { const s = String(c ?? "").trim(); return s.length < 40 && /^(hcpcs|cpt|column\s*1|hcpcs\/?cpt)/i.test(s); };
-  let hi = grid.findIndex((r) => r.some(isHeaderCell));
+  // Header row = first row with ≥2 SHORT cells that each name a known column.
+  // The ≥2 requirement skips the license disclaimer and single-cell title rows
+  // (e.g. "Column1/Column2 Edits") that sit above the real header.
+  const HDR = /^(hcpcs|cpt|hcpcs\/?cpt|column\s*1|column\s*2|modifier|effective|deletion|mue|adjudication|rationale|units)/i;
+  const headerish = (c: any) => { const s = String(c ?? "").trim(); return s.length > 0 && s.length < 40 && HDR.test(s); };
+  let hi = grid.findIndex((r) => r.filter(headerish).length >= 2);
+  if (hi < 0) hi = grid.findIndex((r) => r.some(headerish));
   if (hi < 0) hi = 0;
   return { headers: grid[hi].map((c) => String(c ?? "")), grid: grid.slice(hi + 1) };
 }
@@ -193,20 +197,53 @@ interface PtpRow { col1: string; col2: string; modifier_indicator: string | null
 async function parsePtpWorkbook(buf: ArrayBuffer): Promise<PtpRow[]> {
   const { headers, grid } = await readFirstTable(buf);
   const find = (re: RegExp) => headers.findIndex((h) => re.test(h));
-  const i1 = find(/column 1/i), i2 = find(/column 2/i);
-  const im = find(/modifier/i), ie = find(/effective/i), id = find(/deletion/i);
-  const rows: PtpRow[] = [];
+  // CMS publishes the outpatient PTP table under a single merged title cell
+  // ("Column1/Column2 Edits") with NO per-column header, so fall back to the
+  // fixed published column order: Col1, Col2, [* pre-1996], Effective, Deletion,
+  // Modifier, Rationale. Detect that layout by sampling the first data rows.
+  let i1 = find(/column\s*1/i), i2 = find(/column\s*2/i);
+  let im = find(/modifier/i), ie = find(/effective/i), id = find(/deletion/i);
+  // A single merged title cell ("Column1/Column2 Edits") matches both regexes at
+  // the same index — that is NOT a real two-column header, so force positional.
+  if (i1 < 0 || i2 < 0 || i1 === i2) {
+    // Positional: the two code columns are the first two cells of a data row
+    // that both look like HCPCS/CPT codes. Modifier is the 0/1/9 column.
+    const sample = grid.slice(0, 50).filter((r) => normalizeHcpcs(String(r[0] ?? "")) && normalizeHcpcs(String(r[1] ?? "")));
+    if (sample.length) {
+      i1 = 0; i2 = 1;
+      const width = Math.max(...sample.map((r) => r.length));
+      // Modifier indicator column = the one whose values are all 0/1/9.
+      im = -1;
+      for (let c = 2; c < width; c++) {
+        if (sample.every((r) => /^[019]$/.test(String(r[c] ?? "").trim()))) { im = c; break; }
+      }
+      // Effective/deletion = the date-like columns (YYYYMMDD or M/D/YYYY).
+      const dateCols = [];
+      for (let c = 2; c < width; c++) {
+        if (sample.some((r) => /\d{8}|\d{1,2}\/\d{1,2}\/\d{2,4}/.test(String(r[c] ?? "").trim()))) dateCols.push(c);
+      }
+      ie = dateCols[0] ?? -1; id = dateCols[1] ?? -1;
+    }
+  }
+  // Collapse to one row per pair = its current definition (prefer the row that
+  // is still active, then the latest effective date). The source lists a pair
+  // more than once when an edit was superseded or re-dated.
+  const byPair = new Map<string, PtpRow>();
+  const score = (r: PtpRow) => (r.deletion ? 0 : 1_000_000_0000) + (parseInt(String(r.effective ?? "").replace(/\D/g, "").slice(0, 8), 10) || 0);
   for (const r of grid) {
     const c1 = normalizeHcpcs(String(r[i1] ?? "")), c2 = normalizeHcpcs(String(r[i2] ?? ""));
     if (!c1 || !c2) continue;
-    rows.push({
+    const row: PtpRow = {
       col1: c1, col2: c2,
       modifier_indicator: im >= 0 ? String(r[im] ?? "").trim().slice(0, 1) || null : null,
       effective: ie >= 0 ? (r[ie] == null ? null : String(r[ie])) : null,
-      deletion: id >= 0 ? (r[id] == null ? null : String(r[id])) : null,
-    });
+      deletion: id >= 0 ? (String(r[id] ?? "").trim() && !/^\*+$/.test(String(r[id]).trim()) ? String(r[id]) : null) : null,
+    };
+    const key = `${c1}|${c2}`;
+    const prev = byPair.get(key);
+    if (!prev || score(row) > score(prev)) byPair.set(key, row);
   }
-  return rows;
+  return Array.from(byPair.values());
 }
 
 /** PTP has its own table (pairs, not per-HCPCS), so it bypasses persist(). */
@@ -223,21 +260,19 @@ export async function refreshNcciPtpTable(s: SourceStatus): Promise<RefreshOutco
     }
     const rows = await parsePtpWorkbook(buf);
     if (rows.length < 50_000) {
-      const AdmZip: any = (await import("adm-zip" as any)).default;
-      const XLSX = await import("xlsx");
-      const zip = new AdmZip(Buffer.from(buf));
-      const entries = zip.getEntries().map((e: any) => `${e.entryName}:${e.getData().length}`);
-      const { headers } = await readFirstTable(buf);
-      await recordFailure(s.key, `only ${rows.length} pairs; entries=${JSON.stringify(entries).slice(0, 180)} headers=${JSON.stringify(headers.slice(0, 10)).slice(0, 200)}`);
+      await recordFailure(s.key, `only ${rows.length} pairs parsed — likely a CMS layout change`);
       return { key: s.key, status: "failed", error: "too few pairs" };
     }
     const db = admin();
     await db.from("ncci_ptp").delete().neq("id", 0);
     let written = 0;
-    for (let i = 0; i < rows.length; i += 1000) {
-      const { error } = await db.from("ncci_ptp").insert(rows.slice(i, i + 1000));
-      if (error) throw new Error(`ncci_ptp insert failed (table provisioned?): ${error.message}`);
-      written += Math.min(1000, rows.length - i);
+    const BATCH = 5000;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const slice = rows.slice(i, i + BATCH);
+      // upsert on the pair key so any residual duplicate is absorbed, not fatal.
+      const { error } = await db.from("ncci_ptp").upsert(slice, { onConflict: "col1,col2", ignoreDuplicates: true });
+      if (error) throw new Error(`ncci_ptp insert failed @${i}: ${error.message}`);
+      written += slice.length;
     }
     const vintage = (zipUrl.match(/20\d\d/g)?.pop()) || String(new Date().getUTCFullYear());
     await admin().from("cms_reference_sources").upsert({ key: s.key, vintage, last_refreshed: new Date().toISOString(), row_count: written, status: "ok", last_error: null }, { onConflict: "key" });
@@ -258,8 +293,9 @@ const REFRESHERS: Record<string, Refresher> = {
     const zipUrl = await resolveNcciZipUrl(s.cmsUrl, /hospital|outpatient/i);
     const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
     const rows = await parseMueWorkbook(buf);
-    const yr = (zipUrl.match(/20\d\d/g)?.pop()) || String(new Date().getUTCFullYear());
-    return { rows, vintage: String(yr) };
+    const qm = zipUrl.match(/(20\d\d)q([1-4])/i);
+    const vintage = qm ? `${qm[1]} Q${qm[2]}` : ((zipUrl.match(/20\d\d/g)?.pop()) || String(new Date().getUTCFullYear()));
+    return { rows, vintage };
   },
   asp: async (s) => {
     const zipUrl = await resolveAspZipUrl(s.cmsUrl);
