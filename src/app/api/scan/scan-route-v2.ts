@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
-import { runChargeCapturePairRules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
+import { runChargeCapturePairRules, runChargeCaptureBatch2Rules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
 import { runItemMasterRules } from "@/lib/item-master-rules";
 import { runPtpUnbundlingRules, runMueRules } from "@/lib/ncci-rules";
 import { loadRelevantPtp } from "@/lib/ncci";
@@ -735,7 +735,7 @@ export async function POST(request: Request) {
     // item-master reconciliation).
     const claimsExtract: any[] = [];
     for (let off = 0; ; off += 1000) {
-      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, mod1, mod2, mod3, mod4, billed_amount, allowed_amount, paid_amount, denial_code, payer").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, mod1, mod2, mod3, mod4, dx_code, billed_amount, allowed_amount, paid_amount, denial_code, payer").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
       claimsExtract.push(...data);
       if (data.length < 1000) break;
@@ -813,6 +813,7 @@ export async function POST(request: Request) {
       ...runPeerCompetitorRules(allItems, peerRows, formularyCodes),
       // Converge batch 1 — rules that use the new de-identified inputs.
       ...runChargeCapturePairRules(allItems, claimsExtract),
+      ...runChargeCaptureBatch2Rules(allItems, claimsExtract),
       ...runDenialRules(allItems, claimsExtract),
       ...runPricingVsPaidRules(allItems, claimsExtract),
       ...runItemMasterRules(allItems, itemMaster),
@@ -873,7 +874,7 @@ export async function POST(request: Request) {
         // RVU / low-volume analysis
         "RVU": 6,
         // Converge batch 1 (new intake fields)
-        "CC": 3, "DEN": 2, "PVP": 6, "IM": 1,
+        "CC": 3, "CC2": 3, "DEN": 2, "PVP": 6, "IM": 1,
         // Converge batch 2 (NCCI)
         "NCCI": 2,
       };
