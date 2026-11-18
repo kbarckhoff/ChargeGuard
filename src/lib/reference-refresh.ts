@@ -129,26 +129,44 @@ async function parseAspWorkbook(buf: ArrayBuffer): Promise<ParsedRow[]> {
 // ── NCCI (PTP + MUE) download + parse ────────────────────────
 // CMS posts NCCI edits quarterly as zips under /files/zip/. We resolve the newest
 // zip for the hospital-outpatient variant, unzip, and parse the first table.
+// The CMS NCCI pages link both the full edit tables and small "quarterly
+// additions/deletions/revisions" change files. We want the FULL table, so we
+// exclude the change files and prefer the full one (usually the larger file).
+const NCCI_CHANGE = /addition|deletion|revision|\bchange/i;
 async function resolveNcciZipUrl(landing: string, mustMatch: RegExp): Promise<string> {
   const html = await (await fetch(landing, { headers: { "User-Agent": UA } })).text();
-  const hrefs = Array.from(html.matchAll(/href="([^"]+\.zip)"/gi)).map((m) => m[1]);
-  const abs = hrefs.map((h) => (h.startsWith("http") ? h : `https://www.cms.gov${h}`));
-  const pool = abs.filter((u) => mustMatch.test(u));
-  if (!pool.length) throw new Error("no matching NCCI zip link on CMS page (layout may have changed)");
-  pool.sort((a, b) => (b.match(/20\d\d/g)?.pop() || "").localeCompare(a.match(/20\d\d/g)?.pop() || ""));
+  const hrefs = Array.from(html.matchAll(/href="([^"]+\.zip[^"]*)"/gi)).map((m) => m[1]);
+  const abs = hrefs.map((h) => (h.startsWith("http") ? h : `https://www.cms.gov${h}`)).map((u) => {
+    // CMS gates many downloads behind an AMA-license interstitial
+    // (/license/ama?file=/files/zip/…). The real file path is the `file` param.
+    const m = u.match(/[?&]file=([^&]+)/);
+    return (/\/license\//i.test(u) && m) ? `https://www.cms.gov${decodeURIComponent(m[1])}` : u;
+  });
+  const pool = abs.filter((u) => /\.zip$/i.test(u) && mustMatch.test(u) && !NCCI_CHANGE.test(u));
+  if (!pool.length) throw new Error("no full NCCI zip link on CMS page (only change files, or layout changed)");
+  // Prefer the newest year; among those, the shortest URL (full tables have
+  // plainer names than the long "...additions-deletions-revisions..." ones).
+  pool.sort((a, b) => ((b.match(/20\d\d/g)?.pop() || "").localeCompare(a.match(/20\d\d/g)?.pop() || "")) || (a.length - b.length));
   return pool[0];
 }
 
+// Read the data table from an NCCI zip. Handles xlsx/csv/txt, skips the AMA
+// license-disclaimer preamble, and finds the real header row (a short cell that
+// names a code column), not the long copyright paragraph.
 async function readFirstTable(buf: ArrayBuffer): Promise<{ headers: string[]; grid: any[][] }> {
   const AdmZip: any = (await import("adm-zip" as any)).default;
   const XLSX = await import("xlsx");
   const zip = new AdmZip(Buffer.from(buf));
-  const entry = zip.getEntries().find((e: any) => /\.(xlsx|xls|csv)$/i.test(e.entryName));
-  if (!entry) throw new Error("no xlsx/csv inside the NCCI zip");
-  const wb = XLSX.read(entry.getData(), { type: "buffer" });
+  const dataFiles = zip.getEntries().filter((e: any) => /\.(xlsx|xls|csv|txt)$/i.test(e.entryName) && !NCCI_CHANGE.test(e.entryName));
+  if (!dataFiles.length) throw new Error("no data file inside the NCCI zip");
+  // Prefer the largest file (full tables dwarf any readme).
+  const entry = dataFiles.sort((a: any, b: any) => b.getData().length - a.getData().length)[0];
+  const wb = XLSX.read(entry.getData(), { type: "buffer", raw: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const grid: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-  let hi = grid.findIndex((r) => r.some((c) => /column 1|hcpcs|cpt/i.test(String(c))));
+  // Header row = first row with a SHORT cell that names a code column.
+  const isHeaderCell = (c: any) => { const s = String(c ?? "").trim(); return s.length < 40 && /^(hcpcs|cpt|column\s*1|hcpcs\/?cpt)/i.test(s); };
+  let hi = grid.findIndex((r) => r.some(isHeaderCell));
   if (hi < 0) hi = 0;
   return { headers: grid[hi].map((c) => String(c ?? "")), grid: grid.slice(hi + 1) };
 }
@@ -195,9 +213,24 @@ async function parsePtpWorkbook(buf: ArrayBuffer): Promise<PtpRow[]> {
 export async function refreshNcciPtpTable(s: SourceStatus): Promise<RefreshOutcome> {
   try {
     const zipUrl = await resolveNcciZipUrl(s.cmsUrl, /hospital|outpatient/i);
-    const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
+    const resp = await fetch(zipUrl, { headers: { "User-Agent": UA } });
+    const buf = await resp.arrayBuffer();
+    // Diagnostic guard: confirm we actually got a zip (starts with "PK").
+    const head = Buffer.from(buf.slice(0, 4)).toString("latin1");
+    if (head.slice(0, 2) !== "PK") {
+      const text = Buffer.from(buf.slice(0, 160)).toString("utf8").replace(/\s+/g, " ");
+      throw new Error(`DIAG not-a-zip url=${zipUrl} status=${resp.status} ctype=${resp.headers.get("content-type")} bytes=${buf.byteLength} head=${JSON.stringify(text)}`);
+    }
     const rows = await parsePtpWorkbook(buf);
-    if (rows.length < 50_000) { await recordFailure(s.key, `only ${rows.length} PTP pairs parsed`); return { key: s.key, status: "failed", error: "too few pairs" }; }
+    if (rows.length < 50_000) {
+      const AdmZip: any = (await import("adm-zip" as any)).default;
+      const XLSX = await import("xlsx");
+      const zip = new AdmZip(Buffer.from(buf));
+      const entries = zip.getEntries().map((e: any) => `${e.entryName}:${e.getData().length}`);
+      const { headers } = await readFirstTable(buf);
+      await recordFailure(s.key, `only ${rows.length} pairs; entries=${JSON.stringify(entries).slice(0, 180)} headers=${JSON.stringify(headers.slice(0, 10)).slice(0, 200)}`);
+      return { key: s.key, status: "failed", error: "too few pairs" };
+    }
     const db = admin();
     await db.from("ncci_ptp").delete().neq("id", 0);
     let written = 0;
