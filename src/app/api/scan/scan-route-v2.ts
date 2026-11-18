@@ -13,6 +13,7 @@ import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-ref
 import { loadDeptMaps, isStructuralCategory } from "@/lib/departments";
 import { changeFieldForCategory, AWAITING_SYNC_STATUSES } from "@/lib/change-log";
 import { resolveActiveOrg } from "@/lib/active-org";
+import { disabledRuleIdsForFacility, type FacilityType } from "@/lib/rule-catalog";
 
 export const maxDuration = 60;
 
@@ -783,8 +784,13 @@ export async function POST(request: Request) {
       if (parsed && !isNaN(parsed.getTime())) reviewDate = parsed;
       const lvt = Number(md.low_volume_threshold);
       if (Number.isFinite(lvt) && lvt >= 0) lowVolumeThreshold = lvt;
+      // Facility-type scoping: a professional-fee practice or behavioral-health
+      // program doesn't run the hospital OPPS rules. Add every catalog rule that
+      // doesn't apply to this facility to the disabled set, so only the applicable
+      // rules produce findings. Universal/engine-only rules are never in this list.
+      const ft = (auditRow?.facility_type as FacilityType) || "short_term_acute";
+      for (const id of disabledRuleIdsForFacility(ft)) disabledRules.add(id);
     } catch { /* national fallback */ }
-    // Short-term acute care runs the full rule set (no facility-based scoping).
 
     // Load the live CMS reference set from the DB (falls back to bundled JSON),
     // so the automatic quarterly refresh takes effect for every scan.

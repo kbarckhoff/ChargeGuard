@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
 import { Badge } from "@/components/ui/shared";
 import { TeamManager } from "@/components/settings/TeamManager";
+import { FacilityTypeSetting } from "@/components/settings/FacilityTypeSetting";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -70,9 +71,8 @@ export default async function SettingsPage() {
                 <span className="text-sm text-[#64748b]">Slug</span>
                 <span className="text-sm text-[#334155] font-mono">{org?.slug}</span>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-[#eef1f5]">
-                <span className="text-sm text-[#64748b]">Facility type</span>
-                <span className="text-sm font-medium text-[#0f172a]">Short-Term Acute Care</span>
+              <div className="pt-3 border-t border-[#eef1f5]">
+                <FacilityTypeSetting initial={(org?.settings?.facility_type as any) || "short_term_acute"} />
               </div>
             </div>
           </div>

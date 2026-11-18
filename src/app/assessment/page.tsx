@@ -93,6 +93,7 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
       reviewPeriod={(audit.metadata as any)?.review_period || ""}
       lowVolume={(audit.metadata as any)?.low_volume_threshold ?? null}
       initialComps={Array.isArray((audit.metadata as any)?.competitors) ? (audit.metadata as any).competitors : null}
+      facilityType={(audit.facility_type as any) || "short_term_acute"}
     />
   );
 }

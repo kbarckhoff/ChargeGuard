@@ -9,12 +9,27 @@ import * as XLSX from "xlsx-js-style";
 export const maxDuration = 60;
 
 // Medicare reference rate for a code — the common yardstick charges are
-// benchmarked against (OPPS APC payment, else lab/drug/physician fee schedule).
-function cmsRate(code: string): number {
+// benchmarked against. Hospital outpatient uses the OPPS APC payment first; a
+// professional-fee practice bills on the physician fee schedule, so it uses the
+// MPFS rate first instead.
+function cmsRate(code: string, proFee = false): number {
   const r = getReference(code);
   if (!r) return 0;
+  if (proFee) return refNum(r.mc_fee) || refNum(r.apc_payment) || refNum(r.clfs) || refNum(r.asp) || 0;
   return refNum(r.apc_payment) || refNum(r.clfs) || refNum(r.asp) || refNum(r.mc_fee) || 0;
 }
+
+// Expected pricing posture by facility type. `low`/`high` are the % of the peer
+// median below/above which a charge is flagged "below"/"above" market. Critical
+// access hospitals are expected to sit lower against peers (roughly the 25th–50th
+// percentile), so their acceptable band is centered lower than a large acute
+// system (roughly the 50th–90th). `proFee` switches the Medicare yardstick to MPFS.
+const FACILITY_BAND: Record<string, { low: number; high: number; proFee: boolean; label: string }> = {
+  short_term_acute:   { low: 75, high: 150, proFee: false, label: "~50th–90th percentile of peers" },
+  critical_access:    { low: 50, high: 120, proFee: false, label: "~25th–50th percentile of peers" },
+  behavioral_php_iop: { low: 75, high: 150, proFee: false, label: "~50th–90th percentile of peers" },
+  pro_fee:            { low: 75, high: 150, proFee: true,  label: "professional fee schedule (MPFS) basis" },
+};
 
 // Drug/biological codes are billed per a small dosage unit defined by the HCPCS
 // (e.g. J0881 = per 1 mcg), but each hospital's MRF lists the gross charge for
@@ -45,6 +60,11 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    // Facility type drives the expected pricing band and the Medicare yardstick.
+    const { data: auditRow } = await db.from("audits").select("facility_type").eq("id", auditId).single();
+    const facilityType = (auditRow?.facility_type as string) || "short_term_acute";
+    const band = FACILITY_BAND[facilityType] || FACILITY_BAND.short_term_acute;
 
     // Per-competitor gross price per HCPCS (a competitor listing a code more than
     // once is averaged), so we can show each competitor's price, the distribution
@@ -137,12 +157,13 @@ export async function GET(request: Request) {
         const med = median(prices);
         const lo = Math.min(...prices);
         const hi = Math.max(...prices);
-        const ref = cmsRate(code);
+        const ref = cmsRate(code, band.proFee);
         const yourMk = ref > 0 ? Math.round((your / ref) * 10) / 10 : null;
         const peerMk = ref > 0 ? Math.round((med / ref) * 10) / 10 : null;
-        // Compare the client's charge to the competitor median (both gross charges).
+        // Compare the client's charge to the competitor median (both gross charges),
+        // against the band expected for this facility type.
         const pct = med > 0 ? Math.round((your / med) * 100) : 100;
-        const position = pct < 75 ? "below" : pct > 150 ? "above" : "at";
+        const position = pct < band.low ? "below" : pct > band.high ? "above" : "at";
         const belowMarket = your < med;
         // Drugs are not comparable on gross charge (unit mismatch); count them in
         // their own bucket and keep them out of the below/above/at market signal.
@@ -198,6 +219,8 @@ export async function GET(request: Request) {
     const peerMks = rows.filter((r) => !r.drug && r.peerMk != null).map((r) => r.peerMk);
     (summary as any).yourMarkupMedian = yourMks.length ? Math.round(median(yourMks) * 10) / 10 : null;
     (summary as any).peerMarkupMedian = peerMks.length ? Math.round(median(peerMks) * 10) / 10 : null;
+    (summary as any).facilityType = facilityType;
+    (summary as any).facilityBand = band.label;
     (summary as any).maxPeers = allComps.size;
     // Show the biggest, cleanest gaps first: clean 1-to-1 codes rank ahead of
     // ambiguous ones so the trustworthy findings are on top.

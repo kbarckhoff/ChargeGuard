@@ -13,19 +13,25 @@
 // outpatient settings. The Intake facility-type selector filters the list, and
 // the scan only runs the rules for the selected facility type.
 
-// ChargeGuard currently supports short-term acute care only. The type is kept as
-// a single-member union so existing call sites compile unchanged, but there is no
-// facility selection in the product anymore.
-export type FacilityType = "short_term_acute";
+// Supported facility types. Hospital outpatient settings (acute, critical access,
+// behavioral health PHP/IOP) bill under OPPS/UB-04 and share the hospital rule set;
+// professional-fee practices bill on MPFS and only get the universal charge-
+// integrity checks. Acute vs critical access run the same rules but differ in the
+// expected pricing band (see peer-compare).
+export type FacilityType = "short_term_acute" | "critical_access" | "behavioral_php_iop" | "pro_fee";
 
 export const DEFAULT_FACILITY: FacilityType = "short_term_acute";
 
 export const FACILITY_TYPES: { value: FacilityType; label: string; note: string }[] = [
-  { value: "short_term_acute", label: "Short-Term Acute Care", note: "Acute hospital billing outpatient (OPPS) and inpatient (IPPS). Full rule set." },
+  { value: "short_term_acute", label: "Short-Term Acute Care", note: "Acute hospital outpatient (OPPS) and inpatient (IPPS). Full rule set; commercial pricing band ~50th–90th percentile of peers." },
+  { value: "critical_access", label: "Critical Access Hospital", note: "Rural CAH outpatient. Same charge-integrity and coding rules as acute, with a lower expected pricing band (~25th–50th percentile)." },
+  { value: "behavioral_php_iop", label: "Behavioral Health (PHP/IOP)", note: "Hospital-based partial hospitalization / intensive outpatient. Hospital outpatient rule set; device and surgical checks rarely apply." },
+  { value: "pro_fee", label: "Professional Fee (Physician Practice)", note: "Physician / professional billing on MPFS. Universal charge-integrity checks only; OPPS and UB-04 hospital rules do not apply." },
 ];
 
-// Full rule set applies to short-term acute care.
-const OPPS: FacilityType[] = ["short_term_acute"];
+// Hospital outpatient (OPPS / UB-04) facility types. Rules tagged with this list
+// run for acute, critical access, and behavioral health, but NOT professional fee.
+const OPPS: FacilityType[] = ["short_term_acute", "critical_access", "behavioral_php_iop"];
 
 export interface RuleItem {
   key: string;
@@ -185,4 +191,13 @@ export function ruleIdsForFacility(ft: FacilityType): Set<string> {
   const s = new Set<string>();
   for (const g of RULE_CATALOG) for (const i of g.items) if (ruleAppliesTo(i, ft)) i.ids.forEach((id) => s.add(id));
   return s;
+}
+
+/** Catalog rule_ids that do NOT apply to a facility type — the scan adds these to
+ *  its disabled set so only the applicable rules run (universal/engine-only rules,
+ *  which aren't facility-tagged, are never in this list and always run). */
+export function disabledRuleIdsForFacility(ft: FacilityType): string[] {
+  const out: string[] = [];
+  for (const g of RULE_CATALOG) for (const i of g.items) if (!ruleAppliesTo(i, ft)) i.ids.forEach((id) => out.push(id));
+  return out;
 }

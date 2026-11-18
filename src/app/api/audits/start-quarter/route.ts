@@ -66,9 +66,12 @@ export async function POST(request: Request) {
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // ChargeGuard supports short-term acute care only. Stamp the period so the
-    // quarterly lock can see it (quarterly clients only; unlimited stay unscheduled).
-    const update: Record<string, any> = { status: "in_progress", facility_type: "short_term_acute" };
+    // Inherit the facility type set once at the entity (organization) level, so a
+    // new review runs the right rule set without re-picking it. Stamp the period
+    // so the quarterly lock can see it (quarterly clients only; unlimited stay unscheduled).
+    const { data: orgRow } = await db.from("organizations").select("settings").eq("id", userData.org_id).single();
+    const facilityType = (orgRow?.settings?.facility_type as string) || "short_term_acute";
+    const update: Record<string, any> = { status: "in_progress", facility_type: facilityType };
     if (runCadence === "quarterly") { update.period_year = cur.year; update.period_quarter = cur.quarter; }
     await db.from("audits").update(update).eq("id", newId);
 

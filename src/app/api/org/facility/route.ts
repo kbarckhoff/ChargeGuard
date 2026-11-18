@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { FACILITY_TYPES } from "@/lib/rule-catalog";
 
 // Saves the facility type once at the entity (organization) level. New reviews
 // inherit it, so it isn't picked each time. Stored in organizations.settings
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { facilityType } = await request.json();
-    const allowed = ["short_term_acute"];
+    const allowed = FACILITY_TYPES.map((f) => f.value) as string[];
     if (!allowed.includes(facilityType)) {
       return NextResponse.json({ error: "A valid facilityType is required" }, { status: 400 });
     }

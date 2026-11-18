@@ -102,7 +102,7 @@ const STEPS = [
 ];
 
 export function AssessmentFlow({
-  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, reviewPeriod, lowVolume, initialComps,
+  auditId, hospitalName, auditName, chargeItems, counts, stats, peerCounts, isOwner, disabledRules, status, intakeLocked, reviewPeriod, lowVolume, initialComps, facilityType,
 }: {
   auditId: string;
   hospitalName: string;
@@ -118,6 +118,7 @@ export function AssessmentFlow({
   reviewPeriod?: string;
   lowVolume?: number | null;
   initialComps?: { n: string; c: string }[] | null;
+  facilityType?: FacilityType;
 }) {
   // Once the intake steps (Intake -> Imports -> Review Imports) are finished, the
   // review is locked: profile, files, competitors, and rules become read-only.
@@ -203,7 +204,7 @@ export function AssessmentFlow({
                 <button onClick={reopenIntake} disabled={lockBusy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#1e293b] bg-white border border-[#c7d2fe] hover:bg-[#eef2ff] disabled:opacity-50">{lockBusy ? <Loader2 size={13} className="animate-spin" /> : null} Reopen to edit</button>
               </div>
             )}
-            {step === 0 && <Intake comps={comps} setComps={setComps} saveComps={saveComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} onNext={() => setStep(nextOf(0))} />}
+            {step === 0 && <Intake comps={comps} setComps={setComps} saveComps={saveComps} hospitalName={hospitalName} auditName={auditName} peerCounts={pc} isOwner={isOwner} auditId={auditId} disabledRules={disabledRules || []} locked={locked} initialReviewPeriod={reviewPeriod} initialLowVolume={lowVolume} facilityType={facilityType} onNext={() => setStep(nextOf(0))} />}
             {step === 1 && <Imports auditId={auditId} chargeItems={chargeItems} counts={counts} locked={locked} onBack={() => setStep(prevOf(1))} onNext={() => setStep(nextOf(1))} />}
             {step === 2 && <Review auditId={auditId} counts={counts} chargeItems={chargeItems} isOwner={isOwner} onBack={() => setStep(prevOf(2))} onNext={() => setStep(nextOf(2))} />}
             {step === 3 && isOwner && <Peer comps={comps} setComps={setComps} saveComps={saveComps} auditId={auditId} peerCounts={pc} onBack={() => setStep(prevOf(3))} />}
@@ -243,8 +244,8 @@ function chip(text: string, tone: string) {
 }
 
 /* ---------- STEP 1: INTAKE ---------- */
-function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume }: any) {
-  const facilityType: FacilityType = "short_term_acute";
+function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCounts, isOwner, onNext, auditId, disabledRules, locked, initialReviewPeriod, initialLowVolume, facilityType: facilityTypeProp }: any) {
+  const facilityType: FacilityType = facilityTypeProp || "short_term_acute";
   const todayIso = new Date().toISOString().slice(0, 10);
   // Review date is no longer a manual input — it defaults to today. If this
   // review has no date recorded yet, persist today's date once on mount so the
