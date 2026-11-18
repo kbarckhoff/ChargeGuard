@@ -150,6 +150,15 @@ export const RULE_CATALOG: RuleGroup[] = [
       { key: "shoppable", name: "Shoppable service checks", desc: "Required shoppable services missing, unpriced, or inpatient/DRG gaps.", ids: ["PT.drg", "PT.missing", "PT.unpriced"], facilities: OPPS },
     ],
   },
+  {
+    group: "Claims & item master (Converge)",
+    items: [
+      { key: "cc_companion", name: "Charge-capture companions", desc: "From the claims extract: a drug billed with no administration (or vice versa), an add-on infusion with no initial service, or a specimen collection with no lab test.", ids: ["CC.drug_no_admin", "CC.admin_no_drug", "CC.addon_no_initial", "CC.coll_no_lab"] },
+      { key: "denials", name: "Denial analysis", desc: "Recurring denial reasons by code, CARC and payer from the claims extract, with denied dollars.", ids: ["DEN"] },
+      { key: "pricing_vs_paid", name: "Pricing vs paid", desc: "CDM charge priced below the average payer-allowed amount from the claims extract (reimbursement capped by the charge).", ids: ["PVP.low"] },
+      { key: "item_master", name: "Item-master reconciliation", desc: "Device / C-code items not set up as devices in the CDM, and revenue-code mismatches between the item master and the chargemaster.", ids: ["IM.device", "IM.rev"] },
+    ],
+  },
 ];
 
 /** Does a rule apply to the given facility type? (no list = universal). */
