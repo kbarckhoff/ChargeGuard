@@ -71,6 +71,10 @@ const EXPLICIT: Record<string, FindingClass> = {
 
   // ── Code validity: coding correctness + fee-schedule compliance ──
   "Add-On - Missing Primary": "code_validity",
+  "Charge Capture — Missing Companion": "code_validity",
+  "Denial Analysis (Claims)": "code_validity",
+  "Pricing vs Paid (Claims)": "pricing",
+  "Item Master Reconciliation": "code_validity",
   "Clinic Visit → G0463 (SI=B)": "code_validity",
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",

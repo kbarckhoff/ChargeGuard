@@ -52,7 +52,7 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
   }
   const cnt = async (t: string) => (await admin.from(t).select("id", { count: "exact", head: true }).eq("audit_id", audit.id)).count || 0;
   const chargeItems = await cnt("charge_items");
-  const counts = { ru: await cnt("charge_usage"), formulary: await cnt("charge_formulary"), claims: await cnt("claim_lines") };
+  const counts = { ru: await cnt("charge_usage"), formulary: await cnt("charge_formulary"), claims: await cnt("claim_lines"), claims_extract: await cnt("claims_extract"), item_master: await cnt("item_master"), gl: await cnt("gl_departments") };
   // Per-competitor peer price counts (for loaded status + per-row lock)
   const peerCounts: Record<string, number> = {};
   for (let off = 0; ; off += 1000) {

@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
+import { runChargeCapturePairRules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
+import { runItemMasterRules } from "@/lib/item-master-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
@@ -725,6 +727,24 @@ export async function POST(request: Request) {
       if (data.length < 1000) break;
     }
 
+    // Load the de-identified claims extract + item master (Converge inputs) for
+    // the Converge rule batch (charge-capture companions, denials, pricing-vs-paid,
+    // item-master reconciliation).
+    const claimsExtract: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, billed_amount, allowed_amount, paid_amount, denial_code, payer").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      claimsExtract.push(...data);
+      if (data.length < 1000) break;
+    }
+    const itemMaster: any[] = [];
+    for (let off = 0; ; off += 1000) {
+      const { data } = await supabaseAdmin.from("item_master").select("item_number, description, hcpcs, rev_code, c_code, is_device, charge_code, is_active").eq("audit_id", auditId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      itemMaster.push(...data);
+      if (data.length < 1000) break;
+    }
+
     // Load competitor peer prices (if any) for the named-competitor benchmark.
     const peerRows: any[] = [];
     for (let off = 0; ; off += 1000) {
@@ -779,6 +799,11 @@ export async function POST(request: Request) {
       ...runBenchmarkRules(allItems, auditState, formularyCodes),
       ...runClaimsRules(allItems, claimLines),
       ...runPeerCompetitorRules(allItems, peerRows, formularyCodes),
+      // Converge batch 1 — rules that use the new de-identified inputs.
+      ...runChargeCapturePairRules(allItems, claimsExtract),
+      ...runDenialRules(allItems, claimsExtract),
+      ...runPricingVsPaidRules(allItems, claimsExtract),
+      ...runItemMasterRules(allItems, itemMaster),
     ];
     // Effective-date awareness: skip findings for CDM lines whose code/line is not
     // yet effective by the review date (e.g. a code effective 1/1/2026 in a 2025
@@ -832,6 +857,8 @@ export async function POST(request: Request) {
         "PC": 6,
         // RVU / low-volume analysis
         "RVU": 6,
+        // Converge batch 1 (new intake fields)
+        "CC": 3, "DEN": 2, "PVP": 6, "IM": 1,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox } from "lucide-react";
+import { LayoutDashboard, Database, Settings, LogOut, BarChart3, ClipboardList, Building2, ChevronDown, Check, Loader2, Inbox, Network } from "lucide-react";
 
 type Org = { id: string; name: string };
 type OrgInfo = { orgs: Org[]; activeOrgId: string | null; isPlatformOwner: boolean; isSuper: boolean; canAssign: boolean };
@@ -92,6 +92,7 @@ function ClientSwitcher({ info }: { info: OrgInfo | null }) {
 const NAV = [
   { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
   { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
+  { label: "Departments", href: "/departments", icon: Network },
   { label: "My Work Queue", href: "/queue", icon: Inbox },
   { label: "Audit Log", href: "/change-log", icon: ClipboardList },
   { label: "References", href: "/references", icon: Database },

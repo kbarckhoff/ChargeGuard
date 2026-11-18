@@ -1,25 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import TopNav from "@/components/layout/TopNav";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DepartmentsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/auth/login");
-  }
-
+  if (!user) redirect("/auth/login");
   return (
-    <div className="flex flex-col h-screen bg-white overflow-hidden">
-      <TopNav />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {children}
-      </main>
+    <div className="flex h-screen bg-white overflow-hidden">
+      <AppSidebar />
+      <main className="flex-1 flex flex-col overflow-hidden min-h-0">{children}</main>
     </div>
   );
 }

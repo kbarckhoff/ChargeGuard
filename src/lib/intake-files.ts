@@ -7,7 +7,7 @@ import type { FacilityType } from "./rule-catalog";
 // spec: the column contract for the file, surfaced in the UI as a downloadable
 // template / spec so clients send the right shape the first time.
 
-export type IntakeHandler = "cdm" | "ru" | "formulary" | null;
+export type IntakeHandler = "cdm" | "ru" | "formulary" | "claims_extract" | "item_master" | "gl" | null;
 
 export interface IntakeColumn {
   name: string;      // canonical column name shown in the spec
@@ -22,7 +22,7 @@ export interface IntakeFile {
   accepts: string;
   required: boolean;
   handler: IntakeHandler;
-  countKey?: "cdm" | "ru" | "formulary";
+  countKey?: "cdm" | "ru" | "formulary" | "claims_extract" | "item_master" | "gl";
   spec: IntakeColumn[];
 }
 
@@ -84,7 +84,76 @@ const FORMULARY: IntakeFile = {
   ],
 };
 
-const CORE_FILES: IntakeFile[] = [CDM, RU, FORMULARY];
+// ── New Converge inputs (de-identified; optional per review). ──
+const CLAIMS_EXTRACT: IntakeFile = {
+  key: "claims_extract",
+  title: "Claims Extract (de-identified)",
+  desc: "Preferred claims input. One row per adjudicated claim line with denial and payment detail. Keep it de-identified — use an internal claim reference number, no patient PHI.",
+  accepts: "CSV",
+  required: true,
+  handler: "claims_extract",
+  countKey: "claims_extract",
+  spec: [
+    { name: "Claim Number", required: true, desc: "De-identified claim control number (used to request specific claims later; no PHI)." },
+    { name: "Line Control Number", required: false, desc: "De-identified line control number (837↔835 line match)." },
+    { name: "Service Date", required: false, desc: "Date of service." },
+    { name: "HCPCS/CPT", required: true, desc: "Procedure code on the line." },
+    { name: "Modifier 1/2/3/4", required: false, desc: "Line modifiers as billed on the 837." },
+    { name: "Revenue Code", required: false, desc: "UB-04 revenue code." },
+    { name: "Units", required: false, desc: "Billed units of service." },
+    { name: "Diagnosis", required: false, desc: "Principal diagnosis / pointed diagnosis code." },
+    { name: "Place of Service", required: false, desc: "POS code (drives PBD / telehealth checks)." },
+    { name: "Billed Amount", required: true, desc: "Submitted/billed charge for the line (835)." },
+    { name: "Allowed Amount", required: false, desc: "Payer-allowed amount (drives net collection yield)." },
+    { name: "Paid Amount", required: true, desc: "Amount the payer paid (835)." },
+    { name: "Contractual Adjustment", required: false, desc: "Contractual write-off (CO group)." },
+    { name: "Patient Responsibility", required: false, desc: "Patient responsibility (PR group)." },
+    { name: "Denial Code (CARC)", required: false, desc: "Claim Adjustment Reason Code for denied/adjusted lines." },
+    { name: "RARC", required: false, desc: "Remittance Advice Remark Code, if present." },
+    { name: "CAS Group", required: false, desc: "Adjustment group code (CO / PR / OA / PI / CR)." },
+    { name: "Payer", required: false, desc: "Payer / plan name." },
+  ],
+};
+
+const ITEM_MASTER: IntakeFile = {
+  key: "item_master",
+  title: "Item Master",
+  desc: "The hospital item master. Used to catch device, C-code, and revenue-code setup errors between the item master and the chargemaster.",
+  accepts: "CSV",
+  required: true,
+  handler: "item_master",
+  countKey: "item_master",
+  spec: [
+    { name: "Item Number", required: true, desc: "Item master item/material number." },
+    { name: "Description", required: false, desc: "Item description." },
+    { name: "HCPCS/CPT", required: false, desc: "Billing code for the item, if any." },
+    { name: "Revenue Code", required: false, desc: "Revenue code set on the item." },
+    { name: "C-Code", required: false, desc: "Device C-code, if the item is a device/implant." },
+    { name: "Is Device", required: false, desc: "Device/implant flag (Y/N)." },
+    { name: "Charge Code", required: false, desc: "The chargemaster charge code this item links to." },
+    { name: "Cost Center", required: false, desc: "Cost center / department on the item." },
+    { name: "UOM", required: false, desc: "Unit of measure / billing unit (drug & supply checks)." },
+    { name: "Active", required: false, desc: "Whether the item is active." },
+  ],
+};
+
+const GL_DEPARTMENTS: IntakeFile = {
+  key: "gl",
+  title: "GL / Department List",
+  desc: "From Finance: GL numbers mapped to department names (and the charge-code prefix that routes a charge to its department). Used to roll findings up by department.",
+  accepts: "CSV",
+  required: true,
+  handler: "gl",
+  countKey: "gl",
+  spec: [
+    { name: "GL Number", required: true, desc: "General-ledger account number." },
+    { name: "Department", required: true, desc: "Department name for the GL account." },
+    { name: "Charge Prefix", required: false, desc: "Charge numbers in this department begin with this prefix (e.g. radiology = 1234)." },
+    { name: "Cost Center", required: false, desc: "Cost-center code, if distinct from the GL number." },
+  ],
+};
+
+const CORE_FILES: IntakeFile[] = [CDM, RU, FORMULARY, CLAIMS_EXTRACT, ITEM_MASTER, GL_DEPARTMENTS];
 
 // Facility type is fixed to short-term acute care; the argument is kept for
 // call-site compatibility but no longer changes the file list.

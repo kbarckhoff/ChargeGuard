@@ -77,6 +77,7 @@ async function collectSample(file: File, headerLineIndex: number, cfg: any, want
 import { CDMImport } from "@/components/cdm/CDMImport";
 import { RUImport } from "@/components/cdm/RUImport";
 import { FormularyImport } from "@/components/cdm/FormularyImport";
+import { ConvergeInputImport } from "@/components/cdm/ConvergeInputImport";
 import { ScanButton } from "@/components/audit/ScanButton";
 import { KPICard, SeverityBar, formatImpact } from "@/components/ui/shared";
 import { RuleSettings } from "@/components/assessment/RuleSettings";
@@ -338,6 +339,9 @@ function Imports({ auditId, chargeItems, counts, locked, onBack, onNext }: any) 
       case "cdm": return <CDMImport auditId={auditId} label={uploaded ? "Replace file" : "Upload CDM"} />;
       case "ru": return <RUImport auditId={auditId} label={uploaded ? "Replace file" : "Import R&U"} />;
       case "formulary": return <FormularyImport auditId={auditId} label={uploaded ? "Replace file" : "Import Formulary"} />;
+      case "claims_extract": return <ConvergeInputImport auditId={auditId} kind="claims-extract" label={uploaded ? "Replace file" : "Import Claims Extract"} />;
+      case "item_master": return <ConvergeInputImport auditId={auditId} kind="item-master" label={uploaded ? "Replace file" : "Import Item Master"} />;
+      case "gl": return <ConvergeInputImport auditId={auditId} kind="gl" label={uploaded ? "Replace file" : "Import GL / Departments"} />;
       default: return <div className="text-[12px] text-[#9aa2af]">No automated import yet — provide this file to your reviewer.</div>;
     }
   };
