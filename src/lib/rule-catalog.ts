@@ -159,6 +159,13 @@ export const RULE_CATALOG: RuleGroup[] = [
       { key: "item_master", name: "Item-master reconciliation", desc: "Device / C-code items not set up as devices in the CDM, and revenue-code mismatches between the item master and the chargemaster.", ids: ["IM.device", "IM.rev"] },
     ],
   },
+  {
+    group: "NCCI edits (Converge)",
+    items: [
+      { key: "ncci_ptp", name: "NCCI PTP unbundling", desc: "A Column-1/Column-2 code pair billed together without an allowed override modifier (indicator 0 = never payable, 1 = needs a modifier).", ids: ["NCCI.ptp.0", "NCCI.ptp.1"], facilities: OPPS },
+      { key: "ncci_mue", name: "MUE unit cap", desc: "A line billed above its per-HCPCS Medically Unlikely Edit unit cap.", ids: ["NCCI.mue"], facilities: OPPS },
+    ],
+  },
 ];
 
 /** Does a rule apply to the given facility type? (no list = universal). */

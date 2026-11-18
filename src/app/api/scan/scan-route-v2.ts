@@ -5,6 +5,8 @@ import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPr
 import { runClaimsRules } from "@/lib/claims-rules";
 import { runChargeCapturePairRules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
 import { runItemMasterRules } from "@/lib/item-master-rules";
+import { runPtpUnbundlingRules, runMueRules } from "@/lib/ncci-rules";
+import { loadRelevantPtp } from "@/lib/ncci";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
 import { isAuditLocked } from "@/lib/audit-lock";
 import { getReference, normalizeHcpcs, loadReferenceFromDb } from "@/lib/cms-reference";
@@ -732,11 +734,15 @@ export async function POST(request: Request) {
     // item-master reconciliation).
     const claimsExtract: any[] = [];
     for (let off = 0; ; off += 1000) {
-      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, billed_amount, allowed_amount, paid_amount, denial_code, payer").eq("audit_id", auditId).range(off, off + 999);
+      const { data } = await supabaseAdmin.from("claims_extract").select("claim_id, hcpcs, rev_code, units, mod1, mod2, mod3, mod4, billed_amount, allowed_amount, paid_amount, denial_code, payer").eq("audit_id", auditId).range(off, off + 999);
       if (!data || data.length === 0) break;
       claimsExtract.push(...data);
       if (data.length < 1000) break;
     }
+    // NCCI PTP edits relevant to the codes billed on this review (bounded fetch).
+    const claimCodes = new Set<string>();
+    for (const r of claimsExtract) if (r.hcpcs) claimCodes.add(String(r.hcpcs));
+    const ptpMap = claimsExtract.length ? await loadRelevantPtp(supabaseAdmin, claimCodes) : new Map();
     const itemMaster: any[] = [];
     for (let off = 0; ; off += 1000) {
       const { data } = await supabaseAdmin.from("item_master").select("item_number, description, hcpcs, rev_code, c_code, is_device, charge_code, is_active").eq("audit_id", auditId).range(off, off + 999);
@@ -804,6 +810,9 @@ export async function POST(request: Request) {
       ...runDenialRules(allItems, claimsExtract),
       ...runPricingVsPaidRules(allItems, claimsExtract),
       ...runItemMasterRules(allItems, itemMaster),
+      // Converge batch 2 — NCCI PTP unbundling + MUE unit caps (reference-driven).
+      ...runPtpUnbundlingRules(allItems, claimsExtract, ptpMap),
+      ...runMueRules(allItems, claimsExtract),
     ];
     // Effective-date awareness: skip findings for CDM lines whose code/line is not
     // yet effective by the review date (e.g. a code effective 1/1/2026 in a 2025
@@ -859,6 +868,8 @@ export async function POST(request: Request) {
         "RVU": 6,
         // Converge batch 1 (new intake fields)
         "CC": 3, "DEN": 2, "PVP": 6, "IM": 1,
+        // Converge batch 2 (NCCI)
+        "NCCI": 2,
       };
       const phaseNum = map[prefix];
       return phaseNum ? phaseMap[phaseNum] || null : null;

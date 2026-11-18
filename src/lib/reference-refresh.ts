@@ -28,6 +28,8 @@ export interface ParsedRow {
   asp?: string | null;
   dosage?: string | null;
   retired?: string | null;
+  mue?: number | string | null;    // NCCI Medically Unlikely Edit unit cap
+  mue_mai?: string | null;         // MUE Adjudication Indicator (1/2/3)
 }
 
 export interface RefreshOutcome {
@@ -48,6 +50,7 @@ type Refresher = (s: SourceStatus) => Promise<{ rows: ParsedRow[]; vintage: stri
 // against a truncated file or a changed layout that parses to near-nothing.
 const MIN_ROWS: Record<string, number> = {
   addendum_b: 8000, addendum_a: 3000, mpfs: 5000, clfs: 1000, asp: 400, hcpcs: 5000, vaccine: 3,
+  ncci_mue: 2000,
 };
 
 // Which reference column(s) a source owns. On refresh we only overwrite these,
@@ -60,6 +63,7 @@ const OWNED_COLUMNS: Record<string, (keyof ParsedRow)[]> = {
   asp: ["asp", "dosage"],
   hcpcs: ["retired", "short_desc"],
   vaccine: ["mc_fee", "pf_fee", "si", "short_desc"],
+  ncci_mue: ["mue", "mue_mai"],
 };
 
 const UA = "ChargeGuard reference refresher (+https://chargeguard.app)";
@@ -122,11 +126,108 @@ async function parseAspWorkbook(buf: ArrayBuffer): Promise<ParsedRow[]> {
   return rows;
 }
 
+// ── NCCI (PTP + MUE) download + parse ────────────────────────
+// CMS posts NCCI edits quarterly as zips under /files/zip/. We resolve the newest
+// zip for the hospital-outpatient variant, unzip, and parse the first table.
+async function resolveNcciZipUrl(landing: string, mustMatch: RegExp): Promise<string> {
+  const html = await (await fetch(landing, { headers: { "User-Agent": UA } })).text();
+  const hrefs = Array.from(html.matchAll(/href="([^"]+\.zip)"/gi)).map((m) => m[1]);
+  const abs = hrefs.map((h) => (h.startsWith("http") ? h : `https://www.cms.gov${h}`));
+  const pool = abs.filter((u) => mustMatch.test(u));
+  if (!pool.length) throw new Error("no matching NCCI zip link on CMS page (layout may have changed)");
+  pool.sort((a, b) => (b.match(/20\d\d/g)?.pop() || "").localeCompare(a.match(/20\d\d/g)?.pop() || ""));
+  return pool[0];
+}
+
+async function readFirstTable(buf: ArrayBuffer): Promise<{ headers: string[]; grid: any[][] }> {
+  const AdmZip: any = (await import("adm-zip" as any)).default;
+  const XLSX = await import("xlsx");
+  const zip = new AdmZip(Buffer.from(buf));
+  const entry = zip.getEntries().find((e: any) => /\.(xlsx|xls|csv)$/i.test(e.entryName));
+  if (!entry) throw new Error("no xlsx/csv inside the NCCI zip");
+  const wb = XLSX.read(entry.getData(), { type: "buffer" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const grid: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+  let hi = grid.findIndex((r) => r.some((c) => /column 1|hcpcs|cpt/i.test(String(c))));
+  if (hi < 0) hi = 0;
+  return { headers: grid[hi].map((c) => String(c ?? "")), grid: grid.slice(hi + 1) };
+}
+
+// Parse an outpatient-hospital MUE file → per-HCPCS rows (fits cms_reference).
+async function parseMueWorkbook(buf: ArrayBuffer): Promise<ParsedRow[]> {
+  const { headers, grid } = await readFirstTable(buf);
+  const col = (needle: string) => headers.findIndex((h) => h.toLowerCase().includes(needle));
+  const ic = col("hcpcs") >= 0 ? col("hcpcs") : col("cpt");
+  const iv = headers.findIndex((h) => /mue value|mue values|units/i.test(h));
+  const im = headers.findIndex((h) => /adjudication|\bmai\b/i.test(h));
+  const rows: ParsedRow[] = [];
+  for (const r of grid) {
+    const code = normalizeHcpcs(String(r[ic] ?? ""));
+    if (!code) continue;
+    const v = parseInt(String(r[iv] ?? "").replace(/[^\d-]/g, ""), 10);
+    rows.push({ hcpcs: code, mue: Number.isFinite(v) ? v : null, mue_mai: im >= 0 ? (r[im] == null ? null : String(r[im])) : null });
+  }
+  return rows;
+}
+
+// Parse an outpatient-hospital PTP file → code-pair rows (own table).
+interface PtpRow { col1: string; col2: string; modifier_indicator: string | null; effective: string | null; deletion: string | null }
+async function parsePtpWorkbook(buf: ArrayBuffer): Promise<PtpRow[]> {
+  const { headers, grid } = await readFirstTable(buf);
+  const find = (re: RegExp) => headers.findIndex((h) => re.test(h));
+  const i1 = find(/column 1/i), i2 = find(/column 2/i);
+  const im = find(/modifier/i), ie = find(/effective/i), id = find(/deletion/i);
+  const rows: PtpRow[] = [];
+  for (const r of grid) {
+    const c1 = normalizeHcpcs(String(r[i1] ?? "")), c2 = normalizeHcpcs(String(r[i2] ?? ""));
+    if (!c1 || !c2) continue;
+    rows.push({
+      col1: c1, col2: c2,
+      modifier_indicator: im >= 0 ? String(r[im] ?? "").trim().slice(0, 1) || null : null,
+      effective: ie >= 0 ? (r[ie] == null ? null : String(r[ie])) : null,
+      deletion: id >= 0 ? (r[id] == null ? null : String(r[id])) : null,
+    });
+  }
+  return rows;
+}
+
+/** PTP has its own table (pairs, not per-HCPCS), so it bypasses persist(). */
+export async function refreshNcciPtpTable(s: SourceStatus): Promise<RefreshOutcome> {
+  try {
+    const zipUrl = await resolveNcciZipUrl(s.cmsUrl, /hospital|outpatient/i);
+    const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
+    const rows = await parsePtpWorkbook(buf);
+    if (rows.length < 50_000) { await recordFailure(s.key, `only ${rows.length} PTP pairs parsed`); return { key: s.key, status: "failed", error: "too few pairs" }; }
+    const db = admin();
+    await db.from("ncci_ptp").delete().neq("id", 0);
+    let written = 0;
+    for (let i = 0; i < rows.length; i += 1000) {
+      const { error } = await db.from("ncci_ptp").insert(rows.slice(i, i + 1000));
+      if (error) throw new Error(`ncci_ptp insert failed (table provisioned?): ${error.message}`);
+      written += Math.min(1000, rows.length - i);
+    }
+    const vintage = (zipUrl.match(/20\d\d/g)?.pop()) || String(new Date().getUTCFullYear());
+    await admin().from("cms_reference_sources").upsert({ key: s.key, vintage, last_refreshed: new Date().toISOString(), row_count: written, status: "ok", last_error: null }, { onConflict: "key" });
+    return { key: s.key, status: "refreshed", rows: written, vintage };
+  } catch (e: any) {
+    const msg = e?.message || String(e);
+    await recordFailure(s.key, msg);
+    return { key: s.key, status: "failed", error: msg };
+  }
+}
+
 // Per-source refreshers. Sources without one report "parser_pending" (the cron
-// still runs and reports them). Heavy files (MPFS, Addendum A/B, CLFS, HCPCS)
-// are pulled by the scheduled GitHub Action instead (see .github/workflows),
+// still runs and reports them). Heavy files (MPFS, Addendum A/B, CLFS, HCPCS,
+// NCCI) are pulled by the scheduled GitHub Action instead (see .github/workflows),
 // which has more headroom than a serverless function.
 const REFRESHERS: Record<string, Refresher> = {
+  ncci_mue: async (s) => {
+    const zipUrl = await resolveNcciZipUrl(s.cmsUrl, /hospital|outpatient/i);
+    const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
+    const rows = await parseMueWorkbook(buf);
+    const yr = (zipUrl.match(/20\d\d/g)?.pop()) || String(new Date().getUTCFullYear());
+    return { rows, vintage: String(yr) };
+  },
   asp: async (s) => {
     const zipUrl = await resolveAspZipUrl(s.cmsUrl);
     const buf = await (await fetch(zipUrl, { headers: { "User-Agent": UA } })).arrayBuffer();
@@ -189,6 +290,8 @@ async function recordFailure(key: string, error: string) {
 }
 
 export async function refreshSource(s: SourceStatus): Promise<RefreshOutcome> {
+  // NCCI PTP writes code-pairs to its own table, not cms_reference.
+  if (s.key === "ncci_ptp") return refreshNcciPtpTable(s);
   const refresher = REFRESHERS[s.key];
   if (!refresher) return { key: s.key, status: "parser_pending", cmsUrl: s.cmsUrl };
   try {

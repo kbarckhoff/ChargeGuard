@@ -26,6 +26,8 @@ export interface CmsReference {
   asp?: string;         // Part B ASP payment limit
   dosage?: string;      // HCPCS billing unit / dosage (e.g. "per 0.25 mg") from the ASP file
   retired?: string;     // "YES" if HCPCS retired / not in current CPT list
+  mue?: number;         // NCCI Medically Unlikely Edit — max units of service
+  mue_mai?: string;     // MUE Adjudication Indicator (1 line / 2 date / 3 clinical)
 }
 
 const REF: Record<string, CmsReference> = referenceData as Record<string, CmsReference>;
@@ -41,7 +43,7 @@ let LIVE: Record<string, CmsReference> | null = null;
 let LIVE_AT = 0;
 const LIVE_TTL_MS = 10 * 60 * 1000; // 10 min — reference only changes quarterly
 
-const DB_COLUMNS = "hcpcs,short_desc,si,apc_payment,mc_fee,mc_rvu,pf_fee,pf_rvu,clfs,asp,dosage,retired";
+const DB_COLUMNS = "hcpcs,short_desc,si,apc_payment,mc_fee,mc_rvu,pf_fee,pf_rvu,clfs,asp,dosage,retired,mue,mue_mai";
 
 /**
  * Load the reference table from Supabase into the in-memory overlay. Call once

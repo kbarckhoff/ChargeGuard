@@ -75,6 +75,8 @@ const EXPLICIT: Record<string, FindingClass> = {
   "Denial Analysis (Claims)": "code_validity",
   "Pricing vs Paid (Claims)": "pricing",
   "Item Master Reconciliation": "code_validity",
+  "NCCI Unbundling (PTP)": "code_validity",
+  "MUE Unit Cap": "code_validity",
   "Clinic Visit → G0463 (SI=B)": "code_validity",
   "Billed Not In CDM (Claims)": "code_validity",
   "Billing Unit / Multiplier": "code_validity",
