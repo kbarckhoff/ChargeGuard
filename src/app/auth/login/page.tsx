@@ -50,7 +50,7 @@ export default function LoginPage() {
       {/* Left — what Converge is */}
       <div className="hidden lg:flex flex-1 flex-col justify-center px-14 xl:px-20">
         <div className="flex items-center gap-2 mb-10">
-          <img src="/logo-dark.png" alt="Converge" className="w-9 h-9 object-contain" />
+          <img src="/logo-dark.png" alt="Converge" className="w-12 h-12 object-contain" />
           <span className="text-[20px] font-bold text-[#1e2a3a] tracking-tight">Converge</span>
         </div>
         <h1 className="text-[32px] font-bold text-[#0f172a] leading-[1.15] mb-4 max-w-lg">Catch charge integrity issues before they cost you.</h1>
@@ -72,7 +72,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-[#f5f8fc]">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
-            <img src="/logo-dark.png" alt="Converge" className="w-9 h-9 object-contain" />
+            <img src="/logo-dark.png" alt="Converge" className="w-12 h-12 object-contain" />
             <span className="text-[18px] font-bold text-[#1e2a3a] tracking-tight">Converge</span>
           </div>
           <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 shadow-sm">

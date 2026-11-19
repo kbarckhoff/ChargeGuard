@@ -57,7 +57,7 @@ export default function VerifyOtpPage() {
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <img src="/logo-login.png" alt="Converge" className="w-12 h-12 object-contain" />
+          <img src="/logo-login.png" alt="Converge" className="w-20 h-20 object-contain" />
           <span className="text-xl font-bold text-white tracking-tight">Converge</span>
         </div>
 
