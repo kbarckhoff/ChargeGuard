@@ -59,9 +59,16 @@ export async function POST() {
     });
 
     let emailed = false;
-    try { emailed = (await sendEmail([user.email], subject, text, html)).ok; } catch { emailed = false; }
+    let reason: string | null = null;
+    try {
+      const r = await sendEmail([user.email], subject, text, html);
+      emailed = r.ok; reason = r.reason ?? null;
+    } catch (e: any) {
+      emailed = false; reason = e?.message ?? "send threw";
+    }
+    if (!emailed) console.error("[OTP] send failed:", reason, "from=", process.env.SES_FROM, "region=", process.env.AWS_REGION);
 
-    return NextResponse.json({ ok: true, emailed });
+    return NextResponse.json({ ok: true, emailed, reason });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });
   }
