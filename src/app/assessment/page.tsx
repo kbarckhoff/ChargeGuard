@@ -3,6 +3,7 @@ import { createClient as createAdminClientLib } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
 import { AssessmentFlow } from "@/components/assessment/AssessmentFlow";
+import { normalizeFacility } from "@/lib/rule-catalog";
 import { EmptyState } from "@/components/ui/shared";
 import { ClipboardList } from "lucide-react";
 import { CreateAuditForm } from "@/components/audit/CreateAuditForm";
@@ -93,7 +94,7 @@ export default async function AssessmentPage({ searchParams }: { searchParams: P
       reviewPeriod={(audit.metadata as any)?.review_period || ""}
       lowVolume={(audit.metadata as any)?.low_volume_threshold ?? null}
       initialComps={Array.isArray((audit.metadata as any)?.competitors) ? (audit.metadata as any).competitors : null}
-      facilityType={(audit.facility_type as any) || "short_term_acute"}
+      facilityType={normalizeFacility(audit.facility_type as any)}
     />
   );
 }

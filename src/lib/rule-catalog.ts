@@ -175,6 +175,13 @@ export const RULE_CATALOG: RuleGroup[] = [
   },
 ];
 
+/** Coerce any stored value (including legacy ones like "opps_outpatient", or an
+ *  empty column) to a supported facility type, defaulting to short-term acute so
+ *  an unknown value never silently disables the hospital rule set. */
+export function normalizeFacility(ft: string | null | undefined): FacilityType {
+  return FACILITY_TYPES.some((f) => f.value === ft) ? (ft as FacilityType) : DEFAULT_FACILITY;
+}
+
 /** Does a rule apply to the given facility type? (no list = universal). */
 export function ruleAppliesTo(item: RuleItem, ft: FacilityType): boolean {
   return !item.facilities || item.facilities.includes(ft);
