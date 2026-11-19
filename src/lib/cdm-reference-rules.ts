@@ -784,7 +784,10 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
           title: `Pharmacy billing unit needs pharmacy input - ${code}`,
           description: `"${item.charge_description}" can't be unit-validated: HCPCS billing unit "${ref.dosage}" or the formulary package (${fm.pkg_amt ?? "—"} ${fm.pkg_unit ?? "—"}) is blank or non-numeric. Confirm whether the drug is correctly billed on this basis.`,
           severity: "medium", category: "Pharmacy UOM Mismatch",
-          financial_impact: gross || undefined,
+          // Needs-pharmacy-input data-quality flag, not a dollar opportunity — the
+          // line gross is review scope, not recoverable. (Attaching gross here let a
+          // single expensive drug line dominate the whole review's impact total.)
+          financial_impact: undefined,
           recommendation: "Have pharmacy confirm the billing unit and package size so the per-unit price can be validated.",
         });
       } else if (buScale.dim !== pkgScale.dim) {
@@ -795,7 +798,9 @@ export function runFormularyRules(items: any[], formularyByCode: Map<string, any
           title: `Pharmacy UOM mismatch - ${code} (${dose.unit} vs ${fm.pkg_unit})`,
           description: `"${item.charge_description}" bills per ${ref.dosage} (${buScale.dim}) but the formulary package is in ${fm.pkg_unit} (${pkgScale.dim}). These units are dimensionally incompatible, so per-unit pricing can't be validated without the drug's concentration.`,
           severity: "high", category: "Pharmacy UOM Mismatch",
-          financial_impact: gross || undefined,
+          // Needs-pharmacy-input data-quality flag, not a dollar opportunity — the
+          // line gross is review scope, not recoverable.
+          financial_impact: undefined,
           recommendation: "Have pharmacy supply the concentration / units-per-vial so the billing-unit price can be validated.",
         });
       } else {
@@ -933,11 +938,14 @@ export function runBenchmarkRules(items: any[], state?: string | null, formulary
       out.push({
         rule_id: "BM.low", charge_item_id: item.id,
         title: `Priced below market — ${code} at ${pctOfPeer}% of peer average - ${procNum}`,
-        description: `"${item.charge_description}" (${code}) is priced at $${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}, only ${pctOfPeer}% of the ${peer} average submitted charge for ${geoLabel} (CMS OPPS data). This is potential revenue left on the table on every unit billed.`,
+        description: `"${item.charge_description}" (${code}) is priced at $${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}, only ${pctOfPeer}% of the ${peer} average submitted charge for ${geoLabel} (CMS OPPS data) — a per-line gap of $${gap.toLocaleString(undefined, { maximumFractionDigits: 0 })}. This is a pricing-policy judgment, not recoverable Medicare/APC/contracted revenue (those pay a fixed rate regardless of the charge), so it carries a count and a per-line gap rather than a gross-dollar total.`,
         severity: ratio < 0.5 ? "high" : "medium",
         category: "Pricing Benchmark (Peer Comparison)",
-        financial_impact: gap > 0 ? gap : undefined,
-        recommendation: `Review whether the charge for ${code} should be raised toward the market rate (peer average ${peer}). Multiply the per-unit gap by annual volume to size the opportunity.`,
+        // Judgment / pricing-policy finding (per the output contract): no gross-dollar
+        // headline. The submitted-charge peer average is a gross charge, so the gap
+        // would wildly overstate recoverable revenue.
+        financial_impact: undefined,
+        recommendation: `Review whether the charge for ${code} should be raised toward the market rate (peer average ${peer}); real uplift applies only to charge-based (percent-of-charge / self-pay) volume.`,
       });
     } else if (ratio > BM_HIGH) {
       out.push({

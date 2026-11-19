@@ -101,11 +101,14 @@ export function runPeerCompetitorRules(items: any[], peerRows: PeerPrice[], form
         out.push({
           rule_id: "PC.low", charge_item_id: item.id,
           title: `Below competitors — ${code} at ${pct}% of peer average - ${procNum}`,
-          description: `"${item.charge_description}" (${code}) is priced ${money(price)}, only ${pct}% of the ${peer} average charged by ${src} in this market. This is potential revenue left on the table. (One CDM line uses this code, so the match is clean.)`,
+          description: `"${item.charge_description}" (${code}) is priced ${money(price)}, only ${pct}% of the ${peer} average charged by ${src} in this market — a per-line gap of ${money(m.avg - price)} to the market average. This is a pricing-policy judgment, not recoverable Medicare/APC/contracted revenue (those pay a fixed rate regardless of the charge), so it carries a count and a per-line gap rather than a gross-dollar total. (One CDM line uses this code, so the match is clean.)`,
           severity: ratio < 0.5 ? "high" : "medium",
           category: "Peer Pricing (Named Competitors)",
-          financial_impact: m.avg - price > 0 ? m.avg - price : undefined,
-          recommendation: `Review whether ${code} should be raised toward the local market rate (${peer} across ${src}).`,
+          // Judgment / pricing-policy finding (per the output contract): no gross-dollar
+          // headline. Raising a below-market charge only yields money on charge-based
+          // (percent-of-charge / self-pay) volume, so the gross gap would overstate it.
+          financial_impact: undefined,
+          recommendation: `Review whether ${code} should be raised toward the local market rate (${peer} across ${src}); real uplift applies only to charge-based (percent-of-charge / self-pay) volume.`,
         });
       } else if (ratio > PC_HIGH) {
         out.push({
