@@ -55,7 +55,7 @@ export function renderEmail(opts: {
   button?: { text: string; url: string };
   footnote?: string;
 }): string {
-  const origin = opts.origin || "https://chargeguard.ameliormss.com";
+  const origin = opts.origin || "https://converge.ameliormss.com";
   const SLATE = "#1e293b", MUTED = "#64748b", BORDER = "#e2e8f0", BG = "#f4f6f8";
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const paras = (opts.paragraphs || []).map(
@@ -78,7 +78,7 @@ export function renderEmail(opts: {
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:92%;background:#ffffff;border:1px solid ${BORDER};border-radius:14px;overflow:hidden;">
         <tr><td style="padding:22px 32px 0;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="vertical-align:middle;"><img src="${origin}/logo-email.png" width="30" height="30" alt="Converge" style="display:block;border:0;"></td>
+            <td style="vertical-align:middle;"><img src="${origin}/logo-signin.png" width="34" height="34" alt="Converge" style="display:block;border:0;"></td>
             <td style="vertical-align:middle;padding-left:9px;font-size:17px;font-weight:700;color:${SLATE};font-family:'Hanken Grotesk',Arial,sans-serif;">Converge</td>
           </tr></table>
         </td></tr>
