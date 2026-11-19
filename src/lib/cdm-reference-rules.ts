@@ -269,11 +269,14 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
           out.push({
             rule_id: "U", charge_item_id: item.id,
             title: `Underpriced vs MC Fee Schedule markup — ${code} at ${markup.toFixed(1)}x (target 2.75-3.25x) - ${procNum}`,
-            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.75x to 3.25x, so repricing to the 2.75x floor ($${floor.toFixed(2)}) across ${rawUnits.toLocaleString()} R&U units is a revenue opportunity.`,
+            description: `"${item.charge_description}" (${code}) is priced $${price.toFixed(2)}, only ${markup.toFixed(1)}x the MC Fee Schedule of $${rate.toFixed(2)}. The target self-pay/commercial band is 2.75x to 3.25x; the per-line repricing gap to the 2.75x floor ($${floor.toFixed(2)}) is $${(floor - price).toFixed(2)} on ${rawUnits.toLocaleString()} R&U units. This is a pricing-policy judgment, not recoverable Medicare/APC revenue (those pay a fixed rate regardless of the charge), so it carries a count and a per-line gap rather than a gross-dollar total.`,
             severity: markup < 1.0 ? "high" : "medium",
             category: "Medicare Markup (Underpriced)",
-            financial_impact: (floor - price) * rawUnits,
-            recommendation: `Reprice toward the 2.75x floor ($${floor.toFixed(2)}) per the facility's markup policy.`,
+            // Judgment / pricing-policy finding (per the output contract): no
+            // gross-dollar headline. The old (floor-price)*units overstated it as
+            // recoverable revenue, which it is not for Medicare/APC/contracted payers.
+            financial_impact: undefined,
+            recommendation: `Reprice toward the 2.75x floor ($${floor.toFixed(2)}) per the facility's markup policy; real uplift applies only to charge-based (percent-of-charge / self-pay) volume.`,
           });
         } else if (markup > 4.5) {
           // Most lines sit above 3.25x already, so only flag extreme outliers
