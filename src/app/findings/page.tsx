@@ -9,7 +9,7 @@ import { FindingsWorkspace } from "@/components/audit/FindingsWorkspace";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
-import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
+import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, type FindingClass } from "@/lib/finding-class";
 import { AlertTriangle, ChevronDown, Table, FileDown, SlidersHorizontal } from "lucide-react";
 
 export default async function FindingsPage({
@@ -444,7 +444,6 @@ export default async function FindingsPage({
                 <a key={cls} href={href}
                   className={`bg-white rounded-xl border p-4 transition-colors ${active ? "border-[#1e293b] ring-1 ring-[#1e293b]" : "border-[#e2e8f0] hover:border-[#cbd5e1]"}`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR[cls] }} />
                     <span className="text-xs font-medium text-[#334155]">{CLASS_LABELS[cls]}</span>
                   </div>
                   <div className="text-xl font-semibold text-[#0f172a]">{cardCounts[cls].toLocaleString()}</div>

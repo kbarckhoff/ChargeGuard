@@ -66,7 +66,7 @@ export const RULE_CATALOG: RuleGroup[] = [
   {
     group: "Pricing",
     items: [
-      { key: "markup_band", name: "Underpriced vs Medicare (2.5x–3.0x)", desc: "Priced below 2.5x the MC Fee Schedule, or far above the 3.0x band.", ids: ["U", "MK.high"], facilities: OPPS },
+      { key: "markup_band", name: "Underpriced vs Medicare (2.75x–3.25x)", desc: "Priced below 2.75x the MC Fee Schedule, or far above the 3.25x band.", ids: ["U", "MK.high"], facilities: OPPS },
       { key: "si_a", name: "SI=A below fee schedule", desc: "An SI=A code priced below its MPFS/CLFS rate.", ids: ["SIA"], facilities: OPPS },
       { key: "cms_bench", name: "Below/above CMS peer average", desc: "Charge far below or above what peer hospitals charge (CMS data).", ids: ["BM.low", "BM.high"], facilities: OPPS },
       { key: "peer", name: "Below/above competitor prices", desc: "Charge below or above the competitors' prices for the code.", ids: ["PC.low", "PC.high"], facilities: OPPS },

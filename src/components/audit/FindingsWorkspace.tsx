@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Badge, formatImpact } from "@/components/ui/shared";
 import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
-import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_COLOR, type FindingClass } from "@/lib/finding-class";
+import { classForCategory, categoriesInClass, CLASS_LABELS, type FindingClass } from "@/lib/finding-class";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { FindingDrawer, type FindingRow } from "@/components/audit/FindingsTable";
 import { Search, ChevronRight, ChevronDown, Loader2, AlertTriangle } from "lucide-react";
@@ -380,7 +380,7 @@ function ClassFilter({ value, counts, onChange }: { value: FindingClass | null; 
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm border border-[#e2e8f0] rounded-lg px-3 py-2 bg-white flex items-center gap-2 min-w-[170px] justify-between">
-        <span className="flex items-center gap-2 truncate">{value && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CLASS_COLOR[value] }} />}<span className="truncate">{label}</span></span>
+        <span className="flex items-center gap-2 truncate"><span className="truncate">{label}</span></span>
         <ChevronDown size={14} className={`text-[#94a3b8] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (<>
@@ -389,7 +389,7 @@ function ClassFilter({ value, counts, onChange }: { value: FindingClass | null; 
           <button onClick={() => { onChange(null); setOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[#f1f5f9] ${!value ? "font-semibold text-[#1e293b]" : "text-[#334155]"}`}>All categories</button>
           {CLASSES.map((cls) => (
             <button key={cls} onClick={() => { onChange(cls); setOpen(false); }} className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-[#f1f5f9] ${value === cls ? "font-semibold text-[#1e293b]" : "text-[#334155]"}`}>
-              <span className="flex items-center gap-2 truncate"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CLASS_COLOR[cls] }} /><span className="truncate">{CLASS_LABELS[cls]}</span></span>
+              <span className="flex items-center gap-2 truncate"><span className="truncate">{CLASS_LABELS[cls]}</span></span>
               <span className="text-[11px] text-[#94a3b8] tabular-nums shrink-0">{counts[cls].toLocaleString()}</span>
             </button>
           ))}

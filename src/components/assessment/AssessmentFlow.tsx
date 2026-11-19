@@ -81,7 +81,7 @@ import { ConvergeInputImport } from "@/components/cdm/ConvergeInputImport";
 import { ScanButton } from "@/components/audit/ScanButton";
 import { KPICard, SeverityBar, formatImpact } from "@/components/ui/shared";
 import { RuleSettings } from "@/components/assessment/RuleSettings";
-import { type FacilityType } from "@/lib/rule-catalog";
+import { FACILITY_TYPES, type FacilityType } from "@/lib/rule-catalog";
 import { intakeFilesForFacility, type IntakeFile } from "@/lib/intake-files";
 
 const AVCOLORS = ["#3b82f6", "#12b76a", "#7c3aed", "#f59e0b", "#ef4444"];
@@ -225,11 +225,11 @@ function PageHead({ title, desc, right }: { title: string; desc: string; right?:
   );
 }
 const CARD = "bg-white rounded-2xl border border-[#edf0f4] p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] mb-4";
-function Footer({ onBack, backTxt, onNext, nextTxt }: { onBack?: () => void; backTxt?: string; onNext?: () => void; nextTxt?: string }) {
+function Footer({ onBack, backTxt, onNext, nextTxt, nextDisabled, nextTitle }: { onBack?: () => void; backTxt?: string; onNext?: () => void; nextTxt?: string; nextDisabled?: boolean; nextTitle?: string }) {
   return (
     <div className="flex justify-between mt-2">
       {onBack ? <button onClick={onBack} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">← {backTxt}</button> : <span />}
-      {onNext && <button onClick={onNext} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm">{nextTxt} →</button>}
+      {onNext && <button onClick={onNext} disabled={nextDisabled} title={nextTitle} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#1e293b]">{nextTxt} →</button>}
     </div>
   );
 }
@@ -297,6 +297,11 @@ function Intake({ comps, setComps, saveComps, hospitalName, auditName, peerCount
             <input type="number" min={0} step={1} className={inputCls + (locked ? " bg-[#f6f7f9] text-[#6b7280]" : "")} value={lowVolume} disabled={locked}
               onChange={(e) => setLowVolume(e.target.value)} onBlur={(e) => saveThreshold(e.target.value)} placeholder="10" />
             <p className="text-xs text-[#9aa2af] mt-1.5">Annual units at or below this count flag a CPT/HCPCS line as low/no volume.</p>
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Facility type</label>
+            <div className={inputCls + " bg-[#f6f7f9] text-[#6b7280] flex items-center"}>{FACILITY_TYPES.find((f) => f.value === facilityType)?.label || "Short-Term Acute Care"}</div>
+            <p className="text-xs text-[#9aa2af] mt-1.5">Set once per client in Settings. It decides which rule set runs for this review.</p>
           </div>
         </div>
       </div>
@@ -424,6 +429,13 @@ function Review({ auditId, counts, chargeItems, isOwner, onBack, onNext }: any) 
   const selFile = files.find((f) => f.key === sel)!;
   const router = useRouter();
 
+  // Gating: a required, system-handled file (one we actually import, not a
+  // "provide to reviewer" manual file) with zero rows is a hard block — the
+  // scan can't produce trustworthy findings without it. Manual/"provide to
+  // reviewer" files are never counted here.
+  const missingRequired = files.filter((f) => !f.optional && f.handled && f.total === 0);
+  const blocked = missingRequired.length > 0;
+
   // Intake is finished once Review Imports is left for Peer Setup, so we lock the
   // review (profile, files, competitors, rules become read-only).
   const lockIntake = () => fetch("/api/audits/lock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auditId, locked: true }) }).catch(() => {});
@@ -491,14 +503,22 @@ function Review({ auditId, counts, chargeItems, isOwner, onBack, onNext }: any) 
         )}
       </div>
 
+      {blocked && (
+        <div className="rounded-xl px-4 py-3 mb-3 bg-[#fef4e2] border border-[#f6dfa8] text-[13px] text-[#8a5a1a] flex items-start gap-2">
+          <AlertTriangle size={15} className="text-[#b45309] mt-0.5 shrink-0" />
+          <span>
+            {missingRequired.length === 1 ? "A required file hasn't been imported yet" : `${missingRequired.length} required files haven't been imported yet`}: {missingRequired.map((f) => f.name).join(", ")}. Go back to Imports and upload {missingRequired.length === 1 ? "it" : "them"} before locking the intake — the scan needs {missingRequired.length === 1 ? "this file" : "these files"} to produce accurate findings.
+          </span>
+        </div>
+      )}
       {isOwner ? (
-        <Footer onBack={onBack} backTxt="Back to Imports" onNext={goPeer} nextTxt="Lock intake & continue to Peer Setup" />
+        <Footer onBack={onBack} backTxt="Back to Imports" onNext={blocked ? undefined : goPeer} nextTxt="Lock intake & continue to Peer Setup" nextDisabled={blocked} nextTitle={blocked ? "Import the required files first" : undefined} />
       ) : submitted ? (
         <div className="rounded-xl px-4 py-3 bg-[#e7f7ef] border border-[#c9ecd8] text-[13px] text-[#067647] flex items-center gap-2"><Check size={15} /> Submitted. Your reviewer has been notified and will complete the peer analysis.</div>
       ) : (
         <div className="flex justify-between mt-2">
           <button onClick={onBack} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-[#e2e6ec] text-[#374151] hover:bg-[#f6f7f9]">← Back to Imports</button>
-          <button onClick={submitForReview} disabled={submitting} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm disabled:opacity-50">{submitting ? "Submitting…" : "Submit for review →"}</button>
+          <button onClick={submitForReview} disabled={submitting || blocked} title={blocked ? "Import the required files first" : undefined} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#1e293b] text-white hover:bg-[#0f172a] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{submitting ? "Submitting…" : "Submit for review →"}</button>
         </div>
       )}
     </>
