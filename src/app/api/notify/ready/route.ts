@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   if (recipients.length === 0) return NextResponse.json({ ok: false, reason: "no entity users with email" });
 
   const review = `${audit.name} (${audit.hospital_name})`;
-  const subject = `ChargeGuard: ${review} is ready for review`;
+  const subject = `Converge: ${review} is ready for review`;
   const text = `Peer price-transparency files have been added for ${review}, so the CDM analysis and peer comparison are complete.\n\nThe review is now marked "Ready" on your dashboard. Open it to see the findings and peer analysis.`;
   try {
     await sendSes(region, accessKey, secretKey, from, recipients, subject, text);

@@ -1,6 +1,6 @@
 import type { FacilityType } from "./rule-catalog";
 
-// ChargeGuard supports short-term acute care hospitals. Every review needs the
+// Converge supports short-term acute care hospitals. Every review needs the
 // same three core files below; there is no per-facility file matrix anymore.
 //
 // handler: which importer parses the file into the database.

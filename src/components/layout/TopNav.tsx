@@ -115,7 +115,7 @@ export default function TopNav() {
           <div className="w-[30px] h-[30px] rounded-[9px] bg-[#1e3a8a] flex items-center justify-center">
             <Shield size={16} className="text-[#1e293b]" />
           </div>
-          <span className="font-bold text-[16px] tracking-tight text-[#1e3a8a]">ChargeGuard</span>
+          <span className="font-bold text-[16px] tracking-tight text-[#1e3a8a]">Converge</span>
         </Link>
 
         <div className="flex-1 flex justify-center px-4">

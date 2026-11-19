@@ -94,9 +94,9 @@ export async function POST(request: Request) {
     // 4) Email sign-in instructions.
     const origin = new URL(request.url).origin;
     const loginUrl = `${origin}/auth/login`;
-    const subject = `You've been set up on ChargeGuard — ${org.name}`;
+    const subject = `You've been set up on Converge — ${org.name}`;
     const text =
-      `You've been added as an administrator for ${org.name} on ChargeGuard.\n\n` +
+      `You've been added as an administrator for ${org.name} on Converge.\n\n` +
       `Sign in here: ${loginUrl}\n` +
       `Email: ${email}\n` +
       `Temporary password: ${tempPassword}\n\n` +

@@ -66,7 +66,7 @@ const OWNED_COLUMNS: Record<string, (keyof ParsedRow)[]> = {
   ncci_mue: ["mue", "mue_mai"],
 };
 
-const UA = "ChargeGuard reference refresher (+https://chargeguard.app)";
+const UA = "Converge reference refresher (+https://chargeguard.app)";
 
 /** Pick a value from a parsed row object by fuzzy header match. */
 function pick(row: Record<string, any>, ...needles: string[]): any {

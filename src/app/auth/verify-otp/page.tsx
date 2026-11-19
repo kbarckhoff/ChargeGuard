@@ -54,11 +54,11 @@ export default function VerifyOtpPage() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/auth/login"); router.refresh(); };
 
   return (
-    <div className="min-h-screen bg-[#0a6cff] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <img src="/logo-login.png" alt="ChargeGuard" className="w-12 h-12 object-contain" />
-          <span className="text-xl font-bold text-white tracking-tight">ChargeGuard</span>
+          <img src="/logo-login.png" alt="Converge" className="w-12 h-12 object-contain" />
+          <span className="text-xl font-bold text-white tracking-tight">Converge</span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 shadow-xl">

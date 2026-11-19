@@ -115,8 +115,8 @@ export function AppSidebar() {
   return (
     <aside className="w-[224px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
       <div className="flex items-center gap-1.5 px-5 h-14">
-        <img src="/logo-dark.png" alt="ChargeGuard" className="w-[28px] h-[28px] object-contain" />
-        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">ChargeGuard</span>
+        <img src="/logo-dark.png" alt="Converge" className="w-[28px] h-[28px] object-contain" />
+        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">Converge</span>
       </div>
       <ClientSwitcher info={info} />
       <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">

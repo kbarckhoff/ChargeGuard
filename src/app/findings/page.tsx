@@ -34,8 +34,10 @@ export default async function FindingsPage({
 
   // Assignment context: who can assign, the user directory (for the picker and
   // for showing assignee names), and the current user id.
-  const actor = await getActor(supabaseAdmin, user!.id);
-  const { data: orgUsers } = await supabaseAdmin.from("users").select("id, full_name, email, department, is_active").eq("org_id", userData!.org_id);
+  const [actor, { data: orgUsers }] = await Promise.all([
+    getActor(supabaseAdmin, user!.id),
+    supabaseAdmin.from("users").select("id, full_name, email, department, is_active").eq("org_id", userData!.org_id),
+  ]);
   const assignUsers = (orgUsers || []).filter((u: any) => u.is_active).map((u: any) => ({ id: u.id, full_name: u.full_name || u.email, email: u.email, department: u.department || null }));
   const assigneeNames: Record<string, string> = {};
   for (const u of orgUsers || []) assigneeNames[(u as any).id] = (u as any).full_name || (u as any).email;
@@ -102,29 +104,36 @@ export default async function FindingsPage({
   // workspace do all tab/card/category/search/pagination in memory — so those
   // interactions are instant (no server round-trip per click).
   if (viewMode === "grouped") {
-    const { data: aggData } = await supabaseAdmin.rpc("findings_rollup", { p_audit: auditId });
-    const agg = (Array.isArray(aggData) ? aggData : []).map((r: any) => ({ category: r.category, status: r.status, cnt: Number(r.cnt) || 0, impact: Number(r.impact) || 0 }));
-    // Page through all groups (Supabase caps each response at 1000 rows, so a
-    // single big range would truncate and undercount the cards).
-    const allTodos: any[] = [];
-    for (let off = 0; ; off += 1000) {
-      const { data, error } = await supabaseAdmin.rpc("findings_todos", { p_audit: auditId }).range(off, off + 999);
-      if (error || !Array.isArray(data) || data.length === 0) break;
-      allTodos.push(...data);
-      if (data.length < 1000) break;
-    }
+    // Page through an RPC that caps each response at 1000 rows (a single big
+    // range would truncate and undercount).
+    const pageRpc = async (fn: string) => {
+      const rows: any[] = [];
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await supabaseAdmin.rpc(fn, { p_audit: auditId }).range(off, off + 999);
+        if (error || !Array.isArray(data) || data.length === 0) break;
+        rows.push(...data);
+        if (data.length < 1000) break;
+      }
+      return rows;
+    };
+
+    // These five reads are independent (all keyed on auditId only), so run them
+    // concurrently instead of waiting on each in turn — the page was spending
+    // most of its load time blocked on serial round-trips.
+    const [aggRes, allTodos, laggingRes, lineRows, totalLinesRes] = await Promise.all([
+      supabaseAdmin.rpc("findings_rollup", { p_audit: auditId }),
+      pageRpc("findings_todos"),
+      supabaseAdmin.from("findings").select("id, title, category, resolution_note, charge_items(procedure_number, hcpcs_cpt_code)").eq("audit_id", auditId).eq("ehr_lagging", true).order("category"),
+      pageRpc("findings_line_rollup"),
+      supabaseAdmin.from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId),
+    ]);
+
+    const agg = (Array.isArray(aggRes.data) ? aggRes.data : []).map((r: any) => ({ category: r.category, status: r.status, cnt: Number(r.cnt) || 0, impact: Number(r.impact) || 0 }));
     const todos = allTodos.map((g: any) => ({ grp_key: g.grp_key, category: g.category, code: g.code || "", line_count: Number(g.line_count) || 0, open_count: Number(g.open_count) || 0, impact: Number(g.impact) || 0, sample_title: g.sample_title || "", sample_proc: g.sample_proc || null }));
-    const { data: laggingFindings } = await supabaseAdmin.from("findings").select("id, title, category, resolution_note, charge_items(procedure_number, hcpcs_cpt_code)").eq("audit_id", auditId).eq("ehr_lagging", true).order("category");
+    const laggingFindings = laggingRes.data;
 
     // Per-CDM-line rollup: issues-per-line, max-per-line impact (dedup), dominant
     // category + code/description for the line cards and the issue-distribution band.
-    const lineRows: any[] = [];
-    for (let off = 0; ; off += 1000) {
-      const { data, error } = await supabaseAdmin.rpc("findings_line_rollup", { p_audit: auditId }).range(off, off + 999);
-      if (error || !Array.isArray(data) || data.length === 0) break;
-      lineRows.push(...data);
-      if (data.length < 1000) break;
-    }
     const lineRollup = lineRows.map((l: any) => {
       // Full category set on the line (so filters can match ANY issue, not just
       // the dominant one) + per-category {count, maxImpact} so a category filter
@@ -147,8 +156,7 @@ export default async function FindingsPage({
       };
     });
     // Total CDM line universe (for the "clean lines" bucket in the distribution).
-    const { count: totalLines } = await supabaseAdmin
-      .from("charge_items").select("id", { count: "exact", head: true }).eq("audit_id", auditId);
+    const totalLines = totalLinesRes.count;
 
     return (
       <>

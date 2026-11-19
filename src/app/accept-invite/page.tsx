@@ -47,8 +47,8 @@ export default function AcceptInvitePage() {
     <div className="min-h-screen flex items-center justify-center bg-[#f1f5f9] p-4">
       <div className="w-full max-w-md bg-white rounded-2xl border border-[#e2e8f0] shadow-sm p-7">
         <div className="flex items-center gap-2 mb-5">
-          <img src="/logo-mark.png" alt="ChargeGuard" className="w-7 h-7 object-contain" />
-          <span className="font-bold text-[15px] text-[#0f172a]">ChargeGuard</span>
+          <img src="/logo-mark.png" alt="Converge" className="w-7 h-7 object-contain" />
+          <span className="font-bold text-[15px] text-[#0f172a]">Converge</span>
         </div>
 
         {state === "loading" && <p className="text-sm text-[#64748b]">Checking your invite…</p>}
@@ -70,7 +70,7 @@ export default function AcceptInvitePage() {
         {state === "form" && (
           <form onSubmit={submit}>
             <h1 className="text-lg font-semibold text-[#0f172a] mb-1">Accept your invite</h1>
-            <p className="text-sm text-[#64748b] mb-5">Join {orgName || "your team"} on ChargeGuard as <span className="font-medium text-[#334155]">{email}</span>.</p>
+            <p className="text-sm text-[#64748b] mb-5">Join {orgName || "your team"} on Converge as <span className="font-medium text-[#334155]">{email}</span>.</p>
             {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
             <label className="text-sm font-medium text-[#334155] block mb-1.5">Full name</label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full mb-4 px-3 py-2.5 text-sm border border-[#e2e8f0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1e293b]/20" placeholder="Jane Smith" />

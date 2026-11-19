@@ -78,8 +78,8 @@ export function renderEmail(opts: {
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:92%;background:#ffffff;border:1px solid ${BORDER};border-radius:14px;overflow:hidden;">
         <tr><td style="padding:22px 32px 0;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="vertical-align:middle;"><img src="${origin}/logo-email.png" width="30" height="30" alt="ChargeGuard" style="display:block;border:0;"></td>
-            <td style="vertical-align:middle;padding-left:9px;font-size:17px;font-weight:700;color:${SLATE};font-family:'Hanken Grotesk',Arial,sans-serif;">ChargeGuard</td>
+            <td style="vertical-align:middle;"><img src="${origin}/logo-email.png" width="30" height="30" alt="Converge" style="display:block;border:0;"></td>
+            <td style="vertical-align:middle;padding-left:9px;font-size:17px;font-weight:700;color:${SLATE};font-family:'Hanken Grotesk',Arial,sans-serif;">Converge</td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:20px 32px 30px;font-family:'Hanken Grotesk',Arial,sans-serif;">
@@ -87,7 +87,7 @@ export function renderEmail(opts: {
           ${paras}${codeBlock}${button}${footnote}
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid ${BORDER};background:#fbfcfd;">
-          <p style="margin:0;font-size:11px;color:#94a3b8;font-family:'Hanken Grotesk',Arial,sans-serif;">ChargeGuard by Amelior. This is an automated message, please do not reply.</p>
+          <p style="margin:0;font-size:11px;color:#94a3b8;font-family:'Hanken Grotesk',Arial,sans-serif;">Converge by Amelior. This is an automated message, please do not reply.</p>
         </td></tr>
       </table>
     </td></tr>

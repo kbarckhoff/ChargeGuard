@@ -1,4 +1,4 @@
-// ChargeGuard workflow roles (RBAC), separate from the legacy user_role enum.
+// Converge workflow roles (RBAC), separate from the legacy user_role enum.
 //   super_user  the firm / hospital admin: manages users + roles, sees + does all
 //   analyst     the Charge Master Analyst: assigns findings to anyone, reviews all
 //   member      a regular user: acts on findings assigned to their work queue

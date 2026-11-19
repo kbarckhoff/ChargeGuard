@@ -1,4 +1,4 @@
-// ─── ChargeGuard Rule Catalog ────────────────────────────────
+// ─── Converge Rule Catalog ────────────────────────────────
 // Single source of truth for every check the scan performs, grouped by area so
 // the client can activate or deactivate them on the Intake page. Each catalog
 // item maps to one or more engine rule_ids (see scan-route-v2.ts, cdm-reference-

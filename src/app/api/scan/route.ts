@@ -1,4 +1,4 @@
-// ChargeGuard scan endpoint.
+// Converge scan endpoint.
 // Delegates to the v2 engine, which runs the self-contained structural rules
 // PLUS the CMS reference-driven rules ported from an expert consultant's methodology
 // (SI=B / SI=Q1-Q4 packaging, pass-through SI=J/K/G, retired HCPCS, underpriced

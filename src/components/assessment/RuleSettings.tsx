@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, ChevronRight } from "lucide-react";
 import { catalogForFacility, RULE_CATALOG, type FacilityType } from "@/lib/rule-catalog";
 
 // Intake control: list the checks the scan runs for the selected facility type,
@@ -13,7 +13,15 @@ export function RuleSettings({ auditId, initialDisabled, locked, facilityType }:
   const [disabled, setDisabled] = useState<Set<string>>(new Set(initialDisabled || []));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const timer = useRef<any>(null);
+
+  const toggleGroup = (group: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      next.has(group) ? next.delete(group) : next.add(group);
+      return next;
+    });
 
   const persist = (next: Set<string>) => {
     setSaving(true); setSaved(false);
@@ -60,34 +68,53 @@ export function RuleSettings({ auditId, initialDisabled, locked, facilityType }:
           <span className="text-[12px] font-semibold text-[#1e293b] bg-[#eef2ff] px-2.5 py-1 rounded-full">{active}/{total} on</span>
         </div>
       </div>
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 items-center">
         <button onClick={() => setAll(true)} className="text-[12px] font-medium text-[#1e293b] hover:underline">Enable all</button>
         <span className="text-[#d1d5db]">·</span>
         <button onClick={() => setAll(false)} className="text-[12px] font-medium text-[#6b7280] hover:underline">Disable all</button>
+        <span className="text-[#d1d5db] ml-1">|</span>
+        <button onClick={() => setOpenGroups(new Set(catalog.map((g) => g.group)))} className="text-[12px] font-medium text-[#6b7280] hover:underline">Expand all</button>
+        <span className="text-[#d1d5db]">·</span>
+        <button onClick={() => setOpenGroups(new Set())} className="text-[12px] font-medium text-[#6b7280] hover:underline">Collapse all</button>
       </div>
 
-      <div className="space-y-5">
-        {catalog.map((g) => (
-          <div key={g.group}>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#9aa2af] mb-2">{g.group}</div>
-            <div className="grid grid-cols-1 gap-2">
-              {g.items.map((it) => {
-                const on = isOn(it.ids);
-                return (
-                  <div key={it.key} className="flex items-start justify-between gap-3 border border-[#edf0f4] rounded-xl px-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className={`text-[13px] font-medium ${on ? "text-[#111827]" : "text-[#9aa2af]"}`}>{it.name}</div>
-                      <div className="text-[11.5px] text-[#9aa2af] leading-snug mt-0.5">{it.desc}</div>
-                    </div>
-                    <button onClick={() => toggle(it.ids)} disabled={locked} aria-label={`Toggle ${it.name}`} className={`relative w-9 h-5 rounded-full shrink-0 mt-0.5 transition-colors ${on ? "bg-[#1e293b]" : "bg-[#d1d5db]"} ${locked ? "opacity-50 cursor-not-allowed" : ""}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
-                    </button>
-                  </div>
-                );
-              })}
+      <div className="space-y-2">
+        {catalog.map((g) => {
+          const open = openGroups.has(g.group);
+          const groupOn = g.items.filter((i) => isOn(i.ids)).length;
+          return (
+            <div key={g.group} className="border border-[#edf0f4] rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleGroup(g.group)}
+                className="w-full flex items-center justify-between gap-3 px-3.5 py-3 bg-[#fbfcfd] hover:bg-[#f6f7f9] transition-colors"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <ChevronRight size={15} className={`text-[#9aa2af] shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+                  <span className="text-[12px] font-semibold uppercase tracking-wide text-[#6b7280] truncate">{g.group}</span>
+                </span>
+                <span className="text-[11px] font-semibold text-[#1e293b] bg-white border border-[#e2e6ec] px-2 py-0.5 rounded-full shrink-0">{groupOn}/{g.items.length}</span>
+              </button>
+              {open && (
+                <div className="grid grid-cols-1 gap-2 p-3 pt-0">
+                  {g.items.map((it) => {
+                    const on = isOn(it.ids);
+                    return (
+                      <div key={it.key} className="flex items-start justify-between gap-3 border border-[#edf0f4] rounded-xl px-3 py-2.5 mt-3">
+                        <div className="min-w-0">
+                          <div className={`text-[13px] font-medium ${on ? "text-[#111827]" : "text-[#9aa2af]"}`}>{it.name}</div>
+                          <div className="text-[11.5px] text-[#9aa2af] leading-snug mt-0.5">{it.desc}</div>
+                        </div>
+                        <button onClick={() => toggle(it.ids)} disabled={locked} aria-label={`Toggle ${it.name}`} className={`relative w-9 h-5 rounded-full shrink-0 mt-0.5 transition-colors ${on ? "bg-[#1e293b]" : "bg-[#d1d5db]"} ${locked ? "opacity-50 cursor-not-allowed" : ""}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

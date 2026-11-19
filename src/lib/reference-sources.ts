@@ -1,5 +1,5 @@
 // ─── Public CMS Reference Source Registry ────────────────────
-// Single source of truth for every public data source ChargeGuard benchmarks
+// Single source of truth for every public data source Converge benchmarks
 // against: its update cadence, the canonical CMS download page, the currently
 // loaded vintage, and the logic that computes when the next release is due.
 //

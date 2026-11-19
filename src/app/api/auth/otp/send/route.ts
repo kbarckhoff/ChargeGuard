@@ -46,9 +46,9 @@ export async function POST() {
 
     (await cookies()).delete(OTP_COOKIE);
 
-    const subject = "Your ChargeGuard sign-in code";
+    const subject = "Your Converge sign-in code";
     const text =
-      `Your ChargeGuard verification code is ${code}\n\n` +
+      `Your Converge verification code is ${code}\n\n` +
       `Enter it to finish signing in. The code expires in 10 minutes.\n\n` +
       `If you didn't try to sign in, you can ignore this email.`;
     const html = renderEmail({

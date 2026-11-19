@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChargeGuard — CDM Audit Platform",
+  title: "Converge — CDM Audit Platform",
   description: "Comprehensive Charge Master Audit Review Platform",
 };
 

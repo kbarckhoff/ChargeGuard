@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     if (data) review = `${data.name} (${data.hospital_name})`;
   } catch { /* keep default */ }
 
-  const subject = `ChargeGuard: ready for peer files — ${review}`;
+  const subject = `Converge: ready for peer files — ${review}`;
   const text = `The client has completed Intake, Imports, and Review Imports for ${review}.\n\nPeer price-transparency files are ready to be uploaded in the Peer Setup step. Once loaded and the analysis is run, the findings and peer comparison will appear on the dashboard Findings tab.`;
   try {
     await sendSes(region, accessKey, secretKey, from, TO, subject, text);

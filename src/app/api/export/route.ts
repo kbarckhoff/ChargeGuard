@@ -238,14 +238,14 @@ export async function GET(request: Request) {
       }
 
       const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-      return new NextResponse(new Uint8Array(buf), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="ChargeGuard_${hospitalName}_Report_${date}.xlsx"` } });
+      return new NextResponse(new Uint8Array(buf), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="Converge_${hospitalName}_Report_${date}.xlsx"` } });
     }
 
     // ── CSV ──
     const headers = ["Severity", "Status", "Category", "Finding", "Description", "Recommendation", "Est. Financial Impact", "Procedure #", "Charge Description", "HCPCS/CPT", "Revenue Code", "Gross Charge", "Department"];
     const rows = findings.map((f: any) => [f.severity, f.status, f.category || "", f.title, (f.description || "").replace(/"/g, '""'), (f.recommendation || "").replace(/"/g, '""'), f.financial_impact || "", f.charge_items?.procedure_number || "", (f.charge_items?.charge_description || "").replace(/"/g, '""'), f.charge_items?.hcpcs_cpt_code || "", f.charge_items?.revenue_code || "", f.charge_items?.gross_charge || "", f.charge_items?.department || ""]);
     const csv = [headers.map((h) => `"${h}"`).join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
-    return new NextResponse(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": `attachment; filename="ChargeGuard_${hospitalName}_Findings_${date}.csv"` } });
+    return new NextResponse(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": `attachment; filename="Converge_${hospitalName}_Findings_${date}.csv"` } });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Self-service provisioning is disabled — ChargeGuard is invite-only. New
+// Self-service provisioning is disabled — Converge is invite-only. New
 // accounts are created by an administrator via /api/team/invite (admin creates
 // the auth user with a temporary password and the profile row directly). This
 // legacy endpoint, used by the removed public signup page, now refuses.

@@ -170,7 +170,7 @@ export function CDMImport({ auditId, label = "Upload CDM" }: { auditId: string; 
               <p className="text-xs text-[#6b7280] mb-4">We auto-matched your file&apos;s columns. Review each field and adjust if needed. <span className="text-[#b45309] font-medium">* required</span></p>
               <div className="rounded-xl border border-[#edf0f4] overflow-hidden">
                 <div className="grid grid-cols-[180px_1fr_150px] items-center gap-3 px-4 py-2 bg-[#f8fafc] border-b border-[#edf0f4] text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8]">
-                  <div>ChargeGuard field</div><div>Your column</div><div>Sample value</div>
+                  <div>Converge field</div><div>Your column</div><div>Sample value</div>
                 </div>
                 <div className="divide-y divide-[#f1f5f9]">
                   {TARGETS.map((t) => {

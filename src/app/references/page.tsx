@@ -45,7 +45,7 @@ function currentQuarterRank(now = new Date()): number {
   return now.getUTCFullYear() * 10 + q;
 }
 
-// Benchmarks = the public CMS reference data ChargeGuard prices every CDM line
+// Benchmarks = the public CMS reference data Converge prices every CDM line
 // against, with each source's update cadence and whether a newer release is due.
 export default async function BenchmarksPage() {
   const cov = referenceCoverage();

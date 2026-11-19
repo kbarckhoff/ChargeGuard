@@ -37,7 +37,7 @@ export default function Sidebar() {
             <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
               <Shield size={14} className="text-white" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">ChargeGuard</span>
+            <span className="font-semibold text-sm tracking-tight">Converge</span>
           </Link>
         )}
         <button onClick={() => setCollapsed((c) => !c)} className="p-1 hover:bg-white/10 rounded">

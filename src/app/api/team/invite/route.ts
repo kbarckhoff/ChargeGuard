@@ -63,19 +63,19 @@ export async function POST(request: Request) {
       }
       await db.from("org_members").upsert({ user_id: existingUser.id, org_id: targetOrg }, { onConflict: "user_id,org_id" });
 
-      const subject = `You've been added to ChargeGuard${orgLabel}`;
+      const subject = `You've been added to Converge${orgLabel}`;
       const text =
-        `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on ChargeGuard.\n\n` +
+        `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on Converge.\n\n` +
         `You can now access it with your existing account. Sign in here: ${loginUrl}\n\n` +
         `Use the client switcher at the top of the left menu to move between the clients you have access to.`;
       const html = renderEmail({
         origin,
         title: "You've been added to a client",
         paragraphs: [
-          `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on ChargeGuard.`,
+          `${me.full_name || "A teammate"} added you to ${org?.name || "a client"} on Converge.`,
           "You can now access it with your existing account. Use the client switcher at the top of the left menu to move between the clients you have access to.",
         ],
-        button: { text: "Sign in to ChargeGuard", url: loginUrl },
+        button: { text: "Sign in to Converge", url: loginUrl },
       });
       let emailed = false;
       try { emailed = (await sendEmail([cleanEmail], subject, text, html)).ok; } catch { emailed = false; }
@@ -113,22 +113,22 @@ export async function POST(request: Request) {
     await db.from("org_members").upsert({ user_id: uid, org_id: targetOrg }, { onConflict: "user_id,org_id" });
 
     // Email the temporary password + where to sign in.
-    const subject = `Your ChargeGuard account${orgLabel}`;
+    const subject = `Your Converge account${orgLabel}`;
     const text =
-      `${me.full_name || "A teammate"} added you to ChargeGuard.\n\n` +
+      `${me.full_name || "A teammate"} added you to Converge.\n\n` +
       `Sign in here: ${loginUrl}\n` +
       `Email: ${cleanEmail}\n` +
       `Temporary password: ${tempPassword}\n\n` +
       `On your first sign-in you'll set a new password and enter a one-time code we email you.`;
     const html = renderEmail({
       origin,
-      title: "Your ChargeGuard account is ready",
+      title: "Your Converge account is ready",
       paragraphs: [
-        `${me.full_name || "A teammate"} set up a ChargeGuard account for you${org?.name ? ` at ${org.name}` : ""}.`,
+        `${me.full_name || "A teammate"} set up a Converge account for you${org?.name ? ` at ${org.name}` : ""}.`,
         `Sign in with your email (${cleanEmail}) and the temporary password below.`,
       ],
       code: tempPassword,
-      button: { text: "Sign in to ChargeGuard", url: loginUrl },
+      button: { text: "Sign in to Converge", url: loginUrl },
       footnote: "On your first sign-in you'll set a new password and enter a one-time code we email you.",
     });
 
