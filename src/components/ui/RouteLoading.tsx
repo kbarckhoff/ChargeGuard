@@ -9,7 +9,7 @@ export function RouteLoading({ title }: { title?: string }) {
         <div className="h-4 w-40 rounded bg-[#eef2f7]" />
         {title ? <span className="sr-only">{title}</span> : null}
       </header>
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 min-h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <ConvergeLoader size={40} />
       </div>
     </>
