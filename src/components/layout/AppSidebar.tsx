@@ -155,7 +155,7 @@ export function AppSidebar() {
 
   return (
     <aside className="w-[232px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
-      <div className="flex items-center justify-center px-5 h-16">
+      <div className="flex items-center justify-start px-4 h-16">
         <img src="/logo-signin.png" alt="Converge" className="w-[44px] h-[44px] object-contain" />
       </div>
       <ClientSwitcher info={info} />
