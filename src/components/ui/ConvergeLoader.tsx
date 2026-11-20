@@ -14,9 +14,9 @@ export function ConvergeLoader({ size = 120, label = "Loading" }: { size?: numbe
           </linearGradient>
         </defs>
         <g transform="rotate(-22 100 100)">
-          <path d={D} stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={D} stroke="#e2e8f0" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
           <path className="cvl-runner" d={D} stroke="url(#cvlRun)" strokeWidth="9" strokeLinecap="round"
-            pathLength={100} strokeDasharray="24 76" />
+            strokeLinejoin="round" pathLength={100} strokeDasharray="100" />
         </g>
       </svg>
       {label ? (
@@ -28,8 +28,8 @@ export function ConvergeLoader({ size = 120, label = "Loading" }: { size?: numbe
       <style>{`
         .cvl-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
         .cvl-svg{overflow:visible}
-        .cvl-runner{filter:drop-shadow(0 0 4px rgba(25,127,249,.45));
-          animation:cvlRun 2s linear infinite}
+        .cvl-runner{filter:drop-shadow(0 0 3px rgba(25,127,249,.4));
+          stroke-dashoffset:100;animation:cvlDraw 2.4s ease-in-out infinite}
         .cvl-label{display:flex;align-items:center;gap:7px;color:#94a3b8;font-size:11.5px;font-weight:600;
           letter-spacing:.22em;text-transform:uppercase;padding-left:.22em}
         .cvl-dot{width:4px;height:4px;border-radius:50%;background:#94a3b8;animation:cvlBlink 1.4s ease-in-out infinite}
