@@ -1,15 +1,24 @@
-// Branded page loader: the Converge ribbon mark with a spinning brand-colored
-// arc, a gloss sweep masked to the logo, and a soft breathing float. Transparent
-// background so it sits on the app's light canvas. Loops seamlessly.
+// Branded page loader: the Converge mark drawn as a thin grey figure-8 track
+// with a blue→teal segment running continuously along its path. Transparent
+// background; loops seamlessly. Motion traces the logo's interlocking loops.
 export function ConvergeLoader({ size = 120, label = "Loading" }: { size?: number; label?: string }) {
-  const inset = Math.round(size * 0.11);
+  const D = "M 100 100 C 74 72, 44 78, 46 100 C 48 124, 80 128, 100 100 C 120 76, 154 74, 156 100 C 158 126, 126 128, 100 100 Z";
   return (
     <div className="cvl-wrap" role="status" aria-label={label}>
-      <div className="cvl-stage" style={{ width: size, height: size }}>
-        <div className="cvl-ring" />
-        <div className="cvl-logo" style={{ inset }} />
-        <div className="cvl-shine" style={{ inset }} />
-      </div>
+      <svg className="cvl-svg" width={size} height={size} viewBox="0 0 200 200" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="cvlRun" x1="20" y1="60" x2="180" y2="140" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#5EA8FF" />
+            <stop offset="55%" stopColor="#197FF9" />
+            <stop offset="100%" stopColor="#13B49B" />
+          </linearGradient>
+        </defs>
+        <g transform="rotate(-22 100 100)">
+          <path d={D} stroke="#cbd5e1" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+          <path className="cvl-runner" d={D} stroke="url(#cvlRun)" strokeWidth="9" strokeLinecap="round"
+            pathLength={100} strokeDasharray="24 76" />
+        </g>
+      </svg>
       {label ? (
         <div className="cvl-label">
           {label}
@@ -17,41 +26,18 @@ export function ConvergeLoader({ size = 120, label = "Loading" }: { size?: numbe
         </div>
       ) : null}
       <style>{`
-        .cvl-wrap{display:flex;flex-direction:column;align-items:center;gap:20px}
-        .cvl-stage{position:relative;animation:cvlFloat 3.2s ease-in-out infinite}
-        .cvl-stage::before{content:"";position:absolute;inset:10%;border-radius:50%;
-          background:radial-gradient(circle,rgba(25,127,249,.18)0%,rgba(19,180,155,.11)50%,rgba(255,255,255,0)75%);
-          filter:blur(8px);animation:cvlAura 2.8s ease-in-out infinite;pointer-events:none}
-        .cvl-ring{position:absolute;inset:-10px;border-radius:50%;
-          background:conic-gradient(from 0deg,
-            rgba(25,127,249,0)0deg,rgba(25,127,249,0)60deg,
-            #197ff9 170deg,#15a3c7 210deg,#13b49b 250deg,
-            rgba(19,180,155,0)300deg,rgba(19,180,155,0)360deg);
-          -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));
-                  mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));
-          animation:cvlSpin 1.5s cubic-bezier(.65,.1,.35,.9) infinite}
-        .cvl-logo{position:absolute;background:url("/logo-signin.png") center/contain no-repeat;
-          animation:cvlBreathe 3.2s ease-in-out infinite}
-        .cvl-shine{position:absolute;mix-blend-mode:screen;pointer-events:none;
-          -webkit-mask:url("/logo-signin.png") center/contain no-repeat;
-                  mask:url("/logo-signin.png") center/contain no-repeat;
-          background:linear-gradient(112deg,transparent 38%,rgba(255,255,255,.7)50%,transparent 62%);
-          background-size:280% 100%;background-position:170% 0;
-          animation:cvlSweep 2.6s cubic-bezier(.4,0,.2,1) infinite}
+        .cvl-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+        .cvl-svg{overflow:visible}
+        .cvl-runner{filter:drop-shadow(0 0 4px rgba(25,127,249,.45));
+          animation:cvlRun 2s linear infinite}
         .cvl-label{display:flex;align-items:center;gap:7px;color:#94a3b8;font-size:11.5px;font-weight:600;
           letter-spacing:.22em;text-transform:uppercase;padding-left:.22em}
         .cvl-dot{width:4px;height:4px;border-radius:50%;background:#94a3b8;animation:cvlBlink 1.4s ease-in-out infinite}
         .cvl-dot:nth-child(2){animation-delay:.18s}
         .cvl-dot:nth-child(3){animation-delay:.36s}
-        @keyframes cvlSpin{to{transform:rotate(360deg)}}
-        @keyframes cvlSweep{0%{background-position:170% 0}48%{background-position:-70% 0}100%{background-position:-70% 0}}
-        @keyframes cvlBreathe{0%,100%{transform:scale(.985)}50%{transform:scale(1.015)}}
-        @keyframes cvlFloat{0%,100%{transform:translateY(2px)}50%{transform:translateY(-2px)}}
-        @keyframes cvlAura{0%,100%{opacity:.5;transform:scale(.92)}50%{opacity:1;transform:scale(1.04)}}
+        @keyframes cvlRun{to{stroke-dashoffset:-100}}
         @keyframes cvlBlink{0%,100%{opacity:.3}50%{opacity:1}}
-        @media (prefers-reduced-motion:reduce){
-          .cvl-stage,.cvl-logo,.cvl-shine,.cvl-ring,.cvl-stage::before,.cvl-dot{animation:none}
-          .cvl-shine{display:none}.cvl-ring{opacity:.7}}
+        @media (prefers-reduced-motion:reduce){.cvl-runner,.cvl-dot{animation:none}}
       `}</style>
     </div>
   );
