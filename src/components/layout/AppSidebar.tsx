@@ -87,17 +87,50 @@ function ClientSwitcher({ info }: { info: OrgInfo | null }) {
   );
 }
 
-// Global menu. The audit log holds the CDM change history (accepted changes,
-// manual entries) across runs.
-const NAV = [
-  { label: "Dashboard", href: "/runs", icon: LayoutDashboard },
-  { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
-  { label: "Departments", href: "/departments", icon: Network },
-  { label: "My Work Queue", href: "/queue", icon: Inbox },
-  { label: "Audit Log", href: "/change-log", icon: ClipboardList },
-  { label: "References", href: "/references", icon: Database },
-  { label: "Settings", href: "/settings", icon: Settings },
+// Global menu, grouped into labelled sections. The audit log holds the CDM
+// change history (accepted changes, manual entries) across runs.
+type NavItem = { label: string; href: string; icon: typeof LayoutDashboard; match?: (p: string) => boolean };
+type NavSection = { title: string; items: NavItem[] };
+
+const SECTIONS: NavSection[] = [
+  {
+    title: "Workspace",
+    items: [
+      { label: "Dashboard", href: "/runs", icon: LayoutDashboard, match: (p) => p === "/runs" || p === "/" },
+      { label: "Findings & Analysis", href: "/findings", icon: BarChart3 },
+      { label: "Departments", href: "/departments", icon: Network },
+    ],
+  },
+  {
+    title: "My Work",
+    items: [
+      { label: "My Work Queue", href: "/queue", icon: Inbox },
+      { label: "Audit Log", href: "/change-log", icon: ClipboardList },
+    ],
+  },
+  {
+    title: "Data",
+    items: [{ label: "References", href: "/references", icon: Database }],
+  },
+  {
+    title: "Account",
+    items: [{ label: "Settings", href: "/settings", icon: Settings }],
+  },
 ];
+
+// Brand blue (from the Converge ribbon mark) used for the active state.
+const ACTIVE = "bg-[#eaf2ff] text-[#0f172a] font-semibold";
+const IDLE = "text-[#475569] hover:bg-[#eef1f5] hover:text-[#0f172a] font-medium";
+
+function NavRow({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link href={item.href} className={`relative flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-lg text-[13.5px] transition-colors ${active ? ACTIVE : IDLE}`}>
+      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r bg-[#197ff9]" />}
+      <Icon size={17} className={active ? "text-[#197ff9]" : "text-[#64748b]"} /> {item.label}
+    </Link>
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -112,28 +145,30 @@ export function AppSidebar() {
     router.push("/auth/login");
     router.refresh();
   };
+
+  // Append Admin into the Account section for platform owners.
+  const sections = SECTIONS.map((s) =>
+    s.title === "Account" && isOwner
+      ? { ...s, items: [...s.items, { label: "Admin", href: "/admin", icon: Building2, match: (p: string) => p.startsWith("/admin") } as NavItem] }
+      : s
+  );
+
   return (
-    <aside className="w-[224px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
-      <div className="flex items-center gap-1.5 px-5 h-14">
-        <img src="/logo-dark.png" alt="Converge" className="w-[28px] h-[28px] object-contain" />
-        <span className="font-bold text-[15px] tracking-tight text-[#1e2a3a]">Converge</span>
+    <aside className="w-[232px] shrink-0 bg-[#f7f8fa] text-[#0f172a] border-r border-[#e5e7eb] flex flex-col min-h-screen">
+      <div className="flex items-center justify-center px-5 h-16">
+        <img src="/logo-signin.png" alt="Converge" className="w-[44px] h-[44px] object-contain" />
       </div>
       <ClientSwitcher info={info} />
-      <nav className="flex-1 px-3 pt-3 flex flex-col gap-1">
-        {NAV.map((n) => {
-          const active = pathname === n.href || (n.href === "/runs" && pathname === "/");
-          const Icon = n.icon;
-          return (
-            <Link key={n.href} href={n.href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${active ? "bg-[#e9ebef] text-[#0f172a]" : "text-[#475569] hover:bg-[#eef1f5] hover:text-[#0f172a]"}`}>
-              <Icon size={17} /> {n.label}
-            </Link>
-          );
-        })}
-        {isOwner && (
-          <Link href="/admin" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${pathname.startsWith("/admin") ? "bg-[#e9ebef] text-[#0f172a]" : "text-[#475569] hover:bg-[#eef1f5] hover:text-[#0f172a]"}`}>
-            <Building2 size={17} /> Admin
-          </Link>
-        )}
+      <nav className="flex-1 px-3 pt-2 flex flex-col gap-4 overflow-y-auto">
+        {sections.map((section) => (
+          <div key={section.title} className="flex flex-col gap-0.5">
+            <div className="px-4 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#94a3b8]">{section.title}</div>
+            {section.items.map((item) => {
+              const active = item.match ? item.match(pathname) : pathname === item.href;
+              return <NavRow key={item.href} item={item} active={active} />;
+            })}
+          </div>
+        ))}
       </nav>
       <button onClick={logout} className="flex items-center gap-2.5 px-5 py-4 text-[13px] text-[#475569] hover:text-[#0f172a] border-t border-[#e5e7eb]">
         <LogOut size={16} /> Sign out
