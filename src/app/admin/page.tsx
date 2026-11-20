@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { resolveActiveOrg } from "@/lib/active-org";
+import { PRODUCT } from "@/lib/product";
 import { AdminClients } from "@/components/admin/AdminClients";
 import { AdminTabs } from "@/components/admin/AdminTabs";
 
@@ -15,6 +16,7 @@ export default async function AdminPage() {
   const { data: orgs } = await db
     .from("organizations")
     .select("id, name, created_at")
+    .eq("product", PRODUCT)
     .order("created_at", { ascending: false });
 
   // Member count per org (for the list).

@@ -4,6 +4,7 @@ import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { ACTIVE_ORG_COOKIE, resolveActiveOrg, listMemberOrgs } from "@/lib/active-org";
 import { getActor } from "@/lib/roles";
+import { PRODUCT } from "@/lib/product";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function GET() {
 
     let orgs: { id: string; name: string }[] = [];
     if (isPlatformOwner) {
-      const { data } = await db.from("organizations").select("id, name").order("name");
+      const { data } = await db.from("organizations").select("id, name").eq("product", PRODUCT).order("name");
       orgs = data || [];
     } else {
       // Regular users see the clients they belong to (home org + org_members).
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
 
     const { org_id } = await request.json();
     if (!org_id) return NextResponse.json({ error: "Missing org_id" }, { status: 400 });
-    const { data: o } = await db.from("organizations").select("id").eq("id", org_id).maybeSingle();
+    const { data: o } = await db.from("organizations").select("id").eq("id", org_id).eq("product", PRODUCT).maybeSingle();
     if (!o?.id) return NextResponse.json({ error: "Unknown client" }, { status: 404 });
 
     // Platform owners may switch to any client; everyone else only to a client

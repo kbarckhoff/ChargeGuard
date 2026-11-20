@@ -4,6 +4,7 @@ import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { seedOrgDepartments } from "@/lib/departments";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
+import { PRODUCT } from "@/lib/product";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
     const { data: org, error } = await db
       .from("organizations")
-      .insert({ name: clean, slug, contact_email: user.email || null })
+      .insert({ name: clean, slug, contact_email: user.email || null, product: PRODUCT })
       .select("id, name")
       .single();
     if (error || !org) return NextResponse.json({ error: error?.message || "Could not create client" }, { status: 500 });

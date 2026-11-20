@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { seedOrgDepartments } from "@/lib/departments";
+import { PRODUCT } from "@/lib/product";
 import { sendEmail, sesConfigured } from "@/lib/email";
 import { genTempPassword } from "@/lib/otp";
 import { ACTIVE_ORG_COOKIE } from "@/lib/active-org";
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
     const { data: org, error: orgErr } = await db
       .from("organizations")
-      .insert({ name, slug, contact_email: email, settings: { run_cadence: cadence, access_expires_at: accessExpiresAt } })
+      .insert({ name, slug, contact_email: email, product: PRODUCT, settings: { run_cadence: cadence, access_expires_at: accessExpiresAt } })
       .select("id, name")
       .single();
     if (orgErr || !org) return NextResponse.json({ error: orgErr?.message || "Could not create hospital" }, { status: 500 });
