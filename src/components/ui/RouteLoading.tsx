@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { ConvergeLoader } from "./ConvergeLoader";
 
 // Instant skeleton shown by App Router the moment a nav link is clicked, while
 // the destination page renders on the server. Makes menu navigation feel snappy.
@@ -9,8 +9,8 @@ export function RouteLoading({ title }: { title?: string }) {
         <div className="h-4 w-40 rounded bg-[#eef2f7]" />
         {title ? <span className="sr-only">{title}</span> : null}
       </header>
-      <div className="flex-1 flex items-center justify-center text-[#94a3b8]">
-        <Loader2 size={22} className="animate-spin" />
+      <div className="flex-1 flex items-center justify-center">
+        <ConvergeLoader size={104} />
       </div>
     </>
   );
