@@ -273,6 +273,24 @@ const REV_CODE_CPT_RANGES: Record<string, { min: number; max: number; alpha?: st
 
 // ─── Rule Engine ─────────────────────────────────────────────
 
+// Recognized CPT (Level I) + HCPCS (Level II) modifiers; pattern families
+// (anatomic F/T/E, anesthesia P1-P6, payer U-mods, G-numeric) matched separately.
+const VALID_MODIFIERS = new Set([
+  "22","23","24","25","26","27","32","33","47","50","51","52","53","54","55","56","57","58","59",
+  "62","63","66","73","74","76","77","78","79","80","81","82","90","91","92","93","95","96","97","99",
+  "AA","AD","AI","AQ","AR","AS","AT","AU","AV","AW","AX","AY","AZ","BA","BL","BO","BP","BR","BU",
+  "CA","CB","CC","CD","CE","CF","CG","CR","CS","CT","EJ","EM","ET","EY","FB","FC","FP","FX","FY",
+  "GA","GB","GC","GE","GF","GG","GH","GJ","GK","GL","GM","GN","GO","GP","GQ","GR","GS","GT","GU","GV","GW","GX","GY","GZ","G0",
+  "HA","HB","HC","HD","HE","HF","HG","HH","HI","HJ","HK","HL","HM","HN","HO","HP","HQ","HR","HS","HT","HU","HV","HW","HX","HY","HZ",
+  "JA","JB","JC","JD","JE","JG","JW","JZ","KD","KE","KF","KP","KQ","KR","KS","KT","KU","KV","KW","KX","KZ","K0","K1","K2","K3","K4",
+  "LC","LD","LL","LM","LR","LS","LT","MS","NB","NR","NU","PA","PB","PC","PD","PI","PL","PN","PO","PS","PT",
+  "Q0","Q1","Q2","Q3","Q4","Q5","Q6","Q7","Q8","Q9","QA","QB","QC","QD","QE","QF","QG","QH","QJ","QK","QL","QM","QN","QP","QR","QS","QT","QW","QX","QY","QZ",
+  "RA","RB","RC","RD","RE","RI","RR","RT","SA","SB","SC","SD","SE","SF","SG","SH","SJ","SK","SL","SM","SN","SQ","SS","ST","SU","SV","SW","SY",
+  "TA","TC","TD","TE","TF","TG","TH","TJ","TK","TL","TM","TN","TP","TQ","TR","TS","TT","TU","TV","TW","UN","UP","UQ","UR","US","V5","V6","V7","V8","V9","XE","XP","XS","XU",
+]);
+const VALID_MOD_PATTERN = /^(F[1-9]|FA|T[1-9]|TA|E[1-4]|P[1-6]|U[1-9]|U[A-D]|G[0-9])$/;
+function isValidModifier(m: string): boolean { return VALID_MODIFIERS.has(m) || VALID_MOD_PATTERN.test(m); }
+
 function runRules(items: any[]): RuleResult[] {
   const results: RuleResult[] = [];
 
@@ -311,6 +329,20 @@ function runRules(items: any[]): RuleResult[] {
     const mod3 = (item.modifier_3 || "").trim().toUpperCase();
     const allMods = [mod1, mod2, mod3].filter(Boolean);
     const procNum = item.procedure_number || item.id;
+
+    // ─── Modifier validity: any modifier on the CDM line must be a recognized
+    //     CPT/HCPCS modifier, else claims reject/deny. ─────────────────────
+    for (const m of allMods) {
+      if (!isValidModifier(m)) {
+        results.push({
+          rule_id: "MOD.invalid", charge_item_id: item.id,
+          title: `Unrecognized modifier "${m}" on CDM line - ${procNum}`,
+          description: `"${item.charge_description}" (${procNum}) carries modifier "${m}", which is not a recognized CPT/HCPCS modifier. Claims with invalid modifiers are rejected or denied.`,
+          severity: "high", category: "Modifier Validity",
+          recommendation: `Remove or correct modifier "${m}" — use a valid CPT (e.g., 25, 59, 76) or HCPCS Level II (e.g., LT, RT, GA, XU) modifier appropriate to the service.`,
+        });
+      }
+    }
 
     // ─── Rule S.2: No Revenue Code ─────────────────────
     if (!rev) {

@@ -77,6 +77,14 @@ export async function POST(request: Request) {
       });
     }
 
+    // Real, insertable columns on charge_items. Any mapped target outside this
+    // set is ignored so a bad/stale mapping can never fail the entire import.
+    const KNOWN_CDM_COLUMNS = new Set([
+      "procedure_number", "charge_description", "hcpcs_cpt_code", "revenue_code",
+      "department", "department_gl", "gross_charge", "unit_of_service", "units_billed",
+      "ndc_code", "modifier_1", "modifier_2", "modifier_3", "service_line",
+    ]);
+
     // Transform rows
     const baseRow = typeof rowOffset === "number" ? rowOffset : null;
     const chargeItems = items.map((row: Record<string, string>, idx: number) => {
@@ -88,6 +96,10 @@ export async function POST(request: Request) {
       };
 
       Object.entries(columnMappings).forEach(([targetCol, sourceCol]) => {
+        // Only map to real charge_items columns. An unknown target (e.g. a stale
+        // saved mapping or a future field) is skipped rather than failing the
+        // whole insert with a "column not in schema cache" error.
+        if (!KNOWN_CDM_COLUMNS.has(targetCol)) return;
         if (sourceCol && row[sourceCol as string] !== undefined) {
           const val = String(row[sourceCol as string] || "");
           if (targetCol === "gross_charge") {
