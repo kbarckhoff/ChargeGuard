@@ -55,6 +55,8 @@ export const RULE_CATALOG: RuleGroup[] = [
     group: "Coding & status indicators",
     items: [
       { key: "retired", name: "Retired code still active", desc: "The code was deleted from the current CPT/HCPCS list and will deny.", ids: ["12"] },
+      { key: "invalid_code", name: "Invalid or nonexistent code", desc: "A code that isn't a valid CPT/HCPCS format, or (with the live reference loaded) isn't on the current CPT/HCPCS list — beyond just retired codes.", ids: ["CODE.invalid", "CODE.unknown"] },
+      { key: "si_e", name: "Non-covered (SI=E1/E2)", desc: "The code carries OPPS status indicator E1 or E2 — not covered / not payable by Medicare, so it denies and belongs in a non-covered/ABN flow.", ids: ["SI.E1", "SI.E2"], facilities: OPPS },
       { key: "si_b", name: "Not recognized under OPPS (SI=B)", desc: "Status B isn't recognized by OPPS on a 12x/13x/14x claim, so it isn't paid under OPPS and an alternate code may apply (e.g. outpatient clinic visits bill G0463).", ids: ["8.B"], facilities: OPPS },
       { key: "si_q", name: "Conditionally packaged (SI=Q1–Q4)", desc: "Paid separately only in certain claim combinations.", ids: ["8.Q"], facilities: OPPS },
       { key: "passthrough", name: "Pass-through / new technology", desc: "Pass-through drug/device (SI=J/K); checks pricing vs ASP.", ids: ["15", "15.ASP"], facilities: OPPS },
@@ -101,6 +103,7 @@ export const RULE_CATALOG: RuleGroup[] = [
   {
     group: "Modifiers & laterality",
     items: [
+      { key: "modifier_valid", name: "Invalid modifier", desc: "A modifier on the CDM line that isn't a recognized CPT/HCPCS modifier. Claims with invalid modifiers are rejected or denied.", ids: ["MOD.invalid"] },
       { key: "hardcoded_mod", name: "Hard-coded modifiers", desc: "Situational modifiers hard-coded in the CDM.", ids: ["2.4"], facilities: OPPS },
       { key: "bilateral_missing", name: "Bilateral missing RT/LT", desc: "A modifier-50 line with no RT/LT counterpart.", ids: ["10.B"], facilities: OPPS },
       { key: "bilateral_price", name: "Bilateral not priced at 1.75x", desc: "A bilateral line not priced at 1.75x the one-sided rate.", ids: ["10"], facilities: OPPS },

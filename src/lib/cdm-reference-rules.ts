@@ -8,7 +8,7 @@
 // SI=J/K/G/H + ASP price audit), Step 12 (retired HCPCS), the "Underpriced vs
 // MPFS" flag, and Step 10 (bilateral 1.75x pricing).
 
-import { getReference, refNum, normalizeHcpcs } from "./cms-reference";
+import { getReference, refNum, normalizeHcpcs, referenceSource } from "./cms-reference";
 import { getProcDevice, classifyDevice, getVaccine, NEW_CODES } from "./device-crosswalk";
 import ptData from "./price-transparency-data.json";
 import { getBenchmark } from "./pricing-benchmark";
@@ -91,8 +91,40 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
 
     const code = (item.hcpcs_cpt_code || "").trim();
     if (!code) continue;
+
+    // A valid CPT/HCPCS code is 5 digits (CPT I), 4 digits + F/T/M (CPT II/III,
+    // alpha), or a letter A-V + 4 digits (HCPCS Level II).
+    const codeNorm = normalizeHcpcs(code);
+    const wellFormed = /^\d{5}$/.test(codeNorm) || /^\d{4}[A-Z]$/.test(codeNorm) || /^[A-V]\d{4}$/.test(codeNorm);
+
     const ref = getReference(code);
-    if (!ref) continue;
+    if (!ref) {
+      // ── Invalid / nonexistent code (beyond retired) ─────────
+      if (!wellFormed) {
+        // Malformed: not a valid CPT/HCPCS shape. Always safe to flag.
+        out.push({
+          rule_id: "CODE.invalid", charge_item_id: item.id,
+          title: `Invalid code format "${code}" - ${procNum}`,
+          description: `"${item.charge_description}" carries "${code}", which is not a valid CPT/HCPCS format (expected 5 digits, 4 digits + a letter, or a letter + 4 digits). Claims with invalid codes are rejected.`,
+          severity: "high", category: "Invalid / Nonexistent Code",
+          financial_impact: undefined,
+          recommendation: "Correct the code to a valid current CPT/HCPCS value, or deactivate the line.",
+        });
+      } else if (referenceSource() === "db") {
+        // Well-formed but not in the current CMS reference. Only flag when the
+        // live reference table is loaded (a comprehensive code set); on the
+        // bundled partial set this would false-positive, so we skip it there.
+        out.push({
+          rule_id: "CODE.unknown", charge_item_id: item.id,
+          title: `Code ${code} not in current CPT/HCPCS list - ${procNum}`,
+          description: `"${item.charge_description}" uses ${code}, which is well-formed but not present in the current-year CPT/HCPCS reference (nonexistent/not a recognized code). Claims with codes that are not on the current list are denied.`,
+          severity: "high", category: "Invalid / Nonexistent Code",
+          financial_impact: undefined,
+          recommendation: "Verify the code against the current AMA CPT / CMS HCPCS list; replace with the correct current code or deactivate the line.",
+        });
+      }
+      continue;
+    }
 
     const si = (ref.si || "").trim();
 
@@ -107,6 +139,26 @@ export function runReferenceRules(items: any[], usageByCode?: Map<string, any>):
         // the line gross is review scope, so no financial_impact.
         financial_impact: undefined,
         recommendation: "Replace with the current valid code per the CMS transmittal / AMA CPT annual update, or deactivate the line.",
+      });
+    }
+
+    // ── Non-covered under OPPS (SI=E1/E2) ───────────────────
+    // E1 = statutorily excluded / not reasonable & necessary (not covered by
+    // Medicare). E2 = items/services with no payable OPPS status on an
+    // outpatient claim. Billed to Medicare these deny; they belong in a
+    // non-covered / ABN self-pay flow, not Medicare billing.
+    if (si === "E1" || si === "E2") {
+      out.push({
+        rule_id: si === "E1" ? "SI.E1" : "SI.E2", charge_item_id: item.id,
+        title: `Non-covered line (SI=${si}) ${code} - ${procNum}`,
+        description: si === "E1"
+          ? `"${item.charge_description}" (${code}) carries OPPS Status Indicator E1 — not covered by Medicare (statutorily excluded or not reasonable and necessary). Billed to Medicare it denies; an ABN and non-covered/self-pay routing may apply.`
+          : `"${item.charge_description}" (${code}) carries OPPS Status Indicator E2 — no payable OPPS status on an outpatient hospital claim, so it is not reimbursed by Medicare as billed.`,
+        severity: "medium", category: "Non-Covered (SI=E1/E2)",
+        financial_impact: undefined,
+        recommendation: si === "E1"
+          ? "Confirm coverage/medical necessity; if non-covered, issue an ABN and route to self-pay/non-covered billing rather than Medicare. Check the CDM line's payer routing."
+          : "Confirm the correct payable code or bill type for this service; do not expect Medicare payment on this line as billed.",
       });
     }
 
