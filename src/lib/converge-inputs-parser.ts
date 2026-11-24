@@ -4,6 +4,8 @@
 // + Node). Columns are matched loosely by header keyword so they tolerate what-
 // ever the client's export calls them; tighten the hints when the spec firms up.
 
+import { classifyHeaders, makeScrubber, type PhiReport } from "./phi-guard";
+
 const numOrNull = (v: any): number | null => {
   if (v == null || v === "") return null;
   const n = parseFloat(String(v).replace(/[$,]/g, ""));
@@ -29,12 +31,13 @@ function splitCsvLine(line: string): string[] {
   out.push(cur);
   return out;
 }
-function headerIndexer(headerLine: string) {
+// `skip` = column indexes that must never be mapped (PHI columns, see phi-guard.ts).
+function headerIndexer(headerLine: string, skip?: Set<number>) {
   const headers = splitCsvLine(headerLine).map((h) => h.toLowerCase().replace(/[\s_\-./]/g, ""));
-  return (...hints: string[]) => { for (const h of hints) { const i = headers.findIndex((c) => c.includes(h)); if (i >= 0) return i; } return -1; };
+  return (...hints: string[]) => { for (const h of hints) { const i = headers.findIndex((c, j) => !skip?.has(j) && c.includes(h)); if (i >= 0) return i; } return -1; };
 }
 
-export interface ParseMeta { rows: number; format: "csv"; note?: string }
+export interface ParseMeta { rows: number; format: "csv"; note?: string; phi?: PhiReport }
 
 export interface ClaimsExtractRow {
   claim_id: string | null; line_control: string | null; service_date: string | null; hcpcs: string | null;
@@ -47,7 +50,12 @@ export interface ClaimsExtractRow {
 export function parseClaimsExtract(text: string): { rows: ClaimsExtractRow[]; meta: ParseMeta } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { rows: [], meta: { rows: 0, format: "csv", note: "empty" } };
-  const idx = headerIndexer(lines[0]);
+  // PHI guardrail: identifier columns are excluded from mapping before any field
+  // is read, so e.g. a "Date of Birth" column can never be picked up as the
+  // service date, and the user is told which columns were left out.
+  const { phi: removedColumns, phiIndexes } = classifyHeaders(splitCsvLine(lines[0]));
+  const scrubber = makeScrubber("REF");
+  const idx = headerIndexer(lines[0], phiIndexes);
   const ix = {
     claim: idx("claimid", "claimnumber", "claimcontrol", "claim", "clm", "patientcontrol", "referencenumber", "refnumber"),
     line: idx("linecontrol", "linenumber", "lineid", "linenum", "svcline"),
@@ -65,7 +73,7 @@ export function parseClaimsExtract(text: string): { rows: ClaimsExtractRow[]; me
     allowed: idx("allowed", "allowable", "contracted"),
     paid: idx("paid", "payment", "paidamount"),
     contractual: idx("contractual", "contractadj", "coadjustment", "writeoff"),
-    patresp: idx("patientresp", "patientresponsibility", "pr", "patientliability"),
+    patresp: idx("patientresp", "patientresponsibility", "patientliability", "pramount", "pramt"),
     carc: idx("denial", "carc", "adjustmentreason", "reasoncode"),
     rarc: idx("rarc", "remark", "remittanceremark"),
     group: idx("casgroup", "group", "adjustmentgroup"),
@@ -78,7 +86,7 @@ export function parseClaimsExtract(text: string): { rows: ClaimsExtractRow[]; me
     const n = (j: number) => numOrNull(j >= 0 ? c[j] : null);
     if (!g(ix.claim) && !g(ix.hcpcs)) continue;
     rows.push({
-      claim_id: g(ix.claim), line_control: g(ix.line), service_date: g(ix.date), hcpcs: g(ix.hcpcs),
+      claim_id: scrubber.scrub(g(ix.claim)), line_control: scrubber.scrub(g(ix.line)), service_date: g(ix.date), hcpcs: g(ix.hcpcs),
       mod1: g(ix.mod1), mod2: g(ix.mod2), mod3: g(ix.mod3), mod4: g(ix.mod4),
       rev_code: g(ix.rev), units: n(ix.units), dx_code: g(ix.dx), place_of_service: g(ix.pos),
       billed_amount: n(ix.billed), allowed_amount: n(ix.allowed), paid_amount: n(ix.paid),
@@ -86,7 +94,7 @@ export function parseClaimsExtract(text: string): { rows: ClaimsExtractRow[]; me
       denial_code: g(ix.carc), rarc_code: g(ix.rarc), cas_group: g(ix.group), payer: g(ix.payer),
     });
   }
-  return { rows, meta: { rows: rows.length, format: "csv" } };
+  return { rows, meta: { rows: rows.length, format: "csv", phi: { removedColumns, transformedValues: scrubber.count } } };
 }
 
 export interface ItemMasterRow {

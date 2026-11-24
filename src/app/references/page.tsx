@@ -78,7 +78,10 @@ export default async function BenchmarksPage() {
     <>
       <header className="h-14 border-b border-[#e2e8f0] bg-white px-6 flex items-center justify-between flex-shrink-0">
         <h1 className="text-base font-semibold text-[#0f172a]">References</h1>
-        <span className="text-sm text-[#94a3b8]">{cov.total.toLocaleString()} reference codes</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-[#94a3b8]">{cov.total.toLocaleString()} reference codes</span>
+          <a href="/api/admin/rule-validation?format=csv" title="Checks every code in the companion-charge rules against the live reference: exists, retired, OPPS status indicator and packaging, NCCI edits. Platform owner only." className="inline-flex items-center rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#f6f7f9] whitespace-nowrap">Rule code validation (CSV)</a>
+        </div>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-5">

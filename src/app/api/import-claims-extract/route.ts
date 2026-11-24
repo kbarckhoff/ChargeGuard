@@ -3,6 +3,7 @@ import { resolveActiveOrg } from "@/lib/active-org";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { isAuditLocked } from "@/lib/audit-lock";
+import { makeScrubber } from "@/lib/phi-guard";
 
 export const maxDuration = 60;
 const num = (v: any) => { if (v == null || v === "") return null; const n = parseFloat(String(v).replace(/[$,]/g, "")); return isNaN(n) ? null : n; };
@@ -20,9 +21,13 @@ export async function POST(request: Request) {
     if (auditId && await isAuditLocked(db, auditId)) return NextResponse.json({ error: "This quarter is completed (locked)." }, { status: 409 });
     if (!auditId || !Array.isArray(rows)) return NextResponse.json({ error: "Missing auditId or rows" }, { status: 400 });
 
+    // Only the analytic fields below are stored (anything else in the payload is
+    // dropped), and reference fields are re-scrubbed server-side in case a client
+    // other than the Converge uploader posts identifier-like values.
+    const scrubber = makeScrubber("REF");
     const records = rows.map((r: any) => ({
       audit_id: auditId, org_id: orgId,
-      claim_id: str(r.claim_id), line_control: str(r.line_control), service_date: str(r.service_date), hcpcs: str(r.hcpcs),
+      claim_id: scrubber.scrub(str(r.claim_id)), line_control: scrubber.scrub(str(r.line_control)), service_date: str(r.service_date), hcpcs: str(r.hcpcs),
       mod1: str(r.mod1), mod2: str(r.mod2), mod3: str(r.mod3), mod4: str(r.mod4),
       rev_code: str(r.rev_code), units: num(r.units), dx_code: str(r.dx_code), place_of_service: str(r.place_of_service),
       billed_amount: num(r.billed_amount), allowed_amount: num(r.allowed_amount), paid_amount: num(r.paid_amount),

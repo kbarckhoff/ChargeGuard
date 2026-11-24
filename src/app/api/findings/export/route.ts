@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
-import { bucketForCategory, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { bucketForCategory, BUCKET_LABELS, BUCKET_ORDER, type FindingBucket } from "@/lib/finding-buckets";
+import { TAB_REASONING } from "@/lib/tab-reasoning";
 import { classForCategory, CLASS_LABELS } from "@/lib/finding-class";
 import * as XLSX from "xlsx-js-style";
 
@@ -10,7 +11,6 @@ export const maxDuration = 60;
 // Export findings as an Excel workbook. bucket=all builds one sheet per findings-
 // page tab (CDM, RVU, Formulary, Peer Review); a single bucket builds that one
 // sheet. Mirrors the tabs the reviewer sees on the Findings page.
-const BUCKET_ORDER: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
 
 const thin = { style: "thin", color: { rgb: "BFBFBF" } };
 const BORDER = { top: thin, bottom: thin, left: thin, right: thin };
@@ -107,6 +107,14 @@ export async function GET(request: Request) {
       const label = BUCKET_LABELS[b] || "Findings";
       XLSX.utils.book_append_sheet(wb, buildSheet(subset), label.slice(0, 31));
       sheetsAdded++;
+    }
+    // Rules and reasoning: every exported tab with its rules and why (full export only).
+    if (isAll) {
+      const rr: any[][] = [["Tab", "Rule", "Name", "What it tests", "Why it is in the report", "Tier", "Source validation"]];
+      for (const b of BUCKET_ORDER) for (const x of TAB_REASONING[b].rules) rr.push([BUCKET_LABELS[b], x.ref, x.name, x.tests, x.why, x.tier, x.validated === false ? "Pending" : ""]);
+      const ws = XLSX.utils.aoa_to_sheet(rr);
+      ws["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 38 }, { wch: 80 }, { wch: 80 }, { wch: 8 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Rules and Reasoning");
     }
     if (sheetsAdded === 0) {
       // Nothing matched — still return a (possibly empty) sheet so the file opens.

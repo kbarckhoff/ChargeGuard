@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Badge, formatImpact } from "@/components/ui/shared";
-import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, BUCKET_ORDER, type FindingBucket } from "@/lib/finding-buckets";
+import { TabReasoningPanel, TabEmptyState } from "@/components/findings/TabReasoningPanel";
 import { classForCategory, categoriesInClass, CLASS_LABELS, type FindingClass } from "@/lib/finding-class";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
 import { FindingDrawer, type FindingRow } from "@/components/audit/FindingsTable";
@@ -17,7 +18,7 @@ type LineRow = { id: string; n: number; max: number; category: string; categorie
 type LineBucket = "1-2" | "3-4" | "5+";
 const inLineBucket = (n: number, b: LineBucket) => b === "1-2" ? n <= 2 : b === "3-4" ? n >= 3 && n <= 4 : n >= 5;
 
-const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
+const TABS: FindingBucket[] = BUCKET_ORDER;
 const CLASSES: FindingClass[] = ["code_validity", "pricing", "data_quality", "informational"];
 const PAGE_SIZE = 50;
 
@@ -53,6 +54,13 @@ export function FindingsWorkspace({
 
   const categories = useMemo(() => [...new Set(agg.map((a) => a.category).filter((c): c is string => !!c))].sort(), [agg]);
   const bucketCats = useMemo(() => categoriesInBucket(categories, tab), [categories, tab]);
+  // Distinct to-do groups per tab, for the count beside each tab label.
+  const tabCounts = useMemo(() => {
+    const c = Object.fromEntries(BUCKET_ORDER.map((b) => [b, 0])) as Record<FindingBucket, number>;
+    for (const g of allTodos) c[bucketForCategory(g.category)] += 1;
+    return c;
+  }, [allTodos]);
+  const tabEmpty = bucketCats.length === 0;
   const todoCats = useMemo(() => bucketCats.filter((c) => classForCategory(c) !== "informational"), [bucketCats]);
 
   // Class counts for the Category dropdown (distinct to-dos per class, this tab).
@@ -67,10 +75,19 @@ export function FindingsWorkspace({
   // double-counted. Falls back to the old summed aggregate if the per-line rollup
   // RPC isn't available yet (migration not run), so impact never shows $0.
   const hasLineData = lineRollup.length > 0;
-  // A line belongs to the active tab if its dominant category is in that bucket.
-  const tabLines = useMemo(() => lineRollup.filter((l) => bucketForCategory(l.category) === tab), [lineRollup, tab]);
+  // A line belongs to the active tab if ANY of its issues is in that bucket (not
+  // only its dominant one), so a line with a pricing issue and a charge-capture
+  // issue shows on both tabs, each with that tab's own count and dollars.
+  const tabLines = useMemo(() => lineRollup.filter((l) => l.categories.some((c) => bucketForCategory(c) === tab)), [lineRollup, tab]);
   const summedTabImpact = useMemo(() => agg.filter((a) => bucketForCategory(a.category) === tab).reduce((s, a) => s + a.impact, 0), [agg, tab]);
-  const tabDedupImpact = useMemo(() => hasLineData ? tabLines.reduce((s, l) => s + (l.max || 0), 0) : summedTabImpact, [hasLineData, tabLines, summedTabImpact]);
+  const tabDedupImpact = useMemo(() => {
+    if (!hasLineData) return summedTabImpact;
+    return tabLines.reduce((s, l) => {
+      if (Object.keys(l.byCat).length === 0) return s + (l.max || 0);
+      let m = 0; for (const c of l.categories) if (bucketForCategory(c) === tab) m = Math.max(m, l.byCat[c]?.m || 0);
+      return s + m;
+    }, 0);
+  }, [hasLineData, tabLines, summedTabImpact, tab]);
 
   // Effective category restriction from the active filters (fix-type class +
   // category multiselect). null = no restriction, so lines show their totals.
@@ -82,9 +99,12 @@ export function FindingsWorkspace({
   const effSet = useMemo<string[] | null>(() => {
     const classCats = activeClass ? categoriesInClass(categories, activeClass) : null;
     const sel = selectedCats.length ? selectedCats : null;
-    if (classCats && sel) return sel.filter((c) => classCats.includes(c));
-    return classCats ?? sel;
-  }, [activeClass, categories, selectedCats]);
+    // Always scoped to the active tab's categories, then narrowed by the filters.
+    let base = bucketCats;
+    if (classCats) base = base.filter((c) => classCats.includes(c));
+    if (sel) base = base.filter((c) => sel.includes(c));
+    return base;
+  }, [activeClass, categories, selectedCats, bucketCats]);
 
   const matchesCat = useCallback((l: LineRow) => !effSet || l.categories.some((c) => effSet.includes(c)), [effSet]);
   // Issue count on a line within the active category set (total when unrestricted
@@ -185,14 +205,19 @@ export function FindingsWorkspace({
     <div className="max-w-7xl mx-auto space-y-4">
       {/* Tabs */}
       <div className="flex items-center gap-3 border-b border-[#e2e8f0]">
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
-            <button key={t} onClick={() => reset(t)} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#1e293b] text-[#1e293b]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</button>
+            <button key={t} onClick={() => reset(t)} className={`px-3.5 py-2 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap ${tab === t ? "border-[#197ff9] text-[#0f172a]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>
+              {BUCKET_LABELS[t]}
+              {t !== "peer" && <span className={`ml-1.5 text-[11px] font-medium tabular-nums ${tabCounts[t] ? "text-[#64748b]" : "text-[#cbd5e1]"}`}>{tabCounts[t].toLocaleString()}</span>}
+            </button>
           ))}
+          <a href={`/departments?auditId=${auditId}`} className="px-3.5 py-2 text-[13px] font-semibold border-b-2 -mb-px border-transparent text-[#64748b] hover:text-[#334155] whitespace-nowrap" title="Findings rolled up by department (from the GL / Department List)">By Department</a>
         </div>
       </div>
 
-      {tab === "peer" ? <PeerAnalysisTab auditId={auditId} /> : (<>
+      {tab === "peer" ? (<><TabReasoningPanel tab="peer" /><PeerAnalysisTab auditId={auditId} /></>) : tabEmpty ? (<><TabEmptyState tab={tab} auditId={auditId} /><TabReasoningPanel tab={tab} defaultOpen /></>) : (<>
+        <TabReasoningPanel tab={tab} />
         {/* Top findings by impact (collapsible) */}
         {rollup.length > 0 && (
           <div className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">

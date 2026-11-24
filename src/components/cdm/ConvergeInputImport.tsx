@@ -7,7 +7,7 @@ import { parseClaimsExtract, parseItemMaster, parseGlDepartments } from "@/lib/c
 
 type Kind = "claims-extract" | "item-master" | "gl";
 
-const CONFIG: Record<Kind, { label: string; endpoint: string; parse: (t: string) => { rows: any[]; meta: { rows: number } }; title: string }> = {
+const CONFIG: Record<Kind, { label: string; endpoint: string; parse: (t: string) => { rows: any[]; meta: { rows: number; phi?: { removedColumns: string[]; transformedValues: number } } }; title: string }> = {
   "claims-extract": {
     label: "Import Claims Extract", endpoint: "/api/import-claims-extract", parse: parseClaimsExtract,
     title: "De-identified claims extract (claim number, HCPCS, billed/allowed/paid, denial/CARC, RARC, payer)",
@@ -26,16 +26,25 @@ export function ConvergeInputImport({ auditId, kind, label }: { auditId: string;
   const cfg = CONFIG[kind];
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [phiNote, setPhiNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setBusy(true); setMsg("Reading file…");
+    setBusy(true); setMsg("Reading file…"); setPhiNote(null);
     try {
       const text = await file.text();
       const { rows, meta } = cfg.parse(text);
+      // PHI guardrail report: identifier columns never leave the browser.
+      const phi = meta.phi;
+      if (phi && (phi.removedColumns.length || phi.transformedValues)) {
+        const parts: string[] = [];
+        if (phi.removedColumns.length) parts.push(`${phi.removedColumns.length} patient-identifier column${phi.removedColumns.length === 1 ? "" : "s"} left out and not uploaded (${phi.removedColumns.slice(0, 6).join(", ")}${phi.removedColumns.length > 6 ? ", …" : ""})`);
+        if (phi.transformedValues) parts.push(`${phi.transformedValues.toLocaleString()} claim reference value${phi.transformedValues === 1 ? "" : "s"} that looked like an SSN or Medicare ID replaced with a surrogate`);
+        setPhiNote(`PHI guardrail: ${parts.join("; ")}.`);
+      }
       if (rows.length === 0) { setMsg("No usable rows found. Expecting a CSV export."); setBusy(false); return; }
       const CHUNK = 1000;
       let inserted = 0;
@@ -68,6 +77,7 @@ export function ConvergeInputImport({ auditId, kind, label }: { auditId: string;
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {label || cfg.label}
       </button>
       {msg && <p className="text-xs text-[#64748b] mt-1">{msg}</p>}
+      {phiNote && <p className="text-xs text-[#8a5a1a] bg-[#fff8ec] border border-[#f5d99a] rounded-md px-2 py-1.5 mt-1.5">{phiNote}</p>}
     </div>
   );
 }

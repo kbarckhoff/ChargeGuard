@@ -10,7 +10,7 @@ import {
   runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules,
 } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
-import { runChargeCapturePairRules, runChargeCaptureBatch2Rules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
+import { runChargeCapturePairRules, runChargeCaptureBatch2Rules, runDenialRules, runPricingVsPaidRules, runEdDxCompanionRules } from "@/lib/converge-rules";
 import { runItemMasterRules } from "@/lib/item-master-rules";
 import { runPtpUnbundlingRules, runMueRules } from "@/lib/ncci-rules";
 import { runPeerCompetitorRules } from "@/lib/peer-rules";
@@ -117,9 +117,9 @@ cx.push(cxRow({ claim_id: "X1", hcpcs: "J9312", rev_code: "0636", billed_amount:
 // CC.admin_no_drug: admin code, no drug; anchor admin must be in CDM -> add 96365 to CDM
 push({ id: "ADM", charge_description: "IV infusion initial", hcpcs_cpt_code: "96365", revenue_code: "0260" });
 cx.push(cxRow({ claim_id: "X2", hcpcs: "96365", rev_code: "0260" }));                                  // CC.admin_no_drug
-// CC2.ed_chestpain_no_ecg: dx R07, no ECG; anchor is first code -> ensure that code in CDM
+// CC13.chestpain: dx R07, no ECG; anchor is first code -> ensure that code in CDM
 push({ id: "EDv", charge_description: "ED visit level 4", hcpcs_cpt_code: "99284", revenue_code: "0450" });
-cx.push(cxRow({ claim_id: "X3", hcpcs: "99284", rev_code: "0450", dx_code: "R07.9" }));                // CC2.ed_chestpain_no_ecg
+for (let i = 0; i < 5; i++) cx.push(cxRow({ claim_id: "X3" + i, hcpcs: "99284", rev_code: "0450", dx_code: "R07.9" }));                // CC13.chestpain
 // DEN: denial code recurring
 push({ id: "DENc", charge_description: "Drug admin", hcpcs_cpt_code: "96372", revenue_code: "0260" });
 cx.push(cxRow({ claim_id: "X4", hcpcs: "96372", rev_code: "0260", billed_amount: 500, paid_amount: 0, denial_code: "197" }));
@@ -169,6 +169,7 @@ const all: Any[] = [
   ...runPeerCompetitorRules(items, peerRows, new Set(formularyByCode.keys())),
   ...runChargeCapturePairRules(items, cx),
   ...runChargeCaptureBatch2Rules(items, cx),
+  ...runEdDxCompanionRules(items, cx),
   ...runDenialRules(items, cx),
   ...runPricingVsPaidRules(items, cx),
   ...runItemMasterRules(items, itemMaster),
@@ -222,7 +223,7 @@ const expect: { id: string; label: string; note?: string }[] = [
   { id: "PC.high", label: "Above competitors" },
   { id: "CC.drug_no_admin", label: "Drug w/o admin" },
   { id: "CC.admin_no_drug", label: "Admin w/o drug" },
-  { id: "CC2.ed_chestpain_no_ecg", label: "Chest pain w/o ECG (dx)" },
+  { id: "CC13.chestpain", label: "ED chest pain w/o ECG (dx rate)" },
   { id: "DEN", label: "Denial analysis" },
   { id: "PVP.low", label: "Pricing vs paid" },
   { id: "IM.device", label: "Item master device setup" },

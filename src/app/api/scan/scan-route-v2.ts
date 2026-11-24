@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { runReferenceRules, runDeviceCrosswalkRules, runCodingUpdateRules, runPriceTransparencyRules, runMultiplierRules, runFormularyRules, runBenchmarkRules, runModifierRules, runInternalPricingRules, runRvuRules } from "@/lib/cdm-reference-rules";
 import { runClaimsRules } from "@/lib/claims-rules";
-import { runChargeCapturePairRules, runChargeCaptureBatch2Rules, runDenialRules, runPricingVsPaidRules } from "@/lib/converge-rules";
+import { runChargeCapturePairRules, runChargeCaptureBatch2Rules, runDenialRules, runPricingVsPaidRules, runProcedureFollowOnRules, runAdminFamilyRules, runPayerSpecificRules, runEdDxCompanionRules } from "@/lib/converge-rules";
 import { runItemMasterRules } from "@/lib/item-master-rules";
 import { runPtpUnbundlingRules, runMueRules } from "@/lib/ncci-rules";
 import { loadRelevantPtp } from "@/lib/ncci";
@@ -219,6 +219,11 @@ export async function POST(request: Request) {
       // Converge batch 1 — rules that use the new de-identified inputs.
       ...runChargeCapturePairRules(allItems, claimsExtract),
       ...runChargeCaptureBatch2Rules(allItems, claimsExtract),
+      // Charge-capture batch 3 — Greg CC-10..CC-13 (follow-on rate, admin family, payer-specific, ED dx companions).
+      ...runProcedureFollowOnRules(allItems, claimsExtract),
+      ...runAdminFamilyRules(allItems, claimsExtract),
+      ...runPayerSpecificRules(allItems, claimsExtract),
+      ...runEdDxCompanionRules(allItems, claimsExtract),
       ...runDenialRules(allItems, claimsExtract),
       ...runPricingVsPaidRules(allItems, claimsExtract),
       ...runItemMasterRules(allItems, itemMaster),
@@ -250,6 +255,8 @@ export async function POST(request: Request) {
     // Drop findings the client deactivated and any line not yet effective this year.
     const ruleResults = ruleResultsAll.filter(
       (r) => !disabledRules.has(r.rule_id)
+        // Denial findings carry the CARC in the id (DEN.<carc>); the catalog toggle is the bare "DEN".
+        && !(r.rule_id.startsWith("DEN.") && disabledRules.has("DEN"))
         && !(r.charge_item_id && notYetEffective.has(r.charge_item_id))
     );
 

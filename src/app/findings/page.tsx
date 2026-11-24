@@ -8,7 +8,8 @@ import { RecordTable, type RecordLine } from "@/components/audit/RecordTable";
 import { FindingsWorkspace } from "@/components/audit/FindingsWorkspace";
 import { ReviewPicker } from "@/components/findings/ReviewPicker";
 import { PeerAnalysisTab } from "@/components/assessment/AssessmentFlow";
-import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, type FindingBucket } from "@/lib/finding-buckets";
+import { bucketForCategory, categoriesInBucket, BUCKET_LABELS, BUCKET_ORDER, type FindingBucket } from "@/lib/finding-buckets";
+import { TabReasoningPanel } from "@/components/findings/TabReasoningPanel";
 import { classForCategory, categoriesInClass, CLASS_LABELS, CLASS_BLURB, type FindingClass } from "@/lib/finding-class";
 import { AlertTriangle, ChevronDown, Table, FileDown, SlidersHorizontal } from "lucide-react";
 
@@ -18,7 +19,7 @@ export default async function FindingsPage({
   searchParams: Promise<{ severity?: string; status?: string; category?: string; page?: string; search?: string; auditId?: string; tab?: string; tier?: string; assignee?: string; class?: string; view?: string }>;
 }) {
   const sp = await searchParams;
-  const TABS: FindingBucket[] = ["cdm", "rvu", "formulary", "peer"];
+  const TABS: FindingBucket[] = BUCKET_ORDER;
   const tab: FindingBucket = TABS.includes(sp.tab as FindingBucket) ? (sp.tab as FindingBucket) : "cdm";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -373,9 +374,9 @@ export default async function FindingsPage({
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-4">
-          {/* Sub-tabs: CDM | RVU | Formulary | Peer Review */}
+          {/* Sub-tabs: one per output view (see finding-buckets.ts) */}
           <div className="flex items-center gap-3 border-b border-[#e2e8f0]">
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto">
               {TABS.map((t) => (
                 <a key={t} href={`/findings?auditId=${auditId}&tab=${t}`} className={`px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px ${tab === t ? "border-[#1e293b] text-[#1e293b]" : "border-transparent text-[#64748b] hover:text-[#334155]"}`}>{BUCKET_LABELS[t]}</a>
               ))}
@@ -383,6 +384,7 @@ export default async function FindingsPage({
           </div>
 
           {tab === "peer" ? <PeerAnalysisTab auditId={auditId!} /> : (<>
+          <TabReasoningPanel tab={tab} />
           {/* Top findings by impact: roll up the raw flags into systemic issues. */}
           {rollup.length > 0 && (
             <details className="group bg-white rounded-xl border border-[#e2e8f0] overflow-hidden">
