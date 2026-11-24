@@ -51,7 +51,7 @@ const RU: IntakeFile = {
   title: "Revenue & Usage",
   desc: "Revenue and usage by charge code. Drives materiality and payer-impact ranking.",
   accepts: "Excel (.xlsx) or CSV",
-  required: true,
+  required: false,
   handler: "ru",
   countKey: "ru",
   spec: [
@@ -71,7 +71,7 @@ const FORMULARY: IntakeFile = {
   title: "Formulary",
   desc: "Pharmacy formulary with NDC and package units. Validates drug billing units and NDC-to-HCPCS mapping.",
   accepts: "Excel (.xlsx) or CSV",
-  required: true,
+  required: false,
   handler: "formulary",
   countKey: "formulary",
   spec: [
@@ -90,7 +90,7 @@ const CLAIMS_EXTRACT: IntakeFile = {
   title: "Claims Extract (de-identified)",
   desc: "Preferred claims input. One row per adjudicated claim line with denial and payment detail. Keep it de-identified — use an internal claim reference number, no patient PHI.",
   accepts: "CSV",
-  required: true,
+  required: false,
   handler: "claims_extract",
   countKey: "claims_extract",
   spec: [
@@ -120,7 +120,7 @@ const ITEM_MASTER: IntakeFile = {
   title: "Item Master",
   desc: "The hospital item master. Used to catch device, C-code, and revenue-code setup errors between the item master and the chargemaster.",
   accepts: "CSV",
-  required: true,
+  required: false,
   handler: "item_master",
   countKey: "item_master",
   spec: [
@@ -142,7 +142,7 @@ const GL_DEPARTMENTS: IntakeFile = {
   title: "GL / Department List",
   desc: "From Finance: GL numbers mapped to department names (and the charge-code prefix that routes a charge to its department). Used to roll findings up by department.",
   accepts: "CSV",
-  required: true,
+  required: false,
   handler: "gl",
   countKey: "gl",
   spec: [
